@@ -2,39 +2,38 @@
   <div class="app-root">
     <!-- Sidebar -->
     <aside class="sidebar">
-      <div class="sidebar-logo">
-        <div class="logo-icon"><ShoppingCart class="w-8 h-8 text-primary" /></div>
+      <div class="sidebar-logo" style="padding-top: 28px; height: calc(var(--header-h) + 28px);">
+        <div class="logo-icon"><ShoppingCart class="w-5 h-5 text-white" /></div>
         <div class="logo-text-wrap">
-          <div class="logo-text">CrossList</div>
-          <div class="logo-sub">Amazon → eBay</div>
+          <div class="logo-text">eBay Tool</div>
         </div>
       </div>
 
       <nav class="sidebar-nav flex flex-col gap-1 p-2">
         <div class="nav-label text-xs font-semibold text-muted-foreground px-2 py-1 uppercase tracking-wider">Công cụ</div>
         <Button 
-          variant="ghost" 
-          :class="['w-full justify-start', currentPage === 'workspace' ? 'bg-secondary' : '']" 
-          @click="currentPage = 'workspace'"
-        >
-          <LayoutDashboard class="w-4 h-4 mr-2" />
-          Workspace
-          <Badge v-if="stats.total > 0" variant="secondary" class="ml-auto">{{ stats.total }}</Badge>
-        </Button>
-        <Button 
-          variant="ghost" 
-          :class="['w-full justify-start', currentPage === 'queue' ? 'bg-secondary' : '']" 
+          :variant="currentPage === 'queue' ? 'secondary' : 'ghost'" 
+          class="w-full justify-start"
           @click="currentPage = 'queue'"
         >
           <ListOrdered class="w-4 h-4 mr-2" />
-          Hàng đợi
-          <Badge v-if="stats.pending > 0" variant="secondary" class="ml-auto">{{ stats.pending }}</Badge>
+          Amazon Crawler
+          <Badge v-if="stats.pending > 0" variant="outline" class="ml-auto bg-background">{{ stats.pending }}</Badge>
+        </Button>
+        <Button 
+          :variant="currentPage === 'workspace' ? 'secondary' : 'ghost'" 
+          class="w-full justify-start"
+          @click="currentPage = 'workspace'"
+        >
+          <LayoutDashboard class="w-4 h-4 mr-2" />
+          Xử lý & Export
+          <Badge v-if="stats.total > 0" variant="outline" class="ml-auto bg-background">{{ stats.total }}</Badge>
         </Button>
 
         <div class="nav-label text-xs font-semibold text-muted-foreground px-2 py-1 mt-4 uppercase tracking-wider">Cài đặt</div>
         <Button 
-          variant="ghost" 
-          :class="['w-full justify-start', currentPage === 'settings' ? 'bg-secondary' : '']" 
+          :variant="currentPage === 'settings' ? 'secondary' : 'ghost'" 
+          class="w-full justify-start"
           @click="currentPage = 'settings'"
         >
           <SettingsIcon class="w-4 h-4 mr-2" />
@@ -43,14 +42,19 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div style="font-size:10px; color: var(--text-muted); text-align:center;">v1.0.0 · Playwright Engine</div>
+        <div style="font-size:10px; color: var(--text-muted); text-align:center;">v1.0.0</div>
       </div>
     </aside>
 
     <!-- Main area -->
     <div class="main-area">
       <Workspace
-        v-if="currentPage === 'workspace' || currentPage === 'queue'"
+        v-if="currentPage === 'workspace'"
+        :settings="settings"
+        @stats-update="handleStatsUpdate"
+      />
+      <Queue
+        v-else-if="currentPage === 'queue'"
         :settings="settings"
         @stats-update="handleStatsUpdate"
       />
@@ -66,12 +70,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Workspace from './components/Workspace.vue'
+import Queue from './components/Queue.vue'
 import Settings from './components/Settings.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ShoppingCart, LayoutDashboard, ListOrdered, Settings as SettingsIcon } from 'lucide-vue-next'
 
-const currentPage = ref('workspace')
+const currentPage = ref('queue') // Default to queue
+
 const stats = ref({ total: 0, pending: 0, done: 0, error: 0 })
 
 const settings = ref({

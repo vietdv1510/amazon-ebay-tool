@@ -29,6 +29,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "reka-ui": "^2.9.6",
     "tailwind-merge": "^3.5.0",
+    "tailwindcss-animate": "^1.0.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
