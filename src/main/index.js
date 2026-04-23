@@ -27,6 +27,7 @@ function loadSettings() {
     crawlThreads: 3,
     crawlDelay: 2,
     crawlRetry: 3,
+    headlessMode: true,
     ebayEnv: 'sandbox',
     ebayClientId: '',
     ebayClientSecret: '',
@@ -164,7 +165,7 @@ ipcMain.handle('crawl:asin', async (_, asin) => {
         }
       },
       {
-        headless: settings.headlessMode !== false, // default true
+        headless: settings.headlessMode === true,
         delay: settings.crawlDelay ?? 2,
       }
     )

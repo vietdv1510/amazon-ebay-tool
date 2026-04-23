@@ -9,7 +9,6 @@ let currentHeadless = true
 const activeCrawls = new Map()
 
 export async function initBrowser(headless = true) {
-  // Nếu headless mode thay đổi → restart browser
   if (browser && currentHeadless !== headless) {
     await closeBrowser()
   }
@@ -48,73 +47,303 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     }
   })
 
+  // ── Force US region via cookies ─────────────────────────────────────────
+  await context.addCookies([
+    { name: 'i18n-prefs', value: 'USD', domain: '.amazon.com', path: '/' },
+    { name: 'lc-main', value: 'en_US', domain: '.amazon.com', path: '/' },
+    { name: 'sp-cdn', value: '"L5Z9:US"', domain: '.amazon.com', path: '/' },
+  ])
+
   const page = await context.newPage()
   activeCrawls.set(asin, page)
-  progressCb('[PROGRESS] Khởi động Playwright...')
+  progressCb('[PROGRESS] Khởi động trình duyệt...')
 
   try {
     const url = `https://www.amazon.com/dp/${asin}`
-    progressCb(`[PROGRESS] Mở trang ${url}`)
-
+    progressCb(`[PROGRESS] Mở trang Amazon...`)
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 35000 })
 
-    // Random delay để tránh bot detection
     const waitMs = (delay * 1000) + Math.random() * 1000
-    progressCb('[PROGRESS] Đang render trang...')
+    progressCb('[PROGRESS] Đang chờ trang tải...')
     await page.waitForTimeout(waitMs)
 
-    progressCb('[PROGRESS] Trích xuất dữ liệu...')
+    // ── Try to set US delivery address ────────────────────────────────────
+    progressCb('[PROGRESS] Đang thiết lập vùng US...')
+    try {
+      await trySetUSDelivery(page)
+    } catch (_) {
+      // Non-critical, continue with whatever region is available
+    }
+
+    progressCb('[PROGRESS] Trích xuất dữ liệu sản phẩm...')
     const html = await page.content()
     const $ = cheerio.load(html)
 
-    // ── Title ──────────────────────────────────────────────────────────────
+    // ── Title ────────────────────────────────────────────────────────────
     const title = $('#productTitle').text().trim()
     if (!title && html.includes('captcha')) {
-      throw new Error('Amazon Anti-Bot Captcha triggered — thử lại sau.')
+      throw new Error('Amazon Anti-Bot Captcha — thử lại sau hoặc tắt Headless Mode.')
     }
     if (!title) throw new Error('Không tìm thấy tiêu đề sản phẩm.')
 
-    // ── Price ──────────────────────────────────────────────────────────────
-    let priceText = $('.a-price .a-offscreen').first().text().trim()
-    if (!priceText) priceText = $('#priceblock_ourprice').text().trim()
-    if (!priceText) priceText = $('#corePrice_feature_div .a-offscreen').first().text().trim()
-    const priceMatch = priceText.match(/[\d.,]+/)
-    const price = priceMatch ? parseFloat(priceMatch[0].replace(',', '')) : 0
+    // ── Price — FIXED: use JS data first, then careful DOM parsing ──────
+    progressCb('[PROGRESS] Đang lấy thông tin giá...')
+    let price = 0
 
-    // ── Images ─────────────────────────────────────────────────────────────
+    // Method 1 (BEST): Parse from embedded JS data
+    const jsPriceMatch = html.match(/"priceAmount"\s*:\s*([\d.]+)/)
+    if (jsPriceMatch) {
+      price = parseFloat(jsPriceMatch[1])
+    }
+
+    // Method 2: Parse whole+fraction from DOM
+    if (!price) {
+      const whole = $('#corePrice_feature_div .a-price-whole').first().text().replace(/[^0-9]/g, '')
+      const fraction = $('#corePrice_feature_div .a-price-fraction').first().text().replace(/[^0-9]/g, '')
+      if (whole) {
+        price = parseFloat(`${whole}.${fraction || '00'}`)
+      }
+    }
+
+    // Method 3: Fallback to first a-offscreen but only take first element
+    if (!price) {
+      const firstOffscreen = $('#corePrice_feature_div .a-offscreen').first().text().trim()
+      const match = firstOffscreen.match(/\$([\d,]+\.?\d*)/)
+      if (match) price = parseFloat(match[1].replace(',', ''))
+    }
+
+    // ── Price Range ─────────────────────────────────────────────────────
+    let priceRange = ''
+    const rangeEl = $('#corePrice_feature_div .a-price-range')
+    if (rangeEl.length) {
+      const prices = rangeEl.find('.a-offscreen').map((_, el) => $(el).text().trim()).get()
+      if (prices.length >= 2) priceRange = `${prices[0]} - ${prices[1]}`
+    }
+
+    // ── Images — FIXED: multiple extraction methods ─────────────────────
+    progressCb('[PROGRESS] Đang tải hình ảnh...')
     let images = []
-    const imgScript = html.match(/"colorImages":\s*\{\s*"initial":\s*(\[.*?\])\s*\}/)
-    if (imgScript?.[1]) {
+
+    // Method 1: Parse from imageGalleryData or colorImages in JS
+    const imgDataPatterns = [
+      /"colorImages"\s*:\s*\{\s*"initial"\s*:\s*(\[[\s\S]*?\])\s*\}/,
+      /"imageGalleryData"\s*:\s*(\[[\s\S]*?\])\s*[,}]/,
+    ]
+    for (const pat of imgDataPatterns) {
+      if (images.length > 0) break
+      const m = html.match(pat)
+      if (m?.[1]) {
+        try {
+          const parsed = JSON.parse(m[1])
+          images = parsed
+            .map(i => i.hiRes || i.large || i.mainUrl || '')
+            .filter(Boolean)
+        } catch (_) {}
+      }
+    }
+
+    // Method 2: Extract all image URLs from the JS data (broader search)
+    if (images.length === 0) {
+      const allHiRes = [...html.matchAll(/"hiRes"\s*:\s*"(https:\/\/[^"]+)"/g)]
+      if (allHiRes.length > 0) {
+        images = [...new Set(allHiRes.map(m => m[1]))]
+      }
+    }
+
+    // Method 3: Parse from DOM using Playwright (more reliable than cheerio for lazy-loaded)
+    if (images.length === 0) {
       try {
-        const parsed = JSON.parse(imgScript[1])
-        images = parsed.map(i => i.hiRes || i.large).filter(Boolean)
+        images = await page.$$eval(
+          '#altImages .a-spacing-small img, #imageBlock img, .imageThumbnail img',
+          els => {
+            const urls = []
+            for (const el of els) {
+              let src = el.src || el.getAttribute('data-old-hires') || ''
+              // Convert thumbnail to full-size
+              src = src.replace(/\._.*_\./, '.')
+              if (src && !src.includes('sprite') && !src.includes('grey-pixel') && !src.includes('play-icon')) {
+                urls.push(src)
+              }
+            }
+            return [...new Set(urls)]
+          }
+        )
       } catch (_) {}
     }
+
+    // Method 4: Fallback to landing image
     if (images.length === 0) {
-      const mainImg = $('#landingImage').attr('src') || $('#imgBlkFront').attr('src')
-      if (mainImg) images.push(mainImg)
+      const mainImg = await page.$eval('#landingImage', el => {
+        return el.getAttribute('data-old-hires') || el.src || ''
+      }).catch(() => '')
+      if (mainImg) images.push(mainImg.replace(/\._.*_\./, '.'))
     }
 
-    // ── Brand ──────────────────────────────────────────────────────────────
-    const brand = $('#bylineInfo').text()
+    // Deduplicate & clean
+    images = [...new Set(images)].filter(url => url && url.startsWith('http'))
+
+    // ── Brand ───────────────────────────────────────────────────────────
+    let brand = $('#bylineInfo').text()
       .replace(/^Visit the\s+/i, '')
+      .replace(/^Brand:\s*/i, '')
       .replace(/\s+Store$/i, '')
       .trim()
 
-    // ── Specs ──────────────────────────────────────────────────────────────
+    // ── Rating & Reviews ────────────────────────────────────────────────
+    progressCb('[PROGRESS] Đang lấy đánh giá...')
+    const ratingText = $('#acrPopover .a-icon-alt').first().text().trim()
+    const ratingMatch = ratingText.match(/([\d.]+)\s*out/)
+    const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0
+
+    const reviewCountText = $('#acrCustomerReviewText').first().text().trim()
+    const reviewMatch = reviewCountText.match(/([\d,]+)/)
+    const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(',', ''), 10) : 0
+
+    // ── Bullet Points ───────────────────────────────────────────────────
+    const bulletPoints = []
+    $('#feature-bullets li span.a-list-item').each((_, el) => {
+      const txt = $(el).text().trim()
+      if (txt && txt.length > 5) bulletPoints.push(txt)
+    })
+
+    // ── Description ─────────────────────────────────────────────────────
+    let description = ''
+    let descriptionHtml = ''
+    const descriptionImages = []
+
+    const descEl = $('#productDescription')
+    if (descEl.length) {
+      description = descEl.text().trim().replace(/\s+/g, ' ')
+      descriptionHtml = descEl.html()?.trim() || ''
+    }
+
+    // A+ content
+    const aplusEl = $('#aplus-content, #aplus, #aplusProductDescription')
+    if (aplusEl.length) {
+      if (!description) {
+        description = aplusEl.text().trim().replace(/\s+/g, ' ').substring(0, 3000)
+      }
+      if (!descriptionHtml) {
+        descriptionHtml = aplusEl.html()?.trim() || ''
+      }
+      // Extract A+ images via Playwright (cheerio misses lazy-loaded)
+      try {
+        const aplusImgs = await page.$$eval(
+          '#aplus-content img, #aplus img, #aplusProductDescription img',
+          els => els
+            .filter(img => {
+              const w = img.naturalWidth || img.width || 0
+              const h = img.naturalHeight || img.height || 0
+              // Filter out 1x1 placeholders and tiny icons
+              return (w > 10 && h > 10) || (!w && !h)
+            })
+            .map(img => {
+              let src = img.getAttribute('data-src') || img.src || ''
+              // Convert to full resolution
+              src = src.replace(/\._.*_\./, '.')
+              return src
+            })
+            .filter(src => src && src.startsWith('http') && !src.includes('sprite') && !src.includes('grey-pixel'))
+        )
+        for (const src of aplusImgs) {
+          if (!descriptionImages.includes(src)) descriptionImages.push(src)
+        }
+      } catch (_) {}
+    }
+
+    // ── Technical Specs ─────────────────────────────────────────────────
+    progressCb('[PROGRESS] Đang lấy thông số kỹ thuật...')
     const specs = {}
+
     $('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr').each((_, el) => {
       const key = $(el).find('th').text().trim()
       const val = $(el).find('td').text().replace(/\s+/g, ' ').trim()
       if (key && val) specs[key] = val
     })
 
-    // ── Variations ─────────────────────────────────────────────────────────
-    progressCb('[PROGRESS] Đang tìm biến thể...')
-    const variations = await extractVariations($, html, price)
+    $('#detailBullets_feature_div li, #detailBulletsWrapper_feature_div li').each((_, el) => {
+      const spans = $(el).find('span span')
+      if (spans.length >= 2) {
+        const key = $(spans[0]).text().replace(/[:\u200F\u200E\s]+/g, ' ').trim()
+        const val = $(spans[1]).text().replace(/[:\u200F\u200E\s]+/g, ' ').trim()
+        if (key && val && key.length < 60 && !key.includes('Customer Reviews') && !val.includes('P.when')) {
+          specs[key] = val
+        }
+      }
+    })
 
-    progressCb('[PROGRESS] ✓ Hoàn tất cào dữ liệu!')
-    return { asin, title, priceConfigured: price, originalPrice: price, brand, images, specs, variations }
+    $('#productOverview_feature_div tr').each((_, el) => {
+      const key = $(el).find('td.a-span3 span').text().trim()
+      const val = $(el).find('td.a-span9 span').text().trim()
+      if (key && val) specs[key] = val
+    })
+
+    // ── Important Information (Safety, Ingredients, Directions) ────────
+    progressCb('[PROGRESS] Đang lấy thông tin quan trọng...')
+    const importantInfo = {}
+    try {
+      const importantEl = $('#important-information, #importantInformation')
+      if (importantEl.length) {
+        importantEl.find('h4, .a-text-bold').each((_, h) => {
+          const title = $(h).text().trim()
+          let content = ''
+          let next = $(h).next()
+          while (next.length && !next.is('h4') && !next.is('h3') && !next.hasClass('a-text-bold')) {
+            content += next.text().trim() + ' '
+            next = next.next()
+          }
+          if (title && content.trim()) {
+            importantInfo[title] = content.trim()
+          }
+        })
+      }
+    } catch (_) {}
+
+    // ── Availability ────────────────────────────────────────────────────
+    const availabilityText = $('#availability span').first().text().trim()
+    const inStock = availabilityText.toLowerCase().includes('in stock')
+
+    // ── Categories ──────────────────────────────────────────────────────
+    const categories = []
+    $('#wayfinding-breadcrumbs_feature_div li a, #wayfinding-breadcrumbs_container li a').each((_, el) => {
+      const cat = $(el).text().trim()
+      if (cat) categories.push(cat)
+    })
+
+    // ── BSR ──────────────────────────────────────────────────────────────
+    let bsr = ''
+    $('#productDetails_detailBullets_sections1 tr, #detailBulletsWrapper_feature_div li').each((_, el) => {
+      const text = $(el).text()
+      if (text.includes('Best Sellers Rank') || text.includes('Amazon Best Sellers Rank')) {
+        bsr = text.replace(/\s+/g, ' ').trim()
+      }
+    })
+
+    // ── Variations — FIXED: comprehensive parsing ───────────────────────
+    progressCb('[PROGRESS] Đang phân tích biến thể sản phẩm...')
+    const variations = await extractVariations($, html, page, price, progressCb)
+
+    progressCb('[PROGRESS] ✓ Hoàn tất crawl!')
+    return {
+      asin,
+      title,
+      priceConfigured: price,
+      originalPrice: price,
+      priceRange,
+      brand,
+      images,
+      specs,
+      importantInfo,
+      variations,
+      bulletPoints,
+      description,
+      descriptionHtml,
+      descriptionImages,
+      categories,
+      bsr,
+      inStock,
+      availability: availabilityText,
+    }
 
   } finally {
     await page.close().catch(() => {})
@@ -124,39 +353,323 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 }
 
 /**
- * Parse Amazon variation data from inline JS
+ * Attempt to set US delivery address to get proper US prices.
+ * Wrapped with a hard timeout to prevent hanging.
  */
-function extractVariations($, html, basePrice) {
+async function trySetUSDelivery(page) {
+  const result = await Promise.race([
+    _doSetUSDelivery(page),
+    new Promise(resolve => setTimeout(() => resolve('timeout'), 15000))
+  ])
+  if (result === 'timeout') {
+    console.log('[trySetUSDelivery] Timed out, closing popups...')
+    await page.keyboard.press('Escape').catch(() => {})
+    await page.waitForTimeout(1000)
+  }
+  // Ensure page is stable before continuing
+  await page.waitForLoadState('domcontentloaded').catch(() => {})
+  await page.waitForTimeout(500)
+}
+
+async function _doSetUSDelivery(page) {
+  const deliverTo = await page.$('#glow-ingress-block, #nav-global-location-popover-link')
+  if (!deliverTo) return
+
+  const deliveryText = await deliverTo.textContent().catch(() => '')
+  if (deliveryText?.includes('United States') || deliveryText?.includes('US')) return
+
+  await deliverTo.click()
+  await page.waitForTimeout(1500)
+
+  const zipInput = await page.$('#GLUXZipUpdateInput')
+  if (zipInput) {
+    await zipInput.fill('10001')
+    const applyBtn = await page.$('#GLUXZipUpdate input[type="submit"], #GLUXZipUpdate .a-button-input')
+    if (applyBtn) {
+      await applyBtn.click()
+      await page.waitForTimeout(2500)
+    }
+
+    // Handle "Continue" confirmation popup
+    const continueBtn = await page.$('.a-popover-footer .a-button-primary .a-button-input, #GLUXConfirmClose .a-button-input, .a-popover .a-button-primary .a-button-input')
+    if (continueBtn) {
+      await continueBtn.click()
+      await page.waitForTimeout(1500)
+    }
+    // Also try text-based button
+    const continueText = await page.$('input[aria-labelledby*="Continue"], button:has-text("Continue"), .a-button-primary:has-text("Continue")')
+    if (continueText) {
+      await continueText.click().catch(() => {})
+      await page.waitForTimeout(1500)
+    }
+
+    // Close any remaining popups
+    await page.keyboard.press('Escape').catch(() => {})
+    await page.waitForTimeout(500)
+
+    // Reload to refresh prices
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(2000)
+  } else {
+    await page.keyboard.press('Escape').catch(() => {})
+  }
+}
+
+/**
+ * Enhanced variation extraction
+ * Uses multiple strategies: twister JS data, DOM swatches, dimension display data
+ */
+async function extractVariations($, html, page, basePrice, progressCb) {
   const variations = []
   try {
-    // Amazon embeds variation data in twisterJS or dimensionValuesDisplayData
-    const twisterMatch = html.match(/var\s+dataToReturn\s*=\s*(\{.*?"asin_variation_values".*?\});/s)
-    if (!twisterMatch) return variations
-
-    // Try to get dimension names
+    // ── Parse dimension names ──────────────────────────────────────────
     const dimNamesMatch = html.match(/"dimensions"\s*:\s*(\[.*?\])/)
-    const dimNames = dimNamesMatch ? JSON.parse(dimNamesMatch[1]) : []
+    let dimNames = []
+    if (dimNamesMatch) {
+      try { dimNames = JSON.parse(dimNamesMatch[1]) } catch (_) {}
+    }
 
-    const asinVariations = html.match(/"asin_variation_values"\s*:\s*(\{[^}]+\})/)
-    if (!asinVariations) return variations
-
-    const asinMap = JSON.parse(asinVariations[1])
-    const dimDisplay = html.match(/"dimensionValuesDisplayData"\s*:\s*(\{.*?\}\s*\})/)
-
+    // ── Parse dimensionValuesDisplayData ────────────────────────────────
+    // This maps ASIN → display values array
     let displayMap = {}
-    if (dimDisplay) {
-      try { displayMap = JSON.parse(dimDisplay[1]) } catch (_) {}
+    const dimDisplayMatch = html.match(/"dimensionValuesDisplayData"\s*:\s*(\{[\s\S]*?\})\s*,\s*"/)
+    if (dimDisplayMatch) {
+      try { displayMap = JSON.parse(dimDisplayMatch[1]) } catch (_) {}
     }
 
-    for (const [childAsin, dimValues] of Object.entries(asinMap)) {
-      const attrs = {}
-      dimNames.forEach((dimName, i) => {
-        const rawVal = dimValues[i]
-        attrs[dimName] = displayMap[childAsin]?.[i] || rawVal || ''
-      })
-      variations.push({ asin: childAsin, attributes: attrs, price: basePrice, quantity: 10, image: '' })
+    // ── Parse asinVariationValues ──────────────────────────────────────
+    let asinMap = {}
+    const asinVarMatch = html.match(/"asin_variation_values"\s*:\s*(\{[\s\S]*?\})\s*,\s*"/)
+    if (asinVarMatch) {
+      try { asinMap = JSON.parse(asinVarMatch[1]) } catch (_) {}
     }
-  } catch (_) {}
+
+    // ── Parse variation price data ──────────────────────────────────────
+    // Method: extract all price info from twister data
+    let priceMap = {}
+    // Try to get per-ASIN prices from the page JS
+    const twisterMatch = html.match(/"twisterModel"\s*:\s*(\{[\s\S]*?\})\s*;\s*/)
+    if (twisterMatch) {
+      try {
+        // Extract price data per ASIN from twister model
+        const allPrices = [...html.matchAll(/"([A-Z0-9]{10})"\s*:\s*\{[^}]*"priceAmount"\s*:\s*([\d.]+)/g)]
+        for (const m of allPrices) {
+          priceMap[m[1]] = parseFloat(m[2])
+        }
+      } catch (_) {}
+    }
+
+    // ── Parse variation image data ──────────────────────────────────────
+    let imageMap = {}
+    // colorImages maps dimension value → image array
+    const colorImgsMatch = html.match(/"colorImages"\s*:\s*(\{[\s\S]*?\})\s*,\s*"colorToAsin/)
+    if (colorImgsMatch) {
+      try {
+        const colorData = JSON.parse(colorImgsMatch[1])
+        for (const [key, imgs] of Object.entries(colorData)) {
+          if (Array.isArray(imgs) && imgs.length > 0) {
+            imageMap[key] = (imgs[0].hiRes || imgs[0].large || '')
+          }
+        }
+      } catch (_) {}
+    }
+
+    // ── colorToAsin mapping ────────────────────────────────────────────
+    let colorToAsin = {}
+    const c2aMatch = html.match(/"colorToAsin"\s*:\s*(\{[\s\S]*?\})\s*[,}]\s*"/)
+    if (c2aMatch) {
+      try { colorToAsin = JSON.parse(c2aMatch[1]) } catch (_) {}
+    }
+
+    // ── Strategy 1: Use displayMap (most reliable) ─────────────────────
+    if (Object.keys(displayMap).length > 0 && dimNames.length > 0) {
+      for (const [childAsin, displayValues] of Object.entries(displayMap)) {
+        if (!Array.isArray(displayValues) || displayValues.length === 0) continue
+
+        const attributes = {}
+        dimNames.forEach((dimName, i) => {
+          // Convert snake_case to readable: "flavor_name" → "Flavor Name"
+          const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          attributes[readableName] = displayValues[i] || ''
+        })
+
+        let varPrice = priceMap[childAsin] || basePrice
+        let varImage = ''
+
+        // Try to match image by first dimension value
+        const firstVal = displayValues[0] || ''
+        if (imageMap[firstVal]) varImage = imageMap[firstVal]
+
+        // Also try colorToAsin mapping
+        if (!varImage && colorToAsin[firstVal]?.asin) {
+          const mappedAsin = colorToAsin[firstVal].asin
+          if (imageMap[mappedAsin]) varImage = imageMap[mappedAsin]
+        }
+
+        variations.push({
+          asin: childAsin,
+          attributes,
+          price: varPrice,
+          quantity: 10,
+          image: varImage,
+        })
+      }
+    }
+
+    // ── Strategy 2: Use asinVariationValues ────────────────────────────
+    if (variations.length === 0 && Object.keys(asinMap).length > 0) {
+      for (const [childAsin, dimValues] of Object.entries(asinMap)) {
+        const attributes = {}
+        dimNames.forEach((dimName, i) => {
+          const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          const rawVal = Array.isArray(dimValues) ? dimValues[i] : ''
+          attributes[readableName] = rawVal || ''
+        })
+
+        variations.push({
+          asin: childAsin,
+          attributes,
+          price: priceMap[childAsin] || basePrice,
+          quantity: 10,
+          image: '',
+        })
+      }
+    }
+
+    // ── Strategy 3: Parse from DOM (fallback) ──────────────────────────
+    if (variations.length === 0) {
+      const domVariations = await parseDOMVariations(page, dimNames, basePrice)
+      variations.push(...domVariations)
+    }
+
+    // ── Fetch real prices per variation (navigate each ASIN) ────────────
+    if (variations.length > 0) {
+      progressCb(`[PROGRESS] Lấy giá ${variations.length} biến thể...`)
+      const context = page.context()
+      for (let i = 0; i < variations.length; i++) {
+        const v = variations[i]
+        // Skip current ASIN (already have price) or if we already got price from JS
+        if (v.price !== basePrice && v.price > 0) continue
+
+        try {
+          progressCb(`[PROGRESS] Giá biến thể ${i + 1}/${variations.length}: ${v.asin}...`)
+          const varPage = await context.newPage()
+          await varPage.goto(`https://www.amazon.com/dp/${v.asin}`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 12000
+          })
+          await varPage.waitForTimeout(1500)
+          const vHtml = await varPage.content()
+
+          // Parse price
+          const jsPrice = vHtml.match(/"priceAmount"\s*:\s*([\d.]+)/)
+          if (jsPrice) {
+            v.price = parseFloat(jsPrice[1])
+          } else {
+            // DOM fallback
+            const whole = await varPage.$eval('#corePrice_feature_div .a-price-whole', el =>
+              el.textContent.replace(/[^0-9]/g, '')
+            ).catch(() => '')
+            const frac = await varPage.$eval('#corePrice_feature_div .a-price-fraction', el =>
+              el.textContent.replace(/[^0-9]/g, '')
+            ).catch(() => '00')
+            if (whole) v.price = parseFloat(`${whole}.${frac}`)
+          }
+
+          // Also grab the main image for this variant if missing
+          if (!v.image) {
+            v.image = await varPage.$eval('#landingImage', el =>
+              (el.getAttribute('data-old-hires') || el.src || '').replace(/\._.*_\./, '.')
+            ).catch(() => '')
+          }
+
+          await varPage.close()
+        } catch (err) {
+          // Non-critical: keep basePrice
+          console.log(`[variation ${v.asin}] price fetch failed:`, err.message?.substring(0, 60))
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error('extractVariations error:', err)
+  }
+  return variations
+}
+
+/**
+ * Parse variations directly from the DOM using Playwright
+ */
+async function parseDOMVariations(page, dimNames, basePrice) {
+  const variations = []
+
+  // Check for dropdown-style variations
+  const selects = await page.$$('#twister select')
+  if (selects.length > 0) {
+    for (const select of selects) {
+      const options = await select.$$eval('option', opts =>
+        opts
+          .filter(o => o.value && o.value !== '-1' && o.value !== '0')
+          .map(o => ({
+            value: o.value,
+            text: o.textContent.trim(),
+            asin: o.getAttribute('data-a-html-content') || '',
+          }))
+      )
+      const dimName = dimNames[0] || 'Option'
+      const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      for (const opt of options) {
+        variations.push({
+          asin: opt.value.length === 10 ? opt.value : `opt_${variations.length}`,
+          attributes: { [readableName]: opt.text },
+          price: basePrice,
+          quantity: 10,
+          image: '',
+        })
+      }
+    }
+    return variations
+  }
+
+  // Check for swatch-style variations (buttons/images)
+  const swatchSelectors = [
+    '#variation_color_name ul li[data-defaultasin]',
+    '#variation_size_name ul li[data-defaultasin]',
+    '#variation_style_name ul li[data-defaultasin]',
+    '#variation_flavor_name ul li[data-defaultasin]',
+    '#variation_pattern_name ul li[data-defaultasin]',
+  ]
+
+  for (let si = 0; si < swatchSelectors.length; si++) {
+    const sel = swatchSelectors[si]
+    const items = await page.$$(sel)
+    if (items.length === 0) continue
+
+    const dimName = dimNames[si] || `option_${si}`
+    const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+    for (const item of items) {
+      const data = await item.evaluate(el => ({
+        asin: el.getAttribute('data-defaultasin') || '',
+        title: el.getAttribute('title')?.replace(/^Click to select\s*/i, '') || el.querySelector('.a-size-base')?.textContent?.trim() || '',
+        img: (() => {
+          const img = el.querySelector('img')
+          return img ? (img.src || '').replace(/\._.*_\./, '.') : ''
+        })(),
+      }))
+
+      if (data.asin || data.title) {
+        variations.push({
+          asin: data.asin,
+          attributes: { [readableName]: data.title },
+          price: basePrice,
+          quantity: 10,
+          image: data.img,
+        })
+      }
+    }
+  }
+
   return variations
 }
 

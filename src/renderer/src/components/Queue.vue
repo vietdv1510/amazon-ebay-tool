@@ -3,23 +3,21 @@
     <!-- Header -->
     <div class="page-header">
       <span class="page-title">
-        Tiến trình Crawl
+        Amazon Crawler
       </span>
-
-
 
       <div class="header-actions flex gap-2">
         <Button variant="outline" size="sm" @click="handleImportFile">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <Upload class="w-4 h-4 mr-2" />
           Import
         </Button>
 
         <Button v-if="!isCrawling" size="sm" :disabled="!hasPendingRows" @click="startCrawl">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <Play class="w-4 h-4 mr-2" />
           Start Crawl
         </Button>
         <Button v-else variant="destructive" size="sm" @click="stopCrawl">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2"><rect x="3" y="3" width="18" height="18"/></svg>
+          <Square class="w-4 h-4 mr-2" />
           Stop
         </Button>
       </div>
@@ -30,9 +28,8 @@
       <div class="progress-fill" :style="{ width: progressPct + '%' }"></div>
     </div>
 
-    <!-- Content: Grid + Detail Panel -->
+    <!-- Content -->
     <div class="workspace-body">
-      <!-- Custom Table -->
       <div class="grid-area flex flex-col pt-4">
         <!-- Empty state -->
         <div v-if="rowData.length === 0" class="empty-state flex flex-col items-center justify-center h-full text-center">
@@ -42,20 +39,23 @@
           <h3 class="text-xl font-semibold mb-2">Chưa có sản phẩm</h3>
           <p class="text-muted-foreground mb-6 max-w-md">Import file Excel/CSV chứa cột ASIN để bắt đầu crawl dữ liệu từ Amazon.</p>
           <Button size="lg" @click="handleImportFile" class="shadow-sm">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <Upload class="w-5 h-5 mr-2" />
             Import file ASIN
           </Button>
         </div>
 
         <div v-else class="flex-1 h-full overflow-auto bg-card rounded-lg border shadow-sm mx-4 mb-4">
           <Table class="relative w-full">
-            <TableHeader class="sticky top-0 bg-secondary/90 backdrop-blur z-10 shadow-sm">
+            <TableHeader class="sticky top-0 bg-muted/80 backdrop-blur z-10">
               <TableRow class="hover:bg-transparent">
-                <TableHead class="w-[60px] text-center font-bold">#</TableHead>
-                <TableHead class="w-[140px] font-bold">Link Amazon</TableHead>
-                <TableHead class="font-bold">Sản phẩm</TableHead>
-                <TableHead class="w-[140px] font-bold">Trạng thái</TableHead>
-                <TableHead class="min-w-[200px] font-bold">Log</TableHead>
+                <TableHead class="w-[50px] text-center font-semibold">#</TableHead>
+                <TableHead class="w-[110px] font-semibold">ASIN</TableHead>
+                <TableHead class="min-w-[250px] font-semibold">Sản phẩm</TableHead>
+                <TableHead class="w-[100px] text-right font-semibold">Giá gốc</TableHead>
+                <TableHead class="w-[80px] text-center font-semibold">Ảnh</TableHead>
+                <TableHead class="w-[80px] text-center font-semibold">Biến thể</TableHead>
+                <TableHead class="w-[120px] text-center font-semibold">Trạng thái</TableHead>
+                <TableHead class="min-w-[200px] font-semibold">Tiến trình</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -63,41 +63,92 @@
                 v-for="(row, index) in rowData"
                 :key="row.id"
                 class="hover:bg-muted/50 transition-colors"
+                :class="{ 'bg-green-50 dark:bg-green-950/20': row.status === 'DONE', 'bg-red-50 dark:bg-red-950/20': row.status === 'ERROR' }"
               >
-                <TableCell class="text-center font-medium text-muted-foreground">{{ index + 1 }}</TableCell>
+                <!-- # -->
+                <TableCell class="text-center font-medium text-muted-foreground text-sm">{{ index + 1 }}</TableCell>
+
+                <!-- ASIN -->
                 <TableCell>
                   <a
                     v-if="row.amazonUrl || row.asin"
                     :href="row.amazonUrl || `https://www.amazon.com/dp/${row.asin}`"
                     target="_blank"
-                    class="inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
+                    class="inline-flex items-center text-xs font-mono font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
                     @click.stop
                   >
-                    <Link2 class="w-4 h-4 mr-1.5" /> Mở link
+                    {{ row.asin }}
+                    <ExternalLink class="w-3 h-3 ml-1 opacity-50" />
                   </a>
                 </TableCell>
+
+                <!-- Sản phẩm -->
                 <TableCell>
-                  <div class="flex flex-col py-1">
-                    <span v-if="row.brand" class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">{{ row.brand }}</span>
-                    <span class="font-medium text-foreground line-clamp-2 leading-tight" :title="row.title">{{ row.title || '...' }}</span>
-                    <span class="text-xs text-muted-foreground mt-1.5 font-mono bg-muted/50 w-fit px-1.5 py-0.5 rounded">ASIN: {{ row.asin }}</span>
+                  <div class="flex items-start gap-2.5 py-0.5">
+                    <!-- Thumbnail -->
+                    <div class="w-10 h-10 rounded border bg-muted/50 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                      <img
+                        v-if="row.images && row.images.length > 0"
+                        :src="row.images[0]"
+                        class="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <ImageIcon v-else class="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                      <span v-if="row.brand" class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{{ row.brand }}</span>
+                      <span class="text-sm font-medium text-foreground line-clamp-2 leading-snug" :title="row.title">{{ row.title || '—' }}</span>
+                      <div v-if="row.rating" class="flex items-center gap-1 mt-0.5">
+                        <Star class="w-3 h-3 text-amber-500 fill-amber-500" />
+                        <span class="text-[11px] text-muted-foreground">{{ row.rating }} ({{ formatNumber(row.reviewCount) }})</span>
+                      </div>
+                    </div>
                   </div>
                 </TableCell>
-                <TableCell>
+
+                <!-- Giá gốc -->
+                <TableCell class="text-right">
+                  <span v-if="row.originalPrice" class="font-semibold text-sm">${{ row.originalPrice }}</span>
+                  <span v-else class="text-muted-foreground text-sm">—</span>
+                </TableCell>
+
+                <!-- Ảnh -->
+                <TableCell class="text-center">
+                  <Badge v-if="row.images?.length" variant="outline" class="text-xs tabular-nums">
+                    {{ row.images.length }}
+                  </Badge>
+                  <span v-else class="text-muted-foreground">—</span>
+                </TableCell>
+
+                <!-- Biến thể -->
+                <TableCell class="text-center">
+                  <Badge v-if="row.variations?.length" variant="secondary" class="text-xs tabular-nums">
+                    {{ row.variations.length }}
+                  </Badge>
+                  <span v-else class="text-muted-foreground">—</span>
+                </TableCell>
+
+                <!-- Trạng thái -->
+                <TableCell class="text-center">
                   <Badge 
                     :variant="row.status === 'DONE' ? 'default' : row.status === 'ERROR' ? 'destructive' : 'secondary'"
                     :class="[
-                      'font-medium tracking-wide',
-                      row.status === 'DONE' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200' : '',
-                      row.status === 'CRAWLING' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse' : ''
+                      'font-medium text-xs',
+                      row.status === 'DONE' ? 'bg-green-600 hover:bg-green-700 text-white' : '',
+                      row.status === 'CRAWLING' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse border-blue-200' : ''
                     ]"
                   >
-                    <span v-if="row.status === 'CRAWLING'" class="mr-1.5 inline-block w-2 h-2 bg-blue-600 rounded-full animate-bounce"></span>
+                    <Loader2 v-if="row.status === 'CRAWLING'" class="w-3 h-3 mr-1 animate-spin" />
+                    <CheckCircle2 v-else-if="row.status === 'DONE'" class="w-3 h-3 mr-1" />
+                    <AlertCircle v-else-if="row.status === 'ERROR'" class="w-3 h-3 mr-1" />
+                    <Clock v-else class="w-3 h-3 mr-1" />
                     {{ getStatusText(row.status) }}
                   </Badge>
                 </TableCell>
+
+                <!-- Tiến trình -->
                 <TableCell>
-                  <div class="text-sm text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-md border border-border/50 font-mono text-xs">
+                  <div class="text-xs text-muted-foreground font-mono bg-muted/30 px-2.5 py-1.5 rounded border border-border/50 truncate" :title="row.log">
                     {{ row.log }}
                   </div>
                 </TableCell>
@@ -114,27 +165,26 @@
       <span class="sep">|</span>
       <span class="s-ok flex items-center"><CheckCircle2 class="w-4 h-4 mr-1 text-green-500" /> {{ stats.done }}</span>
       <span class="sep">|</span>
-      <span class="s-warn flex items-center"><Hourglass class="w-4 h-4 mr-1 text-yellow-500" /> {{ stats.pending }}</span>
+      <span class="s-warn flex items-center"><Clock class="w-4 h-4 mr-1 text-yellow-500" /> {{ stats.pending }}</span>
       <span class="sep">|</span>
-      <span class="s-err flex items-center"><XCircle class="w-4 h-4 mr-1 text-red-500" /> {{ stats.error }}</span>
+      <span class="s-err flex items-center"><AlertCircle class="w-4 h-4 mr-1 text-red-500" /> {{ stats.error }}</span>
       <span v-if="isCrawling" class="sep">|</span>
-      <span v-if="isCrawling" class="s-warn pulse flex items-center"><Bot class="w-4 h-4 mr-1" /> Đang crawl {{ stats.crawling }} luồng...</span>
+      <span v-if="isCrawling" class="s-warn pulse flex items-center"><Loader2 class="w-4 h-4 mr-1 animate-spin" /> Đang crawl {{ stats.crawling }} luồng...</span>
     </div>
   </div>
-
-
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as xlsx from 'xlsx'
 
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
-  FolderOpen, Link2, CheckCircle2, Hourglass, 
-  XCircle, Bot, Folder, Search, AlertTriangle, Lightbulb, X 
+  FolderOpen, Upload, Play, Square, ExternalLink, 
+  CheckCircle2, AlertCircle, Clock, Loader2, Star,
+  Image as ImageIcon,
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -144,21 +194,20 @@ const emit = defineEmits(['stats-update'])
 
 import { globalRowData as rowData } from '../store'
 
-const gridApi = ref(null)
 const isCrawling = ref(false)
 let stopRequested = false
 
-// Helpers for template
+// Helpers
 const getStatusText = (status) => {
   const map = { PENDING: 'Chờ lệnh', CRAWLING: 'Đang crawl', DONE: 'Hoàn tất', ERROR: 'Lỗi' }
   return map[status] || status
 }
 
-const getBadgeClass = (status) => {
-  const map = { PENDING: 'badge-warning', CRAWLING: 'badge-crawling', DONE: 'badge-done', ERROR: 'badge-error' }
-  return map[status] || ''
+const formatNumber = (n) => {
+  if (!n) return '0'
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k'
+  return String(n)
 }
-
 
 // ─── Stats ────────────────────────────────────────────────────────────────
 const stats = computed(() => {
@@ -179,21 +228,11 @@ const progressPct = computed(() => {
   return Math.round(((stats.value.done + stats.value.error) / stats.value.total) * 100)
 })
 
-const onRowClick = (row) => {
-  // Do nothing in Queue
-}
-
 // ─── Import ───────────────────────────────────────────────────────────────
-/**
- * Extract ASIN từ Amazon URL hoặc ASIN trực tiếp
- * VD: https://www.amazon.com/.../dp/B00N5XRYTE/... → B00N5XRYTE
- */
 const extractAsin = (val) => {
   if (!val) return null
   const str = String(val).trim()
-  // Đã là ASIN thuần (10 ký tự alphanumeric bắt đầu bằng B hoặc số)
   if (/^[A-Z0-9]{10}$/.test(str)) return str
-  // Extract từ Amazon URL: /dp/XXXXXXXXXX/
   const match = str.match(/\/dp\/([A-Z0-9]{10})/i)
   if (match) return match[1].toUpperCase()
   return null
@@ -209,13 +248,10 @@ const handleImportFile = async () => {
     const jsonData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' })
     if (jsonData.length < 2) return alert('File cần ít nhất 1 dòng tiêu đề + 1 dòng dữ liệu.')
 
-    // Parse header — ép về string để tránh undefined
     const header = (jsonData[0] || []).map(h => String(h ?? '').toUpperCase().trim())
-
-    // Ưu tiên cột ASIN > cột URL > fallback cột 0
     let colIdx = header.findIndex(h => ['ASIN', 'ID', 'ITEM', 'SKU'].includes(h))
     if (colIdx === -1) colIdx = header.findIndex(h => h && (h.includes('URL') || h.includes('AMAZON') || h.includes('LINK')))
-    if (colIdx === -1) colIdx = 1  // fallback cột 1 (file hay có STT ở cột 0)
+    if (colIdx === -1) colIdx = 1
 
     const newRows = []
     let skipped = 0
@@ -225,12 +261,10 @@ const handleImportFile = async () => {
 
       let asin = null
       let amazonUrl = ''
-      // Thử cột ưu tiên trước, rồi scan toàn row
       for (let c = 0; c < row.length; c++) {
         const cellAsin = extractAsin(row[c])
         if (cellAsin) {
           asin = cellAsin
-          // Lưu URL gốc nếu cell chứa URL
           const cellStr = String(row[c] || '')
           if (cellStr.includes('amazon.com')) amazonUrl = cellStr.trim()
           break
@@ -247,7 +281,7 @@ const handleImportFile = async () => {
         status: 'PENDING',
         log: 'Chờ lệnh...',
         title: '', brand: '', originalPrice: '', sellPrice: '',
-        images: [], variations: []
+        images: [], variations: [], rating: 0, reviewCount: 0,
       })
     }
 
@@ -290,7 +324,7 @@ const stopCrawl = () => {
 }
 
 const crawlItem = async (row) => {
-  updateRow({ ...row, status: 'CRAWLING', log: 'Khởi động Playwright...' })
+  updateRow({ ...row, status: 'CRAWLING', log: 'Khởi động trình duyệt...' })
   try {
     const response = await window.api.crawl.asin(row.asin)
     if (response.ok) {
@@ -305,8 +339,19 @@ const crawlItem = async (row) => {
         images: p.images || [],
         variations: p.variations || [],
         specs: p.specs || {},
+        rating: p.rating || 0,
+        reviewCount: p.reviewCount || 0,
+        bulletPoints: p.bulletPoints || [],
+        description: p.description || '',
+        descriptionHtml: p.descriptionHtml || '',
+        descriptionImages: p.descriptionImages || [],
+        categories: p.categories || [],
+        bsr: p.bsr || '',
+        inStock: p.inStock,
+        availability: p.availability || '',
+        priceRange: p.priceRange || '',
         status: 'DONE',
-        log: '✓ Hoàn tất',
+        log: `✓ Hoàn tất — ${(p.images || []).length} ảnh, ${(p.variations || []).length} biến thể`,
       }
       updateRow(doneRow)
     } else {
@@ -358,135 +403,4 @@ onUnmounted(() => { if (unsubProgress) unsubProgress() })
   overflow: hidden;
   min-width: 0;
 }
-
-
-
-/* Custom Table Styles */
-.custom-table-container {
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  background: var(--bg-primary);
-  border-radius: 6px;
-  border: 1px solid var(--border);
-}
-
-.custom-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
-}
-
-.custom-table th {
-  position: sticky;
-  top: 0;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  z-index: 10;
-  white-space: nowrap;
-}
-
-.custom-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-light);
-  vertical-align: middle;
-}
-
-.custom-table tbody tr {
-  background: var(--bg-primary);
-  transition: background 0.15s;
-  cursor: pointer;
-}
-.custom-table tbody tr:nth-child(even) {
-  background: rgba(255,255,255,0.015);
-}
-.custom-table tbody tr:hover {
-  background: var(--bg-hover);
-}
-.custom-table tbody tr.row-selected {
-  background: var(--accent-dim);
-}
-
-.table-input, .table-select {
-  width: 100%;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-primary);
-  padding: 4px 6px;
-  font-size: 13px;
-  border-radius: 4px;
-}
-.table-input:hover, .table-select:hover {
-  border-color: var(--border);
-}
-.table-input:focus, .table-select:focus {
-  outline: none;
-  border-color: var(--accent);
-  background: rgba(0,0,0,0.2);
-}
-
-</style>
-
-<style scoped>
-/* ─── Category selected chip ─────────────────────────────────────────────── */
-.cat-selected {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px;
-  background: var(--accent-dim);
-  border: 1px solid rgba(99,102,241,0.3);
-  border-radius: 7px; cursor: pointer; transition: background 0.12s;
-  max-width: 320px;
-}
-.cat-selected:hover { background: rgba(99,102,241,0.2); }
-.cat-path { font-size: 12px; color: var(--accent); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-.cat-id { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
-.cat-clear { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 0 2px; }
-.cat-clear:hover { color: #ef4444; }
-.cat-search-btn { gap: 6px; }
-
-/* ─── Category search modal ─────────────────────────────────────────────── */
-.cat-search-wrap {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 8px; padding: 8px 12px; margin-bottom: 12px;
-}
-.cat-search-wrap:focus-within { border-color: var(--accent); }
-.cat-results { display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow-y: auto; }
-.cat-result-item { padding: 10px 12px; border-radius: 7px; cursor: pointer; border: 1px solid transparent; transition: all 0.1s; }
-.cat-result-item:hover { background: var(--bg-hover); border-color: var(--border); }
-.cat-result-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.cat-result-path { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.cat-result-id { font-size: 10px; color: var(--accent); margin-top: 3px; display: block; }
-.cat-hint, .cat-no-results { font-size: 12px; color: var(--text-muted); text-align: center; padding: 20px; }
-.cat-api-notice {
-  background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2);
-  border-radius: 7px; padding: 10px 12px; font-size: 12px; color: #f59e0b;
-  margin-bottom: 10px; line-height: 1.5;
-}
-
-/* ─── Auto-suggest toast ─────────────────────────────────────────────────── */
-.auto-suggest-toast {
-  position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
-  z-index: 500; animation: slideUp 0.2s ease;
-}
-@keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-.toast-content {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 16px;
-  display: flex; align-items: center; gap: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  font-size: 12px; color: var(--text-secondary); white-space: nowrap;
-}
-.toast-cats { display: flex; gap: 6px; }
-.toast-cat-btn { font-size: 11px; }
-.toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; margin-left: 4px; }
-.toast-close:hover { color: var(--text-primary); }
 </style>
