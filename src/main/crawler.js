@@ -278,6 +278,10 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       if (key && val) specs[key] = val
     })
 
+    // Filter out specs not useful for eBay
+    const skipKeys = ['Best Sellers Rank', 'ASIN', 'Customer Reviews', 'Date First Available']
+    for (const sk of skipKeys) delete specs[sk]
+
     // ── Important Information (Safety, Ingredients, Directions) ────────
     progressCb('[PROGRESS] Đang lấy thông tin quan trọng...')
     const importantInfo = {}
