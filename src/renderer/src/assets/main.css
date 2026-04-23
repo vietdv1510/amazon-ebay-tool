@@ -6,6 +6,7 @@
 
 @layer base {
   :root {
+    /* New York Style — 2026 */
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
@@ -22,10 +23,10 @@
     --accent-foreground: 240 5.9% 10%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
+    --border: 240 5.9% 82%;
+    --input: 240 5.9% 82%;
     --ring: 240 10% 3.9%;
-    --radius: 0.5rem;
+    --radius: 0.3rem;
   }
 }
 

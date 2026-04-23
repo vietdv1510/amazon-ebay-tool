@@ -19,10 +19,12 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@radix-icons/vue": "^1.0.0",
     "@vueuse/core": "^14.2.1",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "embla-carousel-vue": "^8.6.0",
     "lucide-vue-next": "^1.0.0",
     "playwright": "^1.59.1",
     "playwright-extra": "^4.3.6",
@@ -30,6 +32,8 @@
     "reka-ui": "^2.9.6",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
+    "vaul-vue": "^0.4.1",
+    "vue-sonner": "^2.0.9",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
