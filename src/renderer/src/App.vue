@@ -2,19 +2,17 @@
   <div class="app-root">
     <!-- Sidebar -->
     <aside class="sidebar" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
-      <!-- macOS traffic light spacer -->
-      <div class="traffic-light-spacer" style="-webkit-app-region: drag;"></div>
+      <!-- macOS traffic light spacer / Windows title bar area -->
+      <div v-if="platform === 'darwin'" class="traffic-light-spacer" style="-webkit-app-region: drag;"></div>
 
       <!-- Logo + Toggle row -->
-      <div class="sidebar-logo-row">
-        <div class="logo-icon flex-shrink-0"><ShoppingCart class="w-5 h-5 text-white" /></div>
-        <div v-if="!sidebarCollapsed" class="logo-text-wrap flex-1 min-w-0">
-          <div class="logo-text">eBay Tool</div>
+      <div class="sidebar-logo-row" :class="{ 'justify-center px-0': sidebarCollapsed }">
+        <div class="logo-icon flex-shrink-0" :class="{ 'mx-auto': sidebarCollapsed }">
+          <img src="./assets/logo.png" class="w-6 h-6 object-contain" alt="Logo" />
         </div>
-        <button class="sidebar-toggle flex-shrink-0" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Mở menu' : 'Thu menu'">
-          <ChevronLeft v-if="!sidebarCollapsed" class="w-4 h-4" />
-          <ChevronRight v-else class="w-4 h-4" />
-        </button>
+        <div v-if="!sidebarCollapsed" class="logo-text-wrap flex-1 min-w-0">
+          <div class="logo-text">eBay Engine</div>
+        </div>
       </div>
 
       <nav class="sidebar-nav flex flex-col gap-1 p-2">
@@ -29,7 +27,7 @@
         >
           <ListOrdered class="w-4 h-4 flex-shrink-0" :class="{ 'mr-2': !sidebarCollapsed }" />
           <span v-if="!sidebarCollapsed">Amazon Crawler</span>
-          <Badge v-if="stats.pending > 0 && !sidebarCollapsed" variant="outline" class="ml-auto bg-background">{{ stats.pending }}</Badge>
+          <Badge v-if="stats.pending > 0 && !sidebarCollapsed" variant="outline" class="ml-auto bg-background/50 border-border/50 text-[10px] px-1.5 h-4">{{ stats.pending }}</Badge>
         </Button>
 
         <Button
@@ -40,8 +38,8 @@
           :title="sidebarCollapsed ? 'Xử lý & Export' : ''"
         >
           <LayoutDashboard class="w-4 h-4 flex-shrink-0" :class="{ 'mr-2': !sidebarCollapsed }" />
-          <span v-if="!sidebarCollapsed">Xử lý &amp; Export</span>
-          <Badge v-if="stats.total > 0 && !sidebarCollapsed" variant="outline" class="ml-auto bg-background">{{ stats.total }}</Badge>
+          <span v-if="!sidebarCollapsed">Xử lý & Export</span>
+          <Badge v-if="stats.total > 0 && !sidebarCollapsed" variant="outline" class="ml-auto bg-background/50 border-border/50 text-[10px] px-1.5 h-4">{{ stats.total }}</Badge>
         </Button>
 
         <Button
@@ -70,8 +68,16 @@
         </Button>
       </nav>
 
-      <div v-if="!sidebarCollapsed" class="sidebar-footer">
-        <div style="font-size:10px; color: var(--text-muted); text-align:center;">v1.0.0</div>
+      <div class="sidebar-footer" :class="{'p-2': sidebarCollapsed, 'px-4 py-3': !sidebarCollapsed}">
+        <button 
+          class="w-full flex items-center justify-center p-1.5 rounded-md hover:bg-muted/40 transition-all text-muted-foreground/60 hover:text-muted-foreground border border-transparent hover:border-border/30 group" 
+          @click="sidebarCollapsed = !sidebarCollapsed" 
+          :title="sidebarCollapsed ? 'Mở menu' : 'Thu menu'"
+        >
+          <ChevronLeft v-if="!sidebarCollapsed" class="w-3.5 h-3.5 opacity-50 group-hover:opacity-100" />
+          <ChevronRight v-else class="w-3.5 h-3.5 opacity-50 group-hover:opacity-100" />
+          <span v-if="!sidebarCollapsed" class="ml-2 text-[11px] font-medium opacity-50 group-hover:opacity-100">Thu nhỏ</span>
+        </button>
       </div>
     </aside>
 
@@ -109,13 +115,14 @@ import Settings from './components/Settings.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  ShoppingCart, LayoutDashboard, ListOrdered,
+  LayoutDashboard, ListOrdered,
   Settings as SettingsIcon, FileSpreadsheet,
   ChevronLeft, ChevronRight
 } from 'lucide-vue-next'
 
 const currentPage = ref('queue')
 const sidebarCollapsed = ref(false)
+const platform = ref(window.electron?.process?.platform || 'win32')
 
 const stats = ref({ total: 0, pending: 0, done: 0, error: 0 })
 
@@ -167,14 +174,15 @@ const handleStatsUpdate = (s) => {
 }
 
 .sidebar-collapsed {
-  width: 56px !important;
+  width: 68px !important;
 }
 
-/* Spacer exactly the height of macOS traffic lights */
+/* Spacer for system title bars (macOS traffic lights) */
 .traffic-light-spacer {
-  height: 28px;
+  height: 38px; /* Standard height for hiddenInset buttons */
   width: 100%;
   flex-shrink: 0;
+  display: block;
 }
 
 /* Logo row — sits BELOW traffic lights */
@@ -213,12 +221,8 @@ const handleStatsUpdate = (s) => {
 
 .sidebar-collapsed .sidebar-logo-row {
   justify-content: center;
-  padding: 0 6px;
+  padding: 0;
   gap: 0;
-}
-
-.sidebar-collapsed .sidebar-toggle {
-  margin-left: 0;
 }
 
 .nav-btn {

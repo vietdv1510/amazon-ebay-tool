@@ -2,9 +2,10 @@
   <div class="workspace-root">
     <!-- Header -->
     <div class="page-header">
-      <span class="page-title">
+      <div class="page-title flex items-center font-bold text-[15px]">
+        <LayoutDashboard class="w-5 h-5 mr-2.5 flex-shrink-0" />
         Xử lý & Export
-      </span>
+      </div>
 
       <div class="header-actions flex gap-2">
         <Button variant="outline" size="sm" @click="handleExport" :disabled="doneRows.length === 0">
@@ -15,29 +16,29 @@
     </div>
 
     <!-- Content: Grid + Detail Panel -->
-    <div class="workspace-body">
-      <!-- Custom Table -->
-      <div class="grid-area" :class="{ 'with-panel': selectedRow }">
-        <div v-if="doneRows.length === 0" class="empty-state flex flex-col items-center justify-center h-full">
+    <div class="workspace-body h-full">
+      <div class="grid-area mx-4 mt-4 h-full" :class="{ 'with-panel': selectedRow }">
+        <div v-if="doneRows.length === 0" class="flex-1 flex flex-col items-center justify-center text-center p-8 h-full min-h-[400px]">
           <div class="bg-muted/30 p-6 rounded-full mb-4">
             <FolderOpen class="w-12 h-12 text-muted-foreground" />
           </div>
           <h3 class="text-xl font-semibold mb-2">Chưa có sản phẩm</h3>
-          <p class="text-muted-foreground text-sm">Sử dụng Amazon Crawler để crawl dữ liệu trước khi xử lý tại đây.</p>
+          <p class="text-muted-foreground text-sm max-w-sm">Sử dụng Amazon Crawler để crawl dữ liệu trước khi xử lý tại đây.</p>
         </div>
 
-        <div v-else class="flex-1 h-full overflow-auto bg-card rounded-lg border shadow-sm mx-4 mb-4 mt-4">
-          <Table class="relative w-full">
+        <div v-else class="flex-1 h-full overflow-hidden flex flex-col bg-card rounded-t-xl ring-1 ring-border/50 shadow-sm border-b-0">
+          <Table class="relative w-full" wrapperClass="flex-1 min-h-0">
             <TableHeader class="sticky top-0 bg-muted/80 backdrop-blur z-10">
               <TableRow class="hover:bg-transparent">
-                <TableHead class="w-[40px] text-center font-semibold">#</TableHead>
-                <TableHead class="w-[90px] font-semibold">ASIN</TableHead>
-                <TableHead class="min-w-[200px] font-semibold">Sản phẩm</TableHead>
-                <TableHead class="w-[85px] text-right font-semibold">Giá gốc</TableHead>
-                <TableHead class="w-[85px] text-right font-semibold">Giá eBay</TableHead>
-                <TableHead class="w-[70px] text-center font-semibold">Biến thể</TableHead>
-                <TableHead class="w-[150px] font-semibold">eBay Category</TableHead>
-                <TableHead class="w-[100px] text-center font-semibold">Trạng thái</TableHead>
+                <TableHead class="w-[40px] text-center font-semibold whitespace-nowrap">#</TableHead>
+                <TableHead class="w-[90px] font-semibold whitespace-nowrap">ASIN</TableHead>
+                <TableHead class="w-[280px] min-w-[280px] font-semibold">Sản phẩm</TableHead>
+                <TableHead class="w-[85px] text-right font-semibold whitespace-nowrap">Giá gốc</TableHead>
+                <TableHead class="w-[85px] text-right font-semibold whitespace-nowrap">Giá eBay</TableHead>
+                <TableHead class="w-[70px] text-center font-semibold whitespace-nowrap">Biến thể</TableHead>
+                <TableHead class="w-[150px] font-semibold whitespace-nowrap">Category</TableHead>
+                <TableHead class="w-[100px] text-center font-semibold whitespace-nowrap">Trạng thái</TableHead>
+                <TableHead class="w-full"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -60,32 +61,32 @@
                 </TableCell>
 
                 <TableCell>
-                  <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded border bg-muted/50 flex-shrink-0 overflow-hidden">
+                  <div class="flex items-start gap-2 max-w-[260px] whitespace-normal">
+                    <div class="w-8 h-8 rounded border bg-muted/50 flex-shrink-0 overflow-hidden mt-0.5">
                       <img v-if="row.images?.length" :src="row.images[0]" class="w-full h-full object-cover" loading="lazy" />
                     </div>
                     <div class="flex flex-col min-w-0">
-                      <span v-if="row.brand" class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{{ row.brand }}</span>
-                      <span class="text-sm font-medium truncate" :title="row.title">{{ row.title || '—' }}</span>
+                      <span v-if="row.brand" class="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{{ row.brand }}</span>
+                      <span class="text-xs font-medium line-clamp-2 leading-tight" :title="row.title">{{ row.title || '—' }}</span>
                     </div>
                   </div>
                 </TableCell>
 
-                <TableCell class="text-right text-sm">
+                <TableCell class="text-right text-sm whitespace-nowrap">
                   ${{ typeof row.originalPrice === 'number' ? row.originalPrice.toFixed(2) : (row.originalPrice || '—') }}
                 </TableCell>
 
-                <TableCell class="text-right text-sm font-semibold text-green-600">
+                <TableCell class="text-right text-sm font-semibold text-green-600 whitespace-nowrap">
                   <span v-if="row.sellPrice">${{ Number(row.sellPrice).toFixed(2) }}</span>
                   <span v-else class="text-muted-foreground">—</span>
                 </TableCell>
 
-                <TableCell class="text-center">
+                <TableCell class="text-center whitespace-nowrap">
                   <Badge v-if="row.variations?.length" variant="secondary" class="text-xs tabular-nums">{{ row.variations.length }}</Badge>
                   <span v-else class="text-muted-foreground text-xs">—</span>
                 </TableCell>
 
-                <TableCell>
+                <TableCell class="whitespace-nowrap">
                   <div v-if="row.ebayCategory" class="flex items-center gap-1.5">
                     <CheckCircle2 class="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
                     <span class="text-xs truncate max-w-[120px]" :title="row.ebayCategoryName">{{ row.ebayCategoryName || row.ebayCategory }}</span>
@@ -95,7 +96,7 @@
                   </span>
                 </TableCell>
 
-                <TableCell class="text-center">
+                <TableCell class="text-center whitespace-nowrap">
                   <Badge
                     :variant="isRowReady(row) ? 'default' : 'secondary'"
                     :class="isRowReady(row) ? 'bg-green-600 hover:bg-green-700 text-white' : ''"
@@ -104,6 +105,7 @@
                     {{ isRowReady(row) ? 'Sẵn sàng' : 'Thiếu dữ liệu' }}
                   </Badge>
                 </TableCell>
+                <TableCell></TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -112,8 +114,11 @@
 
       <!-- Detail Panel -->
       <transition name="panel">
-        <div v-if="selectedRow" class="detail-panel">
+        <div v-if="selectedRow" class="detail-panel" :style="{ width: panelWidth + 'px' }">
+          <div class="resize-handle" @mousedown="startResize"></div>
           <DetailPanel
+            :key="selectedRow.id"
+            ref="detailPanelRef"
             :row="selectedRow"
             :settings="props.settings"
             @close="selectedRow = null"
@@ -133,9 +138,7 @@ import DetailPanel from './DetailPanel.vue'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  FolderOpen, Download, CheckCircle2, AlertTriangle
-} from 'lucide-vue-next'
+import { Search, Filter, RefreshCw, FileSpreadsheet, ListTree, Play, Square, Download, ChevronRight, CheckCircle2, CircleDashed, LayoutDashboard, FolderOpen, AlertTriangle } from 'lucide-vue-next'
 
 const props = defineProps({
   settings: { type: Object, required: true }
@@ -144,12 +147,19 @@ const props = defineProps({
 import { globalRowData as rowData } from '../store'
 
 const selectedRow = ref(null)
+const detailPanelRef = ref(null)
 
 const doneRows = computed(() => rowData.value.filter(r => r.status === 'DONE'))
 
 const isRowReady = (row) => !!row.ebayCategory && !!row.title && (row.sellPrice > 0 || row.variations?.length > 0)
 
 const onRowClick = (row) => {
+  if (selectedRow.value?.id === row.id) return
+  if (detailPanelRef.value?.isDirty) {
+    if (!confirm('Sản phẩm hiện tại có thay đổi chưa lưu. Bạn có chắc chắn muốn chuyển sang sản phẩm khác?')) {
+      return
+    }
+  }
   selectedRow.value = { ...row, variations: (row.variations || []).map(v => ({ ...v })) }
 }
 
@@ -337,6 +347,30 @@ const buildAspectColumns = (row) => {
   }
   return cols
 }
+
+// ─── Resizable Panel ─────────────────────────────────────────────────────────
+const panelWidth = ref(380)
+const isResizing = ref(false)
+
+const startResize = (e) => {
+  isResizing.value = true
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', stopResize)
+}
+
+const onMouseMove = (e) => {
+  if (!isResizing.value) return
+  const newWidth = document.body.clientWidth - e.clientX
+  if (newWidth > 300 && newWidth < 800) {
+    panelWidth.value = newWidth
+  }
+}
+
+const stopResize = () => {
+  isResizing.value = false
+  document.removeEventListener('mousemove', onMouseMove)
+  document.removeEventListener('mouseup', stopResize)
+}
 </script>
 
 <style scoped>
@@ -363,10 +397,36 @@ const buildAspectColumns = (row) => {
   flex-direction: column;
 }
 
-.grid-area.with-panel { flex: 0 0 calc(100% - 380px); }
+.resize-handle {
+  position: absolute;
+  top: 0;
+  left: -4px;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.resize-handle::after {
+  content: '';
+  width: 2px;
+  height: 30px;
+  background: hsl(var(--border));
+  border-radius: 2px;
+}
+.resize-handle:hover, .resize-handle:active {
+  background: hsl(var(--primary) / 0.1);
+}
+.resize-handle:hover::after, .resize-handle:active::after {
+  background: hsl(var(--primary));
+}
 
 .detail-panel {
-  width: 380px;
+  position: relative;
   flex-shrink: 0;
   border-left: 1px solid hsl(var(--border));
   overflow: hidden;
@@ -374,7 +434,21 @@ const buildAspectColumns = (row) => {
   flex-direction: column;
 }
 
-/* Panel transition */
-.panel-enter-active, .panel-leave-active { transition: all 0.2s ease; }
-.panel-enter-from, .panel-leave-to { width: 0; opacity: 0; transform: translateX(20px); }
+/* Table wrap fix */
+.table-container {
+  flex: 1;
+  width: 100%;
+  overflow: auto;
+  min-height: 0;
+}
+
+.table-container :deep(th) {
+  white-space: nowrap;
+}
+
+.table-container :deep(td) {
+  white-space: nowrap;
+}
+
+
 </style>

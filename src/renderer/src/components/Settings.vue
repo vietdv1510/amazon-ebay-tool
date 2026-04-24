@@ -1,8 +1,11 @@
 <template>
   <div class="h-full w-full overflow-y-auto p-8 bg-background text-foreground">
     <div class="max-w-4xl mx-auto space-y-8">
-      <div>
-        <h2 class="text-3xl font-bold tracking-tight">Cài đặt</h2>
+      <div class="flex flex-col items-center text-center">
+        <h2 class="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <SettingsIcon class="w-8 h-8 text-primary" />
+          Cài đặt
+        </h2>
         <p class="text-muted-foreground mt-2">Cấu hình Crawler, API và các thiết lập mặc định cho ứng dụng.</p>
       </div>
 

@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+app.name = 'eBay Engine'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -55,6 +56,7 @@ function createWindow() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0f0f13',
+    title: 'eBay Engine',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
@@ -88,7 +90,7 @@ function createWindow() {
 let mainWindow
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.amazon-ebay-tool')
+  electronApp.setAppUserModelId('com.ebayengine.app')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

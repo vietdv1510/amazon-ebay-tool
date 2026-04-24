@@ -2,15 +2,12 @@
   <div class="workspace-root">
     <!-- Header -->
     <div class="page-header">
-      <span class="page-title">
-        <FileSpreadsheet class="w-5 h-5 mr-2 inline" />
+      <div class="page-title flex items-center font-bold text-[15px]">
+        <FileSpreadsheet class="w-5 h-5 mr-2.5 flex-shrink-0" />
         Export Preview
-      </span>
+      </div>
 
       <div class="header-actions flex gap-2 items-center">
-        <span v-if="previewRows.length > 0" class="text-xs text-muted-foreground">
-          {{ readyProducts.length }} sản phẩm · {{ previewRows.length }} dòng · {{ allColumns.length }} cột
-        </span>
         <Button variant="outline" size="sm" @click="refreshPreview">
           <RefreshCw class="w-4 h-4 mr-2" />
           Làm mới
@@ -22,10 +19,9 @@
       </div>
     </div>
 
-    <!-- Content -->
-    <div class="flex-1 overflow-hidden flex flex-col mx-4 mb-4 mt-4">
+    <div class="flex-1 overflow-hidden flex flex-col mx-4 mt-4 mb-0 h-full">
       <!-- Empty state -->
-      <div v-if="readyProducts.length === 0" class="flex flex-col items-center justify-center h-full">
+      <div v-if="readyProducts.length === 0" class="flex-1 flex flex-col items-center justify-center text-center p-8 h-full min-h-[400px]">
         <div class="bg-muted/30 p-6 rounded-full mb-4">
           <FileSpreadsheet class="w-12 h-12 text-muted-foreground" />
         </div>
@@ -111,6 +107,7 @@
                     <span v-else-if="isRecommendedCol(col)" class="recommended-star">~</span>
                   </div>
                 </th>
+                <th class="w-full border-0 bg-transparent"></th>
               </tr>
             </thead>
             <tbody>
@@ -135,10 +132,11 @@
                 <td
                   v-for="col in allColumns"
                   :key="col"
-                  class="cell editable-cell"
+                  class="cell editable-cell whitespace-normal min-w-[150px] max-w-[350px]"
                   :class="{
                     'empty-required': isCellMissingRequired(row, col),
                     'empty-cell': !row[col],
+                    'empty-ready': !isCellMissingRequired(row, col) && !row[col] && getCellUsage(row, col) !== 'OPTIONAL',
                     'cell-required': getCellUsage(row, col) === 'REQUIRED' && !isCellMissingRequired(row, col),
                     'cell-recommended': getCellUsage(row, col) === 'RECOMMENDED',
                     'cell-optional': getCellUsage(row, col) === 'OPTIONAL',
@@ -156,10 +154,16 @@
                       ref="editInputRef"
                     />
                   </template>
+                  <template v-else-if="col === '*Title'">
+                    <div class="p-2">
+                      <span class="cell-content-title text-xs" :title="row[col]">{{ row[col] }}</span>
+                    </div>
+                  </template>
                   <template v-else>
                     <span class="cell-content">{{ truncate(row[col], 40) }}</span>
                   </template>
                 </td>
+                <td class="border-0 bg-transparent"></td>
               </tr>
             </tbody>
           </table>
@@ -537,10 +541,11 @@ const handleExport = async () => {
   const exportPath = await window.api.dialog.saveFile({ defaultPath: 'ebay-upload-template.csv' })
   if (!exportPath) return
 
-  // Remove internal _rowType before export
+  // Remove internal fields before export
   const exportRows = previewRows.value.map(r => {
     const clean = { ...r }
     delete clean._rowType
+    delete clean._ebayCategory
     return clean
   })
 
@@ -557,15 +562,21 @@ watch(readyProducts, buildPreview, { deep: true })
 
 <style scoped>
 /* ─── Scroll wrapper — scrollbar always at bottom ────────────────────────── */
+.workspace-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
 .table-scroll-wrapper {
   flex: 1;
   overflow-x: scroll;
   overflow-y: auto;
   scrollbar-gutter: stable;
   background: hsl(var(--card));
-  border-radius: 8px;
-  border: 1px solid hsl(var(--border));
-  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 0 0 1px hsl(var(--border) / 0.5), 0 1px 3px rgba(0,0,0,.05);
   display: flex;
   flex-direction: column;
 }
@@ -590,8 +601,8 @@ watch(readyProducts, buildPreview, { deep: true })
 }
 
 .table-inner {
-  flex: 1;
-  min-width: max-content;
+  width: max-content;
+  min-width: 100%;
 }
 
 .preview-table {
@@ -667,7 +678,7 @@ watch(readyProducts, buildPreview, { deep: true })
 .cell-content {
   display: block;
   padding: 4px 8px;
-  max-width: 220px;
+  max-width: 350px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -775,10 +786,13 @@ watch(readyProducts, buildPreview, { deep: true })
   font-style: italic;
 }
 
-.cell-content {
-  display: inline-block;
-  max-width: 200px;
+.cell-content-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.3;
+  max-width: 300px;
 }
 </style>

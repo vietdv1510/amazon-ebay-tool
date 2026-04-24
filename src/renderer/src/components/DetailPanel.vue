@@ -3,7 +3,7 @@
     <!-- Panel Header -->
     <div class="panel-header">
       <span class="panel-title">Chi tiết sản phẩm</span>
-      <Button variant="ghost" size="icon" class="h-6 w-6" @click="$emit('close')">
+      <Button variant="ghost" size="icon" class="h-6 w-6" @click="handleClose">
         <X class="w-4 h-4" />
       </Button>
     </div>
@@ -322,7 +322,7 @@
 
     <!-- Panel Footer -->
     <div class="panel-footer bg-background">
-      <Button variant="ghost" size="sm" @click="$emit('close')">Đóng</Button>
+      <Button variant="ghost" size="sm" @click="handleClose">Đóng</Button>
       <Button size="sm" @click="save"><Save class="w-4 h-4 mr-2" /> Lưu thay đổi</Button>
     </div>
   </div>
@@ -356,6 +356,26 @@ const form = reactive({
 })
 
 const activeImg = ref(0)
+
+// ─── Dirty Check ──────────────────────────────────────────────────────────────
+const getFormState = (source) => JSON.stringify({
+  title: source.title,
+  brand: source.brand,
+  sellPrice: source.sellPrice,
+  ebayCategory: source.ebayCategory,
+  aspectValues: source.aspectValues || {},
+  variations: source.variations || [],
+})
+
+const isDirty = computed(() => getFormState(props.row) !== getFormState(form))
+defineExpose({ isDirty })
+
+const handleClose = () => {
+  if (isDirty.value) {
+    if (!confirm('Sản phẩm này có thay đổi chưa lưu. Bạn có chắc chắn muốn đóng?')) return
+  }
+  emit('close')
+}
 
 // ─── Category Search ──────────────────────────────────────────────────────────
 const showCategorySearch = ref(false)
@@ -419,26 +439,49 @@ const clearCategory = () => {
 
 // Auto-map Amazon specs → eBay aspects
 const autoMapAspect = (aspectName) => {
-  const name = aspectName.toLowerCase()
+  const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const normName = normalize(aspectName)
   const specs = form.specs || {}
 
-  // Direct spec match
+  // 1. Exact match after normalization
   for (const [key, val] of Object.entries(specs)) {
-    if (key.toLowerCase().includes(name) || name.includes(key.toLowerCase())) {
+    if (normalize(key) === normName) return val
+  }
+  
+  // 2. Custom robust keyword mapping
+  const matchKeys = (keywords) => {
+    for (const [key, val] of Object.entries(specs)) {
+      const normKey = normalize(key)
+      if (keywords.some(k => normKey.includes(k))) return val
+    }
+    return null
+  }
+
+  if (normName === 'brand' || normName === 'brandname') return form.brand || matchKeys(['brand']) || 'Unbranded'
+  if (normName === 'mpn' || normName === 'partnumber') return matchKeys(['partnumber', 'mpn']) || 'Does Not Apply'
+  if (normName === 'model') return matchKeys(['modelnumber', 'itemmodelnumber', 'model']) || ''
+  if (normName === 'upc') return matchKeys(['upc']) || 'Does Not Apply'
+  if (normName === 'ean') return matchKeys(['ean']) || 'Does Not Apply'
+  if (normName === 'isbn') return matchKeys(['isbn']) || 'Does Not Apply'
+  if (normName === 'color' || normName === 'colour') return matchKeys(['color', 'colour']) || ''
+  if (normName === 'size') return matchKeys(['size', 'dimensions']) || ''
+  if (normName === 'material') return matchKeys(['material', 'fabric']) || ''
+  if (normName === 'type' || normName === 'style') return matchKeys(['type', 'style']) || ''
+  if (normName === 'theme') return matchKeys(['theme', 'subject']) || ''
+  if (normName === 'features') return matchKeys(['features', 'specialfeature']) || ''
+  if (normName === 'department') return matchKeys(['department', 'targetgender']) || ''
+  if (normName === 'pattern') return matchKeys(['pattern']) || ''
+  if (normName === 'shape') return matchKeys(['shape', 'itemshape']) || ''
+  if (normName === 'weight') return matchKeys(['weight', 'itemweight']) || ''
+  if (normName === 'countryregionofmanufacture' || normName === 'countryoforigin') return matchKeys(['countryoforigin']) || ''
+
+  // 3. Fallback substring match
+  for (const [key, val] of Object.entries(specs)) {
+    const normKey = normalize(key)
+    if (normKey.includes(normName) || normName.includes(normKey)) {
       return val
     }
   }
-
-  // Special mappings
-  if (name === 'brand' || name === 'brand name') return form.brand || ''
-  if (name === 'mpn') return specs['Manufacturer Part Number'] || specs['MPN'] || specs['Item model number'] || 'Does Not Apply'
-  if (name === 'upc') return specs['UPC'] || 'Does Not Apply'
-  if (name === 'ean') return specs['EAN'] || 'Does Not Apply'
-  if (name === 'isbn') return specs['ISBN'] || 'Does Not Apply'
-  if (name === 'color') return specs['Color'] || specs['Colour'] || ''
-  if (name === 'size') return specs['Size'] || specs['Product Dimensions'] || ''
-  if (name === 'material') return specs['Material'] || specs['Fabric Type'] || ''
-  if (name === 'type') return specs['Type'] || specs['Style'] || ''
 
   return ''
 }

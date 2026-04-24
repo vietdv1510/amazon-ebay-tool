@@ -1,7 +1,7 @@
 {
-  "name": "amazon-ebay-tool",
+  "name": "ebay-engine",
   "version": "1.0.0",
-  "description": "Amazon to eBay Cross-Listing Tool",
+  "description": "eBay Engine application",
   "main": "./out/main/index.js",
   "author": "Nexs",
   "scripts": {

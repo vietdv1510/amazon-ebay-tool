@@ -2,9 +2,10 @@
   <div class="workspace-root">
     <!-- Header -->
     <div class="page-header">
-      <span class="page-title">
+      <div class="page-title flex items-center font-bold text-[15px]">
+        <ListOrdered class="w-5 h-5 mr-2.5 flex-shrink-0" />
         Amazon Crawler
-      </span>
+      </div>
 
       <div class="header-actions flex gap-2">
         <Button variant="outline" size="sm" @click="handleImportFile">
@@ -29,33 +30,34 @@
     </div>
 
     <!-- Content -->
-    <div class="workspace-body">
-      <div class="grid-area flex flex-col pt-4">
+    <div class="workspace-body h-full">
+      <div class="flex-1 overflow-hidden flex flex-col mx-4 mt-4 h-full">
         <!-- Empty state -->
-        <div v-if="rowData.length === 0" class="empty-state flex flex-col items-center justify-center h-full text-center">
+        <div v-if="rowData.length === 0" class="flex-1 flex flex-col items-center justify-center text-center p-8 h-full min-h-[400px]">
           <div class="empty-icon bg-muted/30 p-6 rounded-full mb-4">
             <FolderOpen class="w-12 h-12 text-muted-foreground" />
           </div>
           <h3 class="text-xl font-semibold mb-2">Chưa có sản phẩm</h3>
-          <p class="text-muted-foreground mb-6 max-w-md">Import file Excel/CSV chứa cột ASIN để bắt đầu crawl dữ liệu từ Amazon.</p>
+          <p class="text-muted-foreground mb-6 max-w-sm">Import file Excel/CSV chứa cột ASIN để bắt đầu crawl dữ liệu từ Amazon.</p>
           <Button size="lg" @click="handleImportFile" class="shadow-sm">
             <Upload class="w-5 h-5 mr-2" />
             Import file ASIN
           </Button>
         </div>
 
-        <div v-else class="flex-1 h-full overflow-auto bg-card rounded-lg border shadow-sm mx-4 mb-4">
-          <Table class="relative w-full">
+        <div v-else class="flex-1 h-full overflow-hidden flex flex-col bg-card rounded-t-xl shadow-sm mx-4 border-0 ring-1 ring-border/50 border-b-0">
+          <Table class="relative w-full" wrapperClass="flex-1 min-h-0">
             <TableHeader class="sticky top-0 bg-muted/80 backdrop-blur z-10">
               <TableRow class="hover:bg-transparent">
                 <TableHead class="w-[50px] text-center font-semibold">#</TableHead>
                 <TableHead class="w-[110px] font-semibold">ASIN</TableHead>
-                <TableHead class="min-w-[250px] font-semibold">Sản phẩm</TableHead>
+                <TableHead class="w-[280px] min-w-[280px] font-semibold">Sản phẩm</TableHead>
                 <TableHead class="w-[100px] text-right font-semibold">Giá gốc</TableHead>
                 <TableHead class="w-[80px] text-center font-semibold">Ảnh</TableHead>
                 <TableHead class="w-[80px] text-center font-semibold">Biến thể</TableHead>
                 <TableHead class="w-[120px] text-center font-semibold">Trạng thái</TableHead>
                 <TableHead class="min-w-[200px] font-semibold">Tiến trình</TableHead>
+                <TableHead class="w-full"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -84,9 +86,8 @@
 
                 <!-- Sản phẩm -->
                 <TableCell>
-                  <div class="flex items-start gap-2.5 py-0.5">
-                    <!-- Thumbnail -->
-                    <div class="w-10 h-10 rounded border bg-muted/50 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                  <div class="flex items-start gap-2 max-w-[260px] whitespace-normal">
+                    <div class="w-8 h-8 rounded border bg-muted/50 flex-shrink-0 overflow-hidden mt-0.5 flex items-center justify-center">
                       <img
                         v-if="row.images && row.images.length > 0"
                         :src="row.images[0]"
@@ -95,9 +96,9 @@
                       />
                       <ImageIcon v-else class="w-4 h-4 text-muted-foreground" />
                     </div>
-                    <div class="flex flex-col min-w-0">
-                      <span v-if="row.brand" class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{{ row.brand }}</span>
-                      <span class="text-sm font-medium text-foreground line-clamp-2 leading-snug" :title="row.title">{{ row.title || '—' }}</span>
+                    <div class="flex flex-col min-w-0 flex-1 whitespace-normal">
+                      <span v-if="row.brand" class="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{{ row.brand }}</span>
+                      <span class="text-xs font-medium text-foreground line-clamp-2 leading-tight" :title="row.title">{{ row.title || '—' }}</span>
                       <div v-if="row.rating" class="flex items-center gap-1 mt-0.5">
                         <Star class="w-3 h-3 text-amber-500 fill-amber-500" />
                         <span class="text-[11px] text-muted-foreground">{{ row.rating }} ({{ formatNumber(row.reviewCount) }})</span>
@@ -148,10 +149,11 @@
 
                 <!-- Tiến trình -->
                 <TableCell>
-                  <div class="text-xs text-muted-foreground font-mono bg-muted/30 px-2.5 py-1.5 rounded border border-border/50 truncate" :title="row.log">
+                  <div class="text-[11px] text-muted-foreground font-mono truncate max-w-[250px]" :title="row.log">
                     {{ row.log }}
                   </div>
                 </TableCell>
+                <TableCell></TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -163,11 +165,11 @@
     <div class="status-bar">
       <span>Tổng: <b>{{ stats.total }}</b></span>
       <span class="sep">|</span>
-      <span class="s-ok flex items-center"><CheckCircle2 class="w-4 h-4 mr-1 text-green-500" /> {{ stats.done }}</span>
+      <span class="s-ok">Thành công: <b>{{ stats.done }}</b></span>
       <span class="sep">|</span>
-      <span class="s-warn flex items-center"><Clock class="w-4 h-4 mr-1 text-yellow-500" /> {{ stats.pending }}</span>
+      <span class="s-warn">Chờ: <b>{{ stats.pending }}</b></span>
       <span class="sep">|</span>
-      <span class="s-err flex items-center"><AlertCircle class="w-4 h-4 mr-1 text-red-500" /> {{ stats.error }}</span>
+      <span class="s-err">Lỗi: <b>{{ stats.error }}</b></span>
       <span v-if="isCrawling" class="sep">|</span>
       <span v-if="isCrawling" class="s-warn pulse flex items-center"><Loader2 class="w-4 h-4 mr-1 animate-spin" /> Đang crawl {{ stats.crawling }} luồng...</span>
     </div>
@@ -181,11 +183,7 @@ import * as xlsx from 'xlsx'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { 
-  FolderOpen, Upload, Play, Square, ExternalLink, 
-  CheckCircle2, AlertCircle, Clock, Loader2, Star,
-  Image as ImageIcon,
-} from 'lucide-vue-next'
+import { RefreshCw, Play, Pause, Square, Search, Trash2, FolderOpen, ArrowRight, ExternalLink, Settings, Download, X, ListOrdered, Upload, CheckCircle2, AlertCircle, Clock, Loader2, Star, Image as ImageIcon } from 'lucide-vue-next'
 
 const props = defineProps({
   settings: { type: Object, required: true }
@@ -337,7 +335,10 @@ const crawlItem = async (row) => {
         sellPrice: (p.priceConfigured * mul).toFixed(2),
         brand: p.brand,
         images: p.images || [],
-        variations: p.variations || [],
+        variations: (p.variations || []).map(v => ({
+          ...v,
+          price: v.price ? Number((v.price * mul).toFixed(2)) : undefined
+        })),
         specs: p.specs || {},
         importantInfo: p.importantInfo || {},
         bulletPoints: p.bulletPoints || [],
@@ -396,10 +397,18 @@ onUnmounted(() => { if (unsubProgress) unsubProgress() })
   min-height: 0;
 }
 
-.grid-area {
-  flex: 1;
-  padding: 0;
-  overflow: hidden;
-  min-width: 0;
+
+/* Table wrap fix */
+.table-container {
+  width: 100%;
+  overflow: auto;
+}
+
+.table-container :deep(th) {
+  white-space: nowrap;
+}
+
+.table-container :deep(td) {
+  white-space: nowrap;
 }
 </style>
