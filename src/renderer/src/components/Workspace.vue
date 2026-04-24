@@ -231,7 +231,7 @@ const handleExport = async () => {
       // ─ Parent row ─
       const parentRelDetails = buildParentRelationshipDetails(r.variations)
       rows.push({
-        '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)': 'Add',
+        '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
         '*Category': r.ebayCategory || '',
         '*Title': (r.title || '').substring(0, 80),
         '*Description': description,
@@ -241,11 +241,14 @@ const handleExport = async () => {
         '*Format': props.settings.defaultFormat || 'FixedPrice',
         '*StartPrice': '',
         '*Duration': props.settings.defaultDuration || 'GTC',
-        '*Location': 'United States',
+        '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
         '*ReturnsAcceptedOption': 'ReturnsAccepted',
         'CustomLabel': r.asin,
         '*Relationship': '',
         '*RelationshipDetails': parentRelDetails,
+        'ShippingProfileName': props.settings.shippingProfileName || '',
+        'ReturnProfileName': props.settings.returnProfileName || '',
+        'PaymentProfileName': props.settings.paymentProfileName || '',
         ...aspectCols,
       })
 
@@ -253,7 +256,7 @@ const handleExport = async () => {
       for (const v of r.variations) {
         const childRelDetails = Object.entries(v.attributes || {}).map(([k, val]) => `${k}=${val}`).join(';')
         rows.push({
-          '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)': 'Add',
+          '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
           '*Category': '',
           '*Title': '',
           '*Description': '',
@@ -268,12 +271,15 @@ const handleExport = async () => {
           'CustomLabel': v.asin || '',
           '*Relationship': 'Variation',
           '*RelationshipDetails': childRelDetails,
+          'ShippingProfileName': '',
+          'ReturnProfileName': '',
+          'PaymentProfileName': '',
         })
       }
     } else {
       // ─ Single product (no variations) ─
       rows.push({
-        '*Action(SiteID=US|Country=US|Currency=USD|Version=1193)': 'Add',
+        '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
         '*Category': r.ebayCategory || '',
         '*Title': (r.title || '').substring(0, 80),
         '*Description': description,
@@ -283,11 +289,14 @@ const handleExport = async () => {
         '*Format': props.settings.defaultFormat || 'FixedPrice',
         '*StartPrice': r.sellPrice,
         '*Duration': props.settings.defaultDuration || 'GTC',
-        '*Location': 'United States',
+        '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
         '*ReturnsAcceptedOption': 'ReturnsAccepted',
         'CustomLabel': r.asin,
         '*Relationship': '',
         '*RelationshipDetails': '',
+        'ShippingProfileName': props.settings.shippingProfileName || '',
+        'ReturnProfileName': props.settings.returnProfileName || '',
+        'PaymentProfileName': props.settings.paymentProfileName || '',
         ...aspectCols,
       })
     }

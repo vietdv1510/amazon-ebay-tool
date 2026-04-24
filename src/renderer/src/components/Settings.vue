@@ -206,6 +206,29 @@
               </Select>
             </div>
           </div>
+
+          <div class="grid grid-cols-2 gap-6 mt-4">
+            <div class="space-y-2">
+              <Label>Location (*Location)</Label>
+              <Input type="text" placeholder="Ví dụ: US WAREHOUSE" v-model="form.defaultLocation" />
+              <p class="text-[0.8rem] text-muted-foreground">Địa điểm kho hàng xuất hiện trong listing</p>
+            </div>
+            <div class="space-y-2">
+              <Label>Shipping Profile Name</Label>
+              <Input type="text" placeholder="Ví dụ: Shipping" v-model="form.shippingProfileName" />
+              <p class="text-[0.8rem] text-muted-foreground">Tên Business Policy vận chuyển trên eBay</p>
+            </div>
+            <div class="space-y-2">
+              <Label>Return Profile Name</Label>
+              <Input type="text" placeholder="Ví dụ: Return" v-model="form.returnProfileName" />
+              <p class="text-[0.8rem] text-muted-foreground">Tên Business Policy đổi trả trên eBay</p>
+            </div>
+            <div class="space-y-2">
+              <Label>Payment Profile Name</Label>
+              <Input type="text" placeholder="Ví dụ: Payment" v-model="form.paymentProfileName" />
+              <p class="text-[0.8rem] text-muted-foreground">Tên Business Policy thanh toán trên eBay</p>
+            </div>
+          </div>
         </div>
       </div>
 
