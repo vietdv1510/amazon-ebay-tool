@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
 app.name = 'eBay Engine'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -91,6 +91,10 @@ let mainWindow
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.ebayengine.app')
+  if (process.platform === 'darwin') {
+    const iconPath = join(__dirname, '../../resources/icon.png')
+    app.dock.setIcon(nativeImage.createFromPath(iconPath))
+  }
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
