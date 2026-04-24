@@ -5,6 +5,8 @@ import icon from '../../resources/icon.png?asset'
 import fs from 'fs'
 import { crawlAmazon, cancelCrawl, closeBrowser } from './crawler'
 import { getCategorySuggestions, getCategoryAspects, getCategoryTree, clearTokenCache } from './ebay-api'
+import { fullSync } from './ebay-sync'
+import { getSyncStatus, closeDb } from './ebay-db'
 import path from 'path'
 
 // ─── Settings store (JSON file) ───────────────────────────────────────────────
@@ -101,6 +103,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', async () => {
   await closeBrowser()
+  closeDb()
   if (process.platform !== 'darwin') app.quit()
 })
 
@@ -226,4 +229,30 @@ ipcMain.handle('ebay:categoryTree', async () => {
 ipcMain.handle('ebay:clearCache', () => {
   clearTokenCache()
   return { ok: true }
+})
+
+// ─── eBay Data Sync ───────────────────────────────────────────────────────────
+
+// Sync toàn bộ category + aspects vào SQLite
+ipcMain.handle('ebay:syncData', async () => {
+  try {
+    const settings = loadSettings()
+    const result = await fullSync(settings, (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('ebay-sync-progress', progress)
+      }
+    })
+    return result
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
+// Lấy trạng thái sync hiện tại
+ipcMain.handle('ebay:getSyncStatus', () => {
+  try {
+    return { ok: true, data: getSyncStatus() }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
 })

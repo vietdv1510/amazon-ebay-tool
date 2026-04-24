@@ -95,6 +95,50 @@
             </div>
             <Switch :checked="form.useEbayAI" @update:checked="form.useEbayAI = $event" />
           </div>
+
+          <!-- eBay Data Sync -->
+          <div class="pt-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex flex-col space-y-1">
+                <Label class="flex items-center gap-2">
+                  <Database class="w-4 h-4" />
+                  Đồng bộ dữ liệu eBay (Offline Cache)
+                </Label>
+                <p class="text-[0.8rem] text-muted-foreground">
+                  Tải toàn bộ Category + Item Specifics về máy. Chỉ cần chạy 1 lần.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                @click="startSync"
+                :disabled="syncing"
+                class="min-w-[120px]"
+              >
+                <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': syncing }" />
+                {{ syncing ? 'Đang sync...' : 'Sync ngay' }}
+              </Button>
+            </div>
+
+            <!-- Progress bar -->
+            <div v-if="syncing" class="space-y-1">
+              <div class="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  class="h-full bg-primary rounded-full transition-all duration-300"
+                  :style="{ width: syncProgress.percent + '%' }"
+                />
+              </div>
+              <p class="text-xs text-muted-foreground">{{ syncProgress.message }}</p>
+            </div>
+
+            <!-- Sync status -->
+            <div v-if="syncStatus" class="text-xs text-muted-foreground space-y-0.5 p-3 rounded-md bg-muted/50">
+              <p>📂 Categories: <span class="font-mono text-foreground">{{ syncStatus.categoryCount?.toLocaleString() || 0 }}</span></p>
+              <p>📋 Aspects (categories): <span class="font-mono text-foreground">{{ syncStatus.aspectCategoryCount?.toLocaleString() || 0 }}</span></p>
+              <p v-if="syncStatus.lastSyncTime">🕐 Lần sync cuối: <span class="font-mono text-foreground">{{ formatSyncTime(syncStatus.lastSyncTime) }}</span></p>
+              <p v-else class="text-amber-600">⚠ Chưa đồng bộ lần nào</p>
+            </div>
+          </div>
         </div>
 
         <Separator />
@@ -176,8 +220,8 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
-import { DollarSign, Bot, ShoppingCart, Sparkles, ClipboardList, Save } from 'lucide-vue-next'
+import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { DollarSign, Bot, ShoppingCart, Sparkles, ClipboardList, Save, Database, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -201,5 +245,58 @@ const form = reactive({ ...props.initialSettings })
 
 const save = () => {
   emit('save', { ...form })
+}
+
+// ─── eBay Sync ─────────────────────────────────────────────────────────────────
+const syncing = ref(false)
+const syncProgress = ref({ step: '', message: '', percent: 0 })
+const syncStatus = ref(null)
+
+let cleanupProgress = null
+
+onMounted(async () => {
+  // Load sync status
+  try {
+    const res = await window.api.ebay.getSyncStatus()
+    if (res.ok) syncStatus.value = res.data
+  } catch (e) {
+    console.warn('Failed to load sync status:', e)
+  }
+
+  // Listen for progress events
+  cleanupProgress = window.api.ebay.onSyncProgress((progress) => {
+    syncProgress.value = progress
+  })
+})
+
+onUnmounted(() => {
+  if (cleanupProgress) cleanupProgress()
+})
+
+const startSync = async () => {
+  syncing.value = true
+  syncProgress.value = { step: '', message: 'Bắt đầu đồng bộ...', percent: 0 }
+
+  try {
+    const result = await window.api.ebay.syncData()
+    if (result.ok) {
+      syncProgress.value = { step: 'done', message: '✓ Đồng bộ thành công!', percent: 100 }
+      // Refresh status
+      const res = await window.api.ebay.getSyncStatus()
+      if (res.ok) syncStatus.value = res.data
+    } else {
+      syncProgress.value = { step: 'error', message: '✗ Lỗi: ' + result.error, percent: 0 }
+    }
+  } catch (e) {
+    syncProgress.value = { step: 'error', message: '✗ Lỗi: ' + e.message, percent: 0 }
+  } finally {
+    setTimeout(() => { syncing.value = false }, 2000)
+  }
+}
+
+const formatSyncTime = (iso) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 </script>

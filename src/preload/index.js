@@ -42,6 +42,12 @@ const api = {
     categoryAspects: (categoryId) => ipcRenderer.invoke('ebay:categoryAspects', categoryId),
     categoryTree: () => ipcRenderer.invoke('ebay:categoryTree'),
     clearCache: () => ipcRenderer.invoke('ebay:clearCache'),
+    syncData: () => ipcRenderer.invoke('ebay:syncData'),
+    getSyncStatus: () => ipcRenderer.invoke('ebay:getSyncStatus'),
+    onSyncProgress: (callback) => {
+      ipcRenderer.on('ebay-sync-progress', (_, data) => callback(data))
+      return () => ipcRenderer.removeAllListeners('ebay-sync-progress')
+    },
   }
 }
 

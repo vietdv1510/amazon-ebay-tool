@@ -128,10 +128,10 @@
         </div>
       </div>
 
-      <!-- Required Aspects (Item Specifics) -->
+      <!-- 🔴 Required Aspects -->
       <div v-if="requiredAspects.length > 0" class="mt-4">
         <div class="section-title flex items-center">
-          <ClipboardCheck class="w-4 h-4 mr-2" /> Item Specifics ({{ requiredAspects.length }} bắt buộc)
+          <ClipboardCheck class="w-4 h-4 mr-2 text-red-500" /> Bắt buộc ({{ requiredAspects.length }})
         </div>
         <div class="aspects-list mt-2">
           <div v-for="aspect in requiredAspects" :key="aspect.name" class="aspect-row">
@@ -154,12 +154,40 @@
         </div>
       </div>
 
-      <!-- Optional aspects (collapsed) -->
+      <!-- 🟡 Recommended Aspects -->
+      <div v-if="recommendedAspects.length > 0" class="mt-3">
+        <Collapsible :default-open="true">
+          <CollapsibleTrigger class="flex items-center gap-2 text-xs text-amber-600 hover:text-amber-500 cursor-pointer font-semibold">
+            <ChevronRight class="w-3 h-3" />
+            Nên có ({{ recommendedAspects.length }})
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div class="aspects-list mt-2">
+              <div v-for="aspect in recommendedAspects" :key="aspect.name" class="aspect-row">
+                <Label class="text-xs font-medium text-amber-700 dark:text-amber-400">{{ aspect.name }}</Label>
+                <div v-if="aspect.mode === 'SELECTION_ONLY' && aspect.values.length > 0" class="mt-1">
+                  <Select v-model="form.aspectValues[aspect.name]">
+                    <SelectTrigger class="h-8 text-xs">
+                      <SelectValue :placeholder="`Chọn ${aspect.name}`" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="v in aspect.values.slice(0, 50)" :key="v" :value="v">{{ v }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Input v-else v-model="form.aspectValues[aspect.name]" class="mt-1 h-8 text-xs" :placeholder="aspect.name" />
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+
+      <!-- ⚪ Optional Aspects (collapsed by default) -->
       <div v-if="optionalAspects.length > 0" class="mt-3">
         <Collapsible>
           <CollapsibleTrigger class="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
             <ChevronRight class="w-3 h-3" />
-            Thêm Item Specifics ({{ optionalAspects.length }} tùy chọn)
+            Không bắt buộc ({{ optionalAspects.length }})
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div class="aspects-list mt-2">
@@ -415,8 +443,9 @@ const autoMapAspect = (aspectName) => {
   return ''
 }
 
-const requiredAspects = computed(() => allAspects.value.filter(a => a.required))
-const optionalAspects = computed(() => allAspects.value.filter(a => !a.required))
+const requiredAspects = computed(() => allAspects.value.filter(a => a.required || a.usage === 'REQUIRED'))
+const recommendedAspects = computed(() => allAspects.value.filter(a => !a.required && a.usage === 'RECOMMENDED'))
+const optionalAspects = computed(() => allAspects.value.filter(a => !a.required && a.usage !== 'RECOMMENDED'))
 
 // ─── Variations ────────────────────────────────────────────────────────────────
 const variationDimNames = computed(() => {

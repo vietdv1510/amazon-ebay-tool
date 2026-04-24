@@ -1,7 +1,9 @@
 /**
  * eBay Taxonomy API Service
  * Dùng Application Token (Client Credentials) — không cần user login
+ * Hỗ trợ SQLite local cache để giảm API calls
  */
+import { getAspectsFromCache, getCategoryTreeFromCache } from './ebay-db'
 
 const EBAY_CATEGORY_TREE_ID = '0' // US marketplace
 
@@ -81,6 +83,7 @@ async function ebayGet(path, settings) {
 
 /**
  * Lấy danh sách category gợi ý từ title/keyword
+ * Luôn call API (thuật toán AI search của eBay)
  * @returns Array of { categoryId, categoryName, categoryTreeNodeLevel, relevancy }
  */
 export async function getCategorySuggestions(query, settings) {
@@ -96,40 +99,78 @@ export async function getCategorySuggestions(query, settings) {
     categoryTreeNodeLevel: s.categoryTreeNodeLevel,
     relevancy: s.relevancy,
     // Build breadcrumb path
-    path: (s.categoryTreePath || []).map(p => p.categoryName).join(' › ')
+    path: (s.categoryTreeNodeAncestors || []).map(p => p.categoryName).reverse().join(' › ')
   }))
 }
 
 /**
  * Lấy Item Specifics (aspects) bắt buộc/tùy chọn cho 1 category
- * @returns Array of aspect objects
+ * Ưu tiên đọc từ SQLite cache. Nếu cache miss thì fallback call API.
+ * @returns Array of aspect objects with 3-tier usage
  */
 export async function getCategoryAspects(categoryId, settings) {
+  // 1. Thử đọc từ SQLite cache trước
+  try {
+    const cached = getAspectsFromCache(categoryId)
+    if (cached && cached.length > 0) {
+      return cached
+    }
+  } catch (e) {
+    console.warn('SQLite cache read failed, falling back to API:', e.message)
+  }
+
+  // 2. Fallback: gọi API
   const data = await ebayGet(
     `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_item_aspects_for_category?category_id=${categoryId}`,
     settings
   )
 
-  return (data.aspects || []).map(aspect => ({
-    name: aspect.localizedAspectName,
-    required: aspect.aspectConstraint?.aspectRequired || false,
-    mode: aspect.aspectConstraint?.aspectMode || 'FREE_TEXT', // FREE_TEXT | SELECTION_ONLY
-    values: (aspect.aspectValues || []).map(v => v.localizedValue),
-    maxLength: aspect.aspectConstraint?.itemToAspectCardinality === 'MULTI' ? 'MULTI' : 'SINGLE',
-  }))
+  return (data.aspects || []).map(aspect => {
+    const constraint = aspect.aspectConstraint || {}
+    const isRequired = constraint.aspectRequired === true
+    const aspectUsage = constraint.aspectUsage || 'OPTIONAL'
+
+    let usage
+    if (isRequired) {
+      usage = 'REQUIRED'
+    } else if (aspectUsage === 'RECOMMENDED') {
+      usage = 'RECOMMENDED'
+    } else {
+      usage = 'OPTIONAL'
+    }
+
+    return {
+      name: aspect.localizedAspectName,
+      required: isRequired,
+      usage, // REQUIRED | RECOMMENDED | OPTIONAL
+      mode: constraint.aspectMode || 'FREE_TEXT',
+      cardinality: constraint.itemToAspectCardinality || 'SINGLE',
+      values: (aspect.aspectValues || []).map(v => v.localizedValue),
+    }
+  })
 }
 
 /**
- * Tìm top-level category tree (để build dropdown)
- * Chỉ lấy các node cấp 1 và 2 để tránh response quá lớn
+ * Tìm top-level category tree
+ * Ưu tiên đọc từ SQLite cache
  */
 export async function getCategoryTree(settings) {
+  // 1. Thử đọc từ SQLite cache trước
+  try {
+    const cached = getCategoryTreeFromCache()
+    if (cached && cached.length > 0) {
+      return cached
+    }
+  } catch (e) {
+    console.warn('SQLite cache read failed, falling back to API:', e.message)
+  }
+
+  // 2. Fallback: gọi API
   const data = await ebayGet(
     `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}`,
     settings
   )
 
-  // Chỉ lấy cấp 1 (rootCategoryNode.childCategoryTreeNodes)
   const rootNodes = data.rootCategoryNode?.childCategoryTreeNodes || []
   return rootNodes.map(node => ({
     id: node.category.categoryId,
