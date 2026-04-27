@@ -151,14 +151,26 @@
                   @dblclick="startEdit(idx, col, row[col])"
                 >
                   <template v-if="editingCell?.rowIdx === idx && editingCell?.col === col">
-                    <input
-                      class="cell-input"
-                      v-model="editingValue"
-                      @blur="commitEdit(idx, col)"
-                      @keydown.enter="commitEdit(idx, col)"
-                      @keydown.escape="cancelEdit"
-                      ref="editInputRef"
-                    />
+                    <div class="cell-editor-popup">
+                      <div class="cell-editor-actions">
+                        <button @mousedown.prevent="commitEdit(idx, col)" class="editor-btn btn-save" title="Lưu (Ctrl+Enter)">
+                          <Check class="w-3 h-3" />
+                        </button>
+                        <button @mousedown.prevent="cancelEdit" class="editor-btn btn-cancel" title="Hủy (Esc)">
+                          <X class="w-3 h-3" />
+                        </button>
+                      </div>
+                      <textarea
+                        class="cell-textarea"
+                        v-model="editingValue"
+                        @blur="commitEdit(idx, col)"
+                        @keydown.enter.ctrl="commitEdit(idx, col)"
+                        @keydown.enter.meta="commitEdit(idx, col)"
+                        @keydown.escape="cancelEdit"
+                        ref="editInputRef"
+                        placeholder="Nhập nội dung..."
+                      ></textarea>
+                    </div>
                   </template>
                   <template v-else-if="col === '*Title'">
                     <div class="p-2 w-full h-full">
@@ -193,7 +205,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   FileSpreadsheet, Download, RefreshCw, AlertTriangle,
-  Package, Rows3, Columns3
+  Package, Rows3, Columns3, Check, X
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -888,8 +900,6 @@ watch(readyProducts, buildPreview, { deep: true })
   padding: 0;
   white-space: nowrap;
   max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   position: relative;
 }
 
@@ -910,22 +920,72 @@ watch(readyProducts, buildPreview, { deep: true })
   pointer-events: none;
 }
 
-.cell-input {
+.cell-editor-popup {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  min-width: 100%;
-  padding: 4px 8px;
+  top: -1px;
+  left: -1px;
+  min-width: calc(100% + 2px);
+  width: max-content;
+  max-width: 400px;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: hsl(var(--background));
   border: 2px solid hsl(210 80% 55%);
-  border-radius: 0;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cell-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 2px 4px;
+  background: hsl(210 20% 98%);
+  border-bottom: 1px solid hsl(210 20% 90%);
+  border-radius: 2px 2px 0 0;
+}
+
+.editor-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  transition: all 0.1s;
+}
+
+.editor-btn:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.btn-save:hover {
+  background: hsl(142 70% 90%);
+  color: hsl(142 70% 30%);
+}
+
+.btn-cancel:hover {
+  background: hsl(0 70% 94%);
+  color: hsl(0 70% 40%);
+}
+
+.cell-textarea {
+  width: 100%;
+  min-height: 70px;
+  padding: 6px 8px;
+  border: none;
   outline: none;
-  background: hsl(0 0% 100%);
+  background: transparent;
   font-size: 11px;
   font-family: inherit;
-  box-sizing: border-box;
-  z-index: 10;
+  resize: vertical;
+  line-height: 1.4;
 }
 
 .cell-content {
