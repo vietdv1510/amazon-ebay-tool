@@ -52,6 +52,38 @@
       <!-- Legend -->
       <div v-if="readyProducts.length > 0" class="legend-card">
         <div class="legend-group">
+          <span class="legend-group-label">Ý nghĩa cột</span>
+          <div class="legend-items">
+            <div class="legend-chip chip-req">
+              <span class="col-usage-badge badge-required" style="margin-left: 0;">R</span>
+              Required
+            </div>
+            <div class="legend-chip chip-rec">
+              <span class="col-usage-badge badge-recommended" style="margin-left: 0;">~</span>
+              Recommended
+            </div>
+            <div class="legend-chip chip-opt">
+              <span class="col-usage-badge badge-optional" style="margin-left: 0;">O</span>
+              Optional
+            </div>
+          </div>
+        </div>
+        <div class="legend-divider"></div>
+        <div class="legend-group">
+          <span class="legend-group-label">Trạng thái ô (Cell)</span>
+          <div class="legend-items">
+            <div class="legend-chip chip-error">
+              <span class="chip-dot dot-error"></span>
+              Thiếu bắt buộc
+            </div>
+            <div class="legend-chip chip-note" style="background: transparent; border: none; padding: 0;">
+              <span class="chip-icon text-[11px] text-amber-500">⚡</span>
+              Khác Usage giữa các danh mục
+            </div>
+          </div>
+        </div>
+        <div class="legend-divider"></div>
+        <div class="legend-group">
           <span class="legend-group-label">Loại dòng</span>
           <div class="legend-items">
             <div class="legend-chip chip-parent">
@@ -65,38 +97,6 @@
             <div class="legend-chip chip-single">
               <span class="chip-dot dot-single"></span>
               Single
-            </div>
-            <div class="legend-chip chip-error">
-              <span class="chip-dot dot-error"></span>
-              Thiếu bắt buộc
-            </div>
-          </div>
-        </div>
-        <div class="legend-divider"></div>
-        <div class="legend-group">
-          <span class="legend-group-label">Cột aspect (C:)</span>
-          <div class="legend-items">
-            <div class="legend-chip chip-req">
-              <span class="chip-icon">✱</span>
-              Required
-            </div>
-            <div class="legend-chip chip-rec">
-              <span class="chip-icon">◆</span>
-              Recommended
-            </div>
-            <div class="legend-chip chip-opt">
-              <span class="chip-icon">○</span>
-              Optional
-            </div>
-          </div>
-        </div>
-        <div class="legend-divider"></div>
-        <div class="legend-group">
-          <span class="legend-group-label">Ghi chú</span>
-          <div class="legend-items">
-            <div class="legend-chip chip-note">
-              <span class="chip-icon text-[9px]">⚡</span>
-              Cùng cột, khác usage giữa các category sẽ hiển thị badge
             </div>
           </div>
         </div>
@@ -129,7 +129,6 @@
                     <span v-if="isMultiUsageCol(col)" class="col-multi-marker" title="Usage khác nhau giữa các category">⚡</span>
                   </div>
                 </th>
-                <th class="w-full border-0 bg-transparent"></th>
               </tr>
             </thead>
             <tbody>
@@ -159,10 +158,9 @@
                     'empty-required': isCellMissingRequired(row, col),
                     'empty-cell': !row[col],
                     'empty-ready': !isCellMissingRequired(row, col) && !row[col] && getCellUsage(row, col) !== 'OPTIONAL',
-                    'cell-required': getCellUsage(row, col) === 'REQUIRED' && !isCellMissingRequired(row, col),
-                    'cell-recommended': getCellUsage(row, col) === 'RECOMMENDED',
-                    'cell-optional': getCellUsage(row, col) === 'OPTIONAL',
-                    'cell-mixed-usage': isCellMixedUsage(row, col),
+                    'cell-required': row._rowType !== 'child' && getCellUsage(row, col) === 'REQUIRED' && !isCellMissingRequired(row, col),
+                    'cell-recommended': row._rowType !== 'child' && getCellUsage(row, col) === 'RECOMMENDED',
+                    'cell-optional': row._rowType !== 'child' && getCellUsage(row, col) === 'OPTIONAL'
                   }"
                   :title="editingCell?.rowIdx === idx && editingCell?.col === col ? '' : (row[col] || '')"
                   @dblclick="startEdit(idx, col, row[col])"
@@ -191,7 +189,6 @@
                     </div>
                   </template>
                 </td>
-                <td class="border-0 bg-transparent"></td>
               </tr>
             </tbody>
           </table>
@@ -840,10 +837,13 @@ watch(readyProducts, buildPreview, { deep: true })
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 2px 0 0;
+  padding: 0 16px 0 0;
 }
 
 .cell-usage-tag {
+  position: absolute;
+  top: 4px;
+  right: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -861,25 +861,10 @@ watch(readyProducts, buildPreview, { deep: true })
 .tag-recommended { background: hsl(30 90% 92%); color: hsl(25 65% 38%); border: 1px solid hsl(30 70% 76%); }
 .tag-optional { background: hsl(270 30% 93%); color: hsl(270 30% 45%); border: 1px solid hsl(270 25% 82%); }
 
-.cell-mixed-usage {
-  position: relative;
-}
-.cell-mixed-usage::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-top: 6px solid hsl(25 80% 55%);
-  z-index: 1;
-}
-
 
 .preview-table th {
   background: hsl(var(--muted));
-  border: 1px solid hsl(var(--border));
+  border: 1px solid rgba(128, 128, 128, 0.25);
   padding: 6px 8px;
   font-weight: 600;
   white-space: nowrap;
@@ -891,7 +876,7 @@ watch(readyProducts, buildPreview, { deep: true })
 }
 
 .preview-table td {
-  border: 1px solid hsl(var(--border));
+  border: 1px solid rgba(128, 128, 128, 0.25);
   padding: 0;
   white-space: nowrap;
   max-width: 220px;

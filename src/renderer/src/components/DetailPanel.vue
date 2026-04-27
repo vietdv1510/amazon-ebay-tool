@@ -157,8 +157,8 @@
       <!-- 🟡 Recommended Aspects -->
       <div v-if="recommendedAspects.length > 0" class="mt-3">
         <Collapsible :default-open="true">
-          <CollapsibleTrigger class="flex items-center gap-2 text-xs text-amber-600 hover:text-amber-500 cursor-pointer font-semibold">
-            <ChevronRight class="w-3 h-3" />
+          <CollapsibleTrigger class="flex items-center gap-2 text-xs text-amber-600 hover:text-amber-500 cursor-pointer font-semibold [&[data-state=open]>svg]:rotate-90">
+            <ChevronRight class="w-3 h-3 transition-transform duration-200" />
             Nên có ({{ recommendedAspects.length }})
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -185,8 +185,8 @@
       <!-- ⚪ Optional Aspects (collapsed by default) -->
       <div v-if="optionalAspects.length > 0" class="mt-3">
         <Collapsible>
-          <CollapsibleTrigger class="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-            <ChevronRight class="w-3 h-3" />
+          <CollapsibleTrigger class="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer [&[data-state=open]>svg]:rotate-90">
+            <ChevronRight class="w-3 h-3 transition-transform duration-200" />
             Không bắt buộc ({{ optionalAspects.length }})
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -281,7 +281,8 @@
           <FileText class="w-4 h-4 mr-2" /> Mô tả sản phẩm
         </div>
         <Collapsible>
-          <CollapsibleTrigger class="text-xs text-blue-500 hover:text-blue-400 cursor-pointer mt-1">
+          <CollapsibleTrigger class="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-400 cursor-pointer mt-1 [&[data-state=open]>svg]:rotate-90">
+            <ChevronRight class="w-3 h-3 transition-transform duration-200" />
             Xem / Ẩn mô tả
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -329,7 +330,7 @@
 </template>
 
 <script setup>
-import { reactive, computed, ref, watch } from 'vue'
+import { reactive, computed, ref, watch, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -407,14 +408,9 @@ const searchCategory = async () => {
   }
 }
 
-const selectCategory = async (cat) => {
-  form.ebayCategory = cat.categoryId
-  form.ebayCategoryName = cat.categoryName
-  showCategorySearch.value = false
-
-  // Fetch required aspects
+const loadCategoryAspects = async (categoryId) => {
   try {
-    const res = await window.api.ebay.categoryAspects(cat.categoryId)
+    const res = await window.api.ebay.categoryAspects(categoryId)
     if (res.ok) {
       allAspects.value = res.data
 
@@ -429,6 +425,19 @@ const selectCategory = async (cat) => {
     console.error('Failed to load aspects:', err)
   }
 }
+
+const selectCategory = async (cat) => {
+  form.ebayCategory = cat.categoryId
+  form.ebayCategoryName = cat.categoryName
+  showCategorySearch.value = false
+  await loadCategoryAspects(cat.categoryId)
+}
+
+onMounted(async () => {
+  if (form.ebayCategory) {
+    await loadCategoryAspects(form.ebayCategory)
+  }
+})
 
 const clearCategory = () => {
   form.ebayCategory = ''
