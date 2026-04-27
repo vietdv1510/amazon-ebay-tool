@@ -84,8 +84,21 @@
         </div>
       </div>
 
+      <!-- Preview Table Skeleton -->
+      <div v-if="isPreviewLoading" class="flex-1 flex flex-col gap-4 mx-4 mt-2 h-full overflow-hidden">
+        <div class="flex items-center gap-4 border-b border-border/50 pb-3">
+          <Skeleton class="h-8 w-[60px] rounded" />
+          <Skeleton class="h-8 w-[100px] rounded" />
+          <Skeleton class="h-8 w-[150px] rounded" />
+          <Skeleton class="h-8 flex-1 rounded" />
+        </div>
+        <div class="space-y-3 mt-2">
+          <Skeleton v-for="i in 10" :key="i" class="h-10 w-full rounded" />
+        </div>
+      </div>
+
       <!-- Preview Table -->
-      <div v-if="readyProducts.length > 0" class="table-scroll-wrapper">
+      <div v-else-if="readyProducts.length > 0" class="table-scroll-wrapper">
         <div class="table-inner">
           <table class="preview-table">
             <thead>
@@ -201,6 +214,7 @@ import { toast } from 'vue-sonner'
 import { globalRowData as rowData } from '../store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   FileSpreadsheet, Download, RefreshCw, AlertTriangle,
   Package, Rows3, Columns3, Check, X
@@ -439,9 +453,12 @@ const getRowClass = (row) => ({
   'single-row': row._rowType === 'single',
 })
 
+const isPreviewLoading = ref(false)
+
 // ─── Build preview data (same logic as Workspace export) ──────────────────────
 
 const buildPreview = async () => {
+  isPreviewLoading.value = true
   const rows = []
   // Per-category aspect meta: { [catId]: { 'C:Name': usage } }
   const newCatMeta = {}
