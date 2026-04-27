@@ -243,7 +243,7 @@ const handleExport = async () => {
       rows.push({
         '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
         '*Category': r.ebayCategory || '',
-        '*Title': (r.title || '').substring(0, 80),
+        '*Title': cleanTitle(r.title),
         '*Description': description,
         '*ConditionID': props.settings.defaultCondition || '1000',
         'PicURL': (r.images || []).slice(0, 12).join('|'),
@@ -264,9 +264,9 @@ const handleExport = async () => {
 
       // ─ Child (Variation) rows ─
       for (const v of r.variations) {
-        const childRelDetails = Object.entries(v.attributes || {}).map(([k, val]) => `${k}=${val}`).join(';')
+        const childRelDetails = Object.entries(v.attributes || {}).map(([k, val]) => `${k}=${val}`).join('|')
         rows.push({
-          '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
+          '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': '',
           '*Category': '',
           '*Title': '',
           '*Description': '',
@@ -291,7 +291,7 @@ const handleExport = async () => {
       rows.push({
         '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
         '*Category': r.ebayCategory || '',
-        '*Title': (r.title || '').substring(0, 80),
+        '*Title': cleanTitle(r.title),
         '*Description': description,
         '*ConditionID': props.settings.defaultCondition || '1000',
         'PicURL': (r.images || []).slice(0, 12).join('|'),
@@ -314,12 +314,14 @@ const handleExport = async () => {
 
   const ws = xlsx.utils.json_to_sheet(rows)
   const csv = xlsx.utils.sheet_to_csv(ws)
-  await window.api.file.write(exportPath, csv)
+  // eBay requires UTF-8 BOM for correct Unicode parsing
+  const csvWithBom = '\uFEFF' + csv
+  await window.api.file.write(exportPath, csvWithBom)
   alert(`Export thành công! ${readyRows.length} sản phẩm (${rows.length} dòng CSV).`)
 }
 
 // Build parent RelationshipDetails: all dimension values combined
-// e.g. "Color=Red;Blue;Green;Size=S;M;L"
+// e.g. "Color=Red;Blue;Green|Size=S;M;L"
 const buildParentRelationshipDetails = (variations) => {
   const dimValues = {}
   for (const v of variations) {
@@ -330,7 +332,20 @@ const buildParentRelationshipDetails = (variations) => {
   }
   return Object.entries(dimValues)
     .map(([key, vals]) => `${key}=${[...vals].join(';')}`)
-    .join(';')
+    .join('|')
+}
+
+/**
+ * Clean title for eBay: strip problematic chars, limit to 80 chars
+ */
+const cleanTitle = (title) => {
+  if (!title) return ''
+  return title
+    .replace(/[\u{1F600}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // strip emoji
+    .replace(/[【】「」『』]/g, ' ')  // CJK brackets → space
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 80)
 }
 
 // Build C:Brand, C:Color, etc. columns from aspectValues

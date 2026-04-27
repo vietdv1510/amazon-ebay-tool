@@ -67,6 +67,12 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     progressCb('[PROGRESS] Đang chờ trang tải...')
     await page.waitForTimeout(waitMs)
 
+    // Wait for product title to actually render (JS-driven pages load it late)
+    progressCb('[PROGRESS] Đang chờ tiêu đề sản phẩm...')
+    await page.waitForSelector('#productTitle, span#title, h1.a-size-large', {
+      timeout: 15000
+    }).catch(() => {}) // non-fatal: proceed even if not found
+
     // ── Try to set US delivery address ────────────────────────────────────
     progressCb('[PROGRESS] Đang thiết lập vùng US...')
     try {
@@ -76,15 +82,29 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     }
 
     progressCb('[PROGRESS] Trích xuất dữ liệu sản phẩm...')
+
+    // ── Title ────────────────────────────────────────────────────────────
+    // html was already fetched after waitForSelector — use page.content() once here
     const html = await page.content()
     const $ = cheerio.load(html)
 
-    // ── Title ────────────────────────────────────────────────────────────
-    const title = $('#productTitle').text().trim()
+    const title =
+      $('#productTitle').text().trim() ||
+      $('span#title').text().trim() ||
+      $('h1.a-size-large').text().trim() ||
+      await page.$eval('#productTitle, span#title, h1.a-size-large', el => el.textContent.trim()).catch(() => '')
+
     if (!title && html.includes('captcha')) {
       throw new Error('Amazon Anti-Bot Captcha — thử lại sau hoặc tắt Headless Mode.')
     }
     if (!title) throw new Error('Không tìm thấy tiêu đề sản phẩm.')
+
+    // Wait for other lazy-loaded sections before scraping them
+    await Promise.allSettled([
+      page.waitForSelector('#feature-bullets', { timeout: 8000 }),
+      page.waitForSelector('#availability', { timeout: 8000 }),
+      page.waitForSelector('#wayfinding-breadcrumbs_feature_div, #wayfinding-breadcrumbs_container', { timeout: 8000 }),
+    ])
 
     // ── Price — FIXED: use JS data first, then careful DOM parsing ──────
     progressCb('[PROGRESS] Đang lấy thông tin giá...')
@@ -683,4 +703,94 @@ export function cancelCrawl(asin) {
     page.close().catch(() => {})
     activeCrawls.delete(asin)
   }
+}
+
+/**
+ * Sanitize HTML scraped from Amazon for safe use in eBay listings.
+ * eBay allows: b, strong, i, em, u, br, p, ul, ol, li, table, tr, td, th,
+ *              thead, tbody, tfoot, caption, h1-h6, span, div, img (https only),
+ *              a (https, target=_blank).
+ * eBay BLOCKS: script, style, iframe, form, input, button, JS event attrs,
+ *              Amazon CDN images, relative URLs.
+ *
+ * @param {string} rawHtml - HTML from Amazon description/A+ content
+ * @returns {string} Clean, eBay-safe HTML
+ */
+export function sanitizeHtmlForEbay(rawHtml) {
+  if (!rawHtml) return ''
+
+  const ALLOWED_TAGS = new Set([
+    'b', 'strong', 'i', 'em', 'u', 'br', 'p', 'span', 'div',
+    'ul', 'ol', 'li',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
+    'img', 'a',
+  ])
+
+  const $ = cheerio.load(rawHtml, { decodeEntities: false })
+
+  // Remove entirely: script, style, iframe, form, input, button, svg, noscript
+  $('script, style, iframe, form, input, button, select, textarea, svg, noscript, object, embed').remove()
+
+  // Walk every element
+  $('*').each((_, el) => {
+    if (el.type !== 'tag') return
+    const tagName = el.name?.toLowerCase()
+
+    if (!ALLOWED_TAGS.has(tagName)) {
+      // Replace disallowed tag with its children (unwrap)
+      $(el).replaceWith($(el).contents())
+      return
+    }
+
+    // Strip all attributes except safe ones per tag
+    const attribs = el.attribs || {}
+    const safe = {}
+
+    if (tagName === 'a') {
+      const href = (attribs.href || '').trim()
+      if (href.startsWith('https://')) {
+        safe.href = href
+        safe.target = '_blank'
+        safe.rel = 'noopener noreferrer'
+      }
+    }
+
+    if (tagName === 'img') {
+      const src = (attribs.src || attribs['data-src'] || '').trim()
+      // Only keep HTTPS images, skip Amazon thumbnail/sprite URLs
+      if (
+        src.startsWith('https://') &&
+        !src.includes('sprite') &&
+        !src.includes('grey-pixel') &&
+        !src.includes('1x1')
+      ) {
+        // Convert Amazon thumbnail to full resolution
+        safe.src = src.replace(/\._.*_\./, '.')
+        if (attribs.alt) safe.alt = attribs.alt
+        // eBay recommends max 700px width
+        safe.style = 'max-width:700px;height:auto;'
+      } else {
+        // Invalid/Amazon-internal image → remove entirely
+        $(el).remove()
+        return
+      }
+    }
+
+    // For td/th: keep colspan/rowspan
+    if (tagName === 'td' || tagName === 'th') {
+      if (attribs.colspan) safe.colspan = attribs.colspan
+      if (attribs.rowspan) safe.rowspan = attribs.rowspan
+    }
+
+    // Replace attribs with safe-only set
+    el.attribs = safe
+  })
+
+  // Get inner body HTML, trim whitespace blocks
+  const cleaned = $('body').html() || ''
+  return cleaned
+    .replace(/<br\s*\/?>\s*(<br\s*\/?>\s*)+/gi, '<br>') // collapse multiple <br>
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }

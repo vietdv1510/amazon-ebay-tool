@@ -361,7 +361,7 @@ const buildPreview = async () => {
         _ebayCategory: r.ebayCategory || '',
         '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
         '*Category': r.ebayCategory || '',
-        '*Title': (r.title || '').substring(0, 80),
+        '*Title': cleanTitle(r.title),
         '*Description': description,
         '*ConditionID': props.settings.defaultCondition || '1000',
         'PicURL': (r.images || []).slice(0, 12).join('|'),
@@ -384,11 +384,11 @@ const buildPreview = async () => {
       for (const v of r.variations) {
         const childRelDetails = Object.entries(v.attributes || {})
           .map(([k, val]) => `${k}=${val}`)
-          .join(';')
+          .join('|')
         rows.push({
           _rowType: 'child',
           _ebayCategory: r.ebayCategory || '',
-          '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
+          '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': '',
           '*Category': '',
           '*Title': '',
           '*Description': '',
@@ -415,7 +415,7 @@ const buildPreview = async () => {
         _ebayCategory: r.ebayCategory || '',
         '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
         '*Category': r.ebayCategory || '',
-        '*Title': (r.title || '').substring(0, 80),
+        '*Title': cleanTitle(r.title),
         '*Description': description,
         '*ConditionID': props.settings.defaultCondition || '1000',
         'PicURL': (r.images || []).slice(0, 12).join('|'),
@@ -483,14 +483,6 @@ const buildDescription = (row) => {
     parts.push('</ul>')
   }
 
-  if (row.images?.length > 0) {
-    parts.push('<div style="margin:16px 0">')
-    row.images.slice(0, 5).forEach(img => {
-      parts.push(`<img src="${img}" style="max-width:700px;width:100%;display:block;margin:8px 0" />`)
-    })
-    parts.push('</div>')
-  }
-
   if (row.description) {
     parts.push(`<p style="margin-top:12px">${escapeHtml(row.description.substring(0, 2000))}</p>`)
   }
@@ -528,11 +520,29 @@ const buildAspectColumns = (row) => {
 }
 
 const buildParentRelationshipDetails = (variations) => {
-  const allKeys = new Set()
+  const dimValues = {}
   for (const v of variations) {
-    if (v.attributes) Object.keys(v.attributes).forEach(k => allKeys.add(k))
+    for (const [key, val] of Object.entries(v.attributes || {})) {
+      if (!dimValues[key]) dimValues[key] = new Set()
+      if (val) dimValues[key].add(val)
+    }
   }
-  return [...allKeys].join(';')
+  return Object.entries(dimValues)
+    .map(([key, vals]) => `${key}=${[...vals].join(';')}`)
+    .join('|')
+}
+
+/**
+ * Clean title for eBay: strip problematic chars, limit to 80 chars
+ */
+const cleanTitle = (title) => {
+  if (!title) return ''
+  return title
+    .replace(/[\u{1F600}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // strip emoji
+    .replace(/[【】「」『』]/g, ' ')  // CJK brackets → space
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 80)
 }
 
 // ─── Export (reuses preview data) ─────────────────────────────────────────────
@@ -551,7 +561,9 @@ const handleExport = async () => {
 
   const ws = xlsx.utils.json_to_sheet(exportRows)
   const csv = xlsx.utils.sheet_to_csv(ws)
-  await window.api.file.write(exportPath, csv)
+  // eBay requires UTF-8 BOM for correct Unicode parsing
+  const csvWithBom = '\uFEFF' + csv
+  await window.api.file.write(exportPath, csvWithBom)
   alert(`Export thành công! ${readyProducts.value.length} sản phẩm (${exportRows.length} dòng CSV).`)
 }
 
