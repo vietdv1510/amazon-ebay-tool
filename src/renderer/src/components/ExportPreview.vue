@@ -666,6 +666,33 @@ const cleanTitle = (title) => {
 // ─── Export (reuses preview data) ─────────────────────────────────────────────
 
 const handleExport = async () => {
+  // Validate rows before export
+  let hasErrors = false;
+  let errorMsgs = [];
+
+  previewRows.value.forEach((row, idx) => {
+    // 1. Check title length (max 80 for eBay)
+    if (row['*Title'] && row['*Title'].length > 80) {
+      hasErrors = true;
+      errorMsgs.push(`Dòng ${idx + 1}: *Title quá dài (${row['*Title'].length}/80 ký tự)`);
+    }
+
+    // 2. Check missing required fields
+    allColumns.value.forEach(col => {
+      if (isCellMissingRequired(row, col)) {
+        hasErrors = true;
+        errorMsgs.push(`Dòng ${idx + 1}: Thiếu trường bắt buộc [${col}]`);
+      }
+    });
+  });
+
+  if (hasErrors) {
+    const displayErrors = errorMsgs.slice(0, 7).join('\n');
+    const more = errorMsgs.length > 7 ? `\n... và ${errorMsgs.length - 7} lỗi khác.` : '';
+    alert(`Không thể xuất file vì có lỗi dữ liệu:\n\n${displayErrors}${more}\n\nVui lòng sửa các lỗi trên (ô có viền đỏ) trước khi Export.`);
+    return;
+  }
+
   const exportPath = await window.api.dialog.saveFile({ defaultPath: 'ebay-upload-template.csv' })
   if (!exportPath) return
 
