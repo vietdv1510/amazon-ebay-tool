@@ -59,7 +59,7 @@
               <Label>Ẩn trình duyệt (Headless Mode)</Label>
               <p class="text-[0.8rem] text-muted-foreground">Khi bật, Playwright chạy ẩn — không mở cửa sổ Chrome. Khuyên dùng để tăng hiệu suất.</p>
             </div>
-            <Switch :checked="form.headlessMode" @update:checked="form.headlessMode = $event" />
+            <Switch v-model="form.headlessMode" />
           </div>
         </div>
 
@@ -96,7 +96,7 @@
               <Label>Dùng eBay AI Category Mapping</Label>
               <p class="text-[0.8rem] text-muted-foreground">Tự động gợi ý category bằng eBay Taxonomy API khi có token hợp lệ.</p>
             </div>
-            <Switch :checked="form.useEbayAI" @update:checked="form.useEbayAI = $event" />
+            <Switch v-model="form.useEbayAI" />
           </div>
 
           <!-- eBay Data Sync -->
@@ -157,7 +157,7 @@
               <Label>Bật tối ưu nội dung bằng Gemini</Label>
               <p class="text-[0.8rem] text-muted-foreground">Dùng Gemini API để rewrite title/description phù hợp eBay.</p>
             </div>
-            <Switch :checked="form.useGemini" @update:checked="form.useGemini = $event" />
+            <Switch v-model="form.useGemini" />
           </div>
           <div class="space-y-2 pt-2" v-if="form.useGemini">
             <Label>Gemini API Key</Label>
@@ -250,6 +250,7 @@ import { reactive, ref, onMounted, onUnmounted } from 'vue'
 import { DollarSign, Bot, ShoppingCart, Sparkles, ClipboardList, Save, Database, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { toast } from 'vue-sonner'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
@@ -271,6 +272,9 @@ const form = reactive({ ...props.initialSettings })
 
 const save = () => {
   emit('save', { ...form })
+  toast.success('Lưu cài đặt thành công!', {
+    description: 'Các cấu hình của bạn đã được cập nhật.'
+  })
 }
 
 // ─── eBay Sync ─────────────────────────────────────────────────────────────────

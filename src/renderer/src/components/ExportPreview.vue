@@ -8,14 +8,13 @@
       </div>
 
       <div class="header-actions flex gap-2 items-center">
-        <Button variant="outline" size="sm" @click="refreshPreview" :disabled="isRefreshing">
-          <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': isRefreshing }" />
-          Làm mới
-        </Button>
-        <Button size="sm" @click="handleExport" :disabled="previewRows.length === 0">
-          <Download class="w-4 h-4 mr-2" />
-          Export CSV
-        </Button>
+          <Button size="sm" variant="destructive" @click="handleExport(true)" :disabled="previewRows.length === 0" title="Ép xuất không cần kiểm tra lỗi">
+            Export thô (Bỏ qua lỗi)
+          </Button>
+          <Button size="sm" @click="handleExport(false)" :disabled="previewRows.length === 0">
+            <Download class="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
       </div>
     </div>
 
@@ -43,9 +42,9 @@
           <Columns3 class="w-3.5 h-3.5 text-purple-500" />
           <span class="text-xs font-medium text-purple-700 dark:text-purple-300">{{ allColumns.length }} cột</span>
         </div>
-        <div v-if="missingCount > 0" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-800">
+        <div v-if="errorCount > 0" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-800">
           <AlertTriangle class="w-3.5 h-3.5 text-red-500" />
-          <span class="text-xs font-medium text-red-700 dark:text-red-300">{{ missingCount }} ô trống bắt buộc</span>
+          <span class="text-xs font-medium text-red-700 dark:text-red-300">{{ errorCount }} ô có lỗi dữ liệu</span>
         </div>
       </div>
 
@@ -56,19 +55,12 @@
           <div class="legend-items">
             <div class="legend-chip chip-req">
               <span class="col-usage-badge badge-required" style="margin-left: 0;">Req</span>
-              Required
             </div>
             <div class="legend-chip chip-rec">
               <span class="col-usage-badge badge-recommended" style="margin-left: 0;">Rec</span>
-              Recommended
             </div>
             <div class="legend-chip chip-opt">
               <span class="col-usage-badge badge-optional" style="margin-left: 0;">Opt</span>
-              Optional
-            </div>
-            <div class="legend-chip chip-error">
-              <span class="chip-dot dot-error"></span>
-              Thiếu bắt buộc
             </div>
           </div>
         </div>
@@ -107,7 +99,8 @@
                   :class="{
                     'required-col': isRequiredCol(col),
                     'recommended-col': isRecommendedCol(col),
-                    'aspect-col': col.startsWith('C:') && !isRequiredCol(col) && !isRecommendedCol(col)
+                    'aspect-col': col.startsWith('C:') && !isRequiredCol(col) && !isRecommendedCol(col),
+                    'action-col': col.startsWith('*Action')
                   }"
                   :title="getColTooltip(col)"
                 >
@@ -144,8 +137,10 @@
                   :key="col"
                   class="cell editable-cell whitespace-normal min-w-[150px] max-w-[350px]"
                   :class="{
-                    'empty-required': isCellMissingRequired(row, col),
-                    'empty-cell': isValEmpty(row[col])
+                    'empty-required': isCellMissingRequired(row, col) && !validationErrors[`${idx}-${col}`],
+                    'empty-cell': isValEmpty(row[col]),
+                    'error-cell': !!validationErrors[`${idx}-${col}`],
+                    'action-col': col.startsWith('*Action')
                   }"
                   :title="editingCell?.rowIdx === idx && editingCell?.col === col ? '' : (row[col] || '')"
                   @dblclick="startEdit(idx, col, row[col])"
@@ -173,14 +168,16 @@
                     </div>
                   </template>
                   <template v-else-if="col === '*Title'">
-                    <div class="p-2 w-full h-full">
-                      <span v-if="isValEmpty(row[col]) && isCellMissingRequired(row, col)" class="empty-placeholder">Bắt buộc</span>
+                    <div class="p-2 w-full h-full flex flex-col justify-center">
+                      <span v-if="validationErrors[`${idx}-${col}`]" class="text-[10px] font-bold text-red-600 mb-1 leading-tight">{{ validationErrors[`${idx}-${col}`] }}</span>
+                      <span v-if="isValEmpty(row[col]) && isCellMissingRequired(row, col) && !validationErrors[`${idx}-${col}`]" class="empty-placeholder">Bắt buộc</span>
                       <span v-else class="cell-content-title text-xs" :title="row[col]">{{ row[col] }}</span>
                     </div>
                   </template>
                   <template v-else>
-                    <div class="cell-value-wrap w-full h-full">
-                      <span v-if="isValEmpty(row[col]) && isCellMissingRequired(row, col)" class="empty-placeholder">Bắt buộc</span>
+                    <div class="cell-value-wrap w-full h-full flex flex-col justify-center">
+                      <span v-if="validationErrors[`${idx}-${col}`]" class="text-[10px] font-bold text-red-600 mb-1 leading-tight">{{ validationErrors[`${idx}-${col}`] }}</span>
+                      <span v-if="isValEmpty(row[col]) && isCellMissingRequired(row, col) && !validationErrors[`${idx}-${col}`]" class="empty-placeholder">Bắt buộc</span>
                       <span v-else class="cell-content">{{ truncate(row[col], 40) }}</span>
                       <span v-if="showCellUsageBadge(row, col)" class="cell-usage-tag" :class="'tag-' + getCellUsage(row, col)?.toLowerCase()">
                         {{ getCellUsageLabel(row, col) }}
@@ -200,6 +197,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import * as xlsx from 'xlsx'
+import { toast } from 'vue-sonner'
 import { globalRowData as rowData } from '../store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -214,6 +212,17 @@ const props = defineProps({
 
 const previewRows = ref([])
 const allColumns = ref([])
+
+const validationErrors = computed(() => {
+  const errors = {}
+  previewRows.value.forEach((row, idx) => {
+    // 1. Check title length (max 80 for eBay)
+    if (row['*Title'] && row['*Title'].length > 80) {
+      errors[`${idx}-*Title`] = `*Title quá dài (${row['*Title'].length}/80)`
+    }
+  })
+  return errors
+})
 
 /**
  * Per-category aspect usage map:
@@ -257,7 +266,7 @@ const isMultiUsageCol = (col) => {
   if (!col.startsWith('C:')) return false
   const usages = new Set()
   for (const catMeta of Object.values(catAspectMeta.value)) {
-    if (catMeta[col]) usages.add(catMeta[col])
+    usages.add(catMeta[col] || 'OPTIONAL')
   }
   return usages.size > 1
 }
@@ -308,8 +317,8 @@ const getColTooltip = (col) => {
 const getCellUsage = (row, col) => {
   if (!col.startsWith('C:')) return null
   const catId = row._ebayCategory
-  if (!catId || !catAspectMeta.value[catId]) return colHeaderUsage.value[col] || null
-  return catAspectMeta.value[catId][col] || null
+  if (!catId || !catAspectMeta.value[catId]) return colHeaderUsage.value[col] || 'OPTIONAL'
+  return catAspectMeta.value[catId][col] || 'OPTIONAL'
 }
 
 const getCellUsageLabel = (row, col) => {
@@ -401,11 +410,15 @@ const isCellMissingRequired = (row, col) => {
   return false
 }
 
-const missingCount = computed(() => {
+const errorCount = computed(() => {
   let count = 0
-  for (const row of previewRows.value) {
+  for (const [idx, row] of previewRows.value.entries()) {
     for (const col of allColumns.value) {
-      if (isCellMissingRequired(row, col)) count++
+      if (isCellMissingRequired(row, col)) {
+        count++
+      } else if (validationErrors.value[`${idx}-${col}`]) {
+        count++
+      }
     }
   }
   return count
@@ -450,6 +463,15 @@ const buildPreview = async () => {
     }
     const description = buildDescription(r)
     const aspectCols = buildAspectColumns(r)
+
+    // Ensure REQUIRED aspects are included in aspectCols even if empty
+    if (newCatMeta[r.ebayCategory]) {
+      for (const [colName, usage] of Object.entries(newCatMeta[r.ebayCategory])) {
+        if (usage === 'REQUIRED' && !(colName in aspectCols)) {
+          aspectCols[colName] = ''
+        }
+      }
+    }
 
     if (r.variations && r.variations.length > 0) {
       // Parent row
@@ -651,7 +673,7 @@ const buildParentRelationshipDetails = (variations) => {
 }
 
 /**
- * Clean title for eBay: strip problematic chars, limit to 80 chars
+ * Clean title for eBay: strip problematic chars
  */
 const cleanTitle = (title) => {
   if (!title) return ''
@@ -660,37 +682,36 @@ const cleanTitle = (title) => {
     .replace(/[【】「」『』]/g, ' ')  // CJK brackets → space
     .replace(/\s+/g, ' ')
     .trim()
-    .substring(0, 80)
 }
 
 // ─── Export (reuses preview data) ─────────────────────────────────────────────
 
-const handleExport = async () => {
-  // Validate rows before export
-  let hasErrors = false;
-  let errorMsgs = [];
+const validatePreview = () => {
+  let hasErrors = Object.keys(validationErrors.value).length > 0
 
   previewRows.value.forEach((row, idx) => {
-    // 1. Check title length (max 80 for eBay)
-    if (row['*Title'] && row['*Title'].length > 80) {
-      hasErrors = true;
-      errorMsgs.push(`Dòng ${idx + 1}: *Title quá dài (${row['*Title'].length}/80 ký tự)`);
-    }
-
-    // 2. Check missing required fields
+    // Check missing required fields
     allColumns.value.forEach(col => {
       if (isCellMissingRequired(row, col)) {
-        hasErrors = true;
-        errorMsgs.push(`Dòng ${idx + 1}: Thiếu trường bắt buộc [${col}]`);
+        hasErrors = true
+        // We do NOT add to validationErrors here because missing fields
+        // already have the empty-placeholder (Bắt buộc) visual indicator.
       }
-    });
-  });
+    })
+  })
 
-  if (hasErrors) {
-    const displayErrors = errorMsgs.slice(0, 7).join('\n');
-    const more = errorMsgs.length > 7 ? `\n... và ${errorMsgs.length - 7} lỗi khác.` : '';
-    alert(`Không thể xuất file vì có lỗi dữ liệu:\n\n${displayErrors}${more}\n\nVui lòng sửa các lỗi trên (ô có viền đỏ) trước khi Export.`);
-    return;
+  return !hasErrors
+}
+
+const handleExport = async (force = false) => {
+  if (!force) {
+    if (!validatePreview()) {
+      toast.error('Có lỗi dữ liệu!', {
+        description: 'Vui lòng kiểm tra các ô bị viền đỏ và sửa lại trước khi xuất CSV.',
+        duration: 4000
+      })
+      return
+    }
   }
 
   const exportPath = await window.api.dialog.saveFile({ defaultPath: 'ebay-upload-template.csv' })
@@ -709,7 +730,10 @@ const handleExport = async () => {
   // eBay requires UTF-8 BOM for correct Unicode parsing
   const csvWithBom = '\uFEFF' + csv
   await window.api.file.write(exportPath, csvWithBom)
-  alert(`Export thành công! ${readyProducts.value.length} sản phẩm (${exportRows.length} dòng CSV).`)
+  toast.success('Export thành công!', {
+    description: `${readyProducts.value.length} sản phẩm (${exportRows.length} dòng CSV).`,
+    duration: 3000
+  })
 }
 
 // Auto-build on mount and when data changes
@@ -851,37 +875,30 @@ watch(readyProducts, buildPreview, { deep: true })
 .chip-single { background: hsl(40 100% 94%); border-color: hsl(40 80% 72%); color: hsl(35 70% 35%); }
 .dot-single { background: hsl(35 85% 55%); }
 
-.chip-error { background: hsl(0 80% 95%); border-color: hsl(0 70% 78%); color: hsl(0 65% 40%); }
-.dot-error { background: hsl(0 70% 58%); }
+.chip-req { background: hsl(0 80% 95%); border-color: hsl(0 75% 80%); color: hsl(0 75% 50%); }
+.chip-req .chip-icon { color: hsl(0 75% 50%); }
 
-.chip-req { background: hsl(210 50% 94%); border-color: hsl(210 60% 78%); color: hsl(210 60% 35%); }
-.chip-req .chip-icon { color: hsl(210 70% 50%); }
+.chip-rec { background: hsl(142 70% 95%); border-color: hsl(142 70% 80%); color: hsl(142 70% 35%); }
+.chip-rec .chip-icon { color: hsl(142 70% 45%); }
 
-.chip-rec { background: hsl(30 90% 94%); border-color: hsl(30 70% 76%); color: hsl(25 65% 35%); }
-.chip-rec .chip-icon { color: hsl(25 80% 50%); }
-
-.chip-opt { background: hsl(270 30% 95%); border-color: hsl(270 25% 82%); color: hsl(270 30% 40%); }
-.chip-opt .chip-icon { color: hsl(270 40% 55%); }
+.chip-opt { background: hsl(270 50% 95%); border-color: hsl(270 50% 80%); color: hsl(270 60% 40%); }
+.chip-opt .chip-icon { color: hsl(270 60% 40%); }
 
 /* ─── Column header usage badges ─────────────────────────────────────────── */
 .col-usage-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: auto;
-  padding: 0 3px;
-  height: 14px;
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 4px;
   border-radius: 3px;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
-  line-height: 1;
-  margin-left: 3px;
-  flex-shrink: 0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-.badge-required { background: hsl(210 70% 50%); color: white; }
-.badge-recommended { background: hsl(25 80% 52%); color: white; }
-.badge-optional { background: hsl(270 30% 65%); color: white; }
+.badge-required { background: hsl(0 75% 55%); color: white; }
+.badge-recommended { background: hsl(142 70% 45%); color: white; }
+.badge-optional { background: hsl(270 60% 50%); color: white; }
 
 .col-multi-marker {
   font-size: 9px;
@@ -896,6 +913,8 @@ watch(readyProducts, buildPreview, { deep: true })
   align-items: center;
   gap: 4px;
   padding: 0 16px 0 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 .cell-usage-tag {
@@ -916,9 +935,9 @@ watch(readyProducts, buildPreview, { deep: true })
   opacity: 0.85;
 }
 
-.tag-required { background: hsl(210 70% 92%); color: hsl(210 70% 40%); border: 1px solid hsl(210 60% 78%); }
-.tag-recommended { background: hsl(30 90% 92%); color: hsl(25 65% 38%); border: 1px solid hsl(30 70% 76%); }
-.tag-optional { background: hsl(270 30% 93%); color: hsl(270 30% 45%); border: 1px solid hsl(270 25% 82%); }
+.tag-required { background: hsl(0 80% 95%); color: hsl(0 75% 50%); border: 1px solid hsl(0 75% 80%); }
+.tag-recommended { background: hsl(142 70% 95%); color: hsl(142 70% 35%); border: 1px solid hsl(142 70% 80%); }
+.tag-optional { background: hsl(270 50% 95%); color: hsl(270 60% 40%); border: 1px solid hsl(270 50% 80%); }
 
 
 .preview-table th {
@@ -968,10 +987,7 @@ watch(readyProducts, buildPreview, { deep: true })
   position: absolute;
   top: -1px;
   left: -1px;
-  min-width: calc(100% + 2px);
-  min-height: calc(100% + 2px);
-  width: max-content;
-  max-width: 400px;
+  min-width: 250px;
   z-index: 50;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   background: hsl(var(--background));
@@ -979,6 +995,7 @@ watch(readyProducts, buildPreview, { deep: true })
   border-radius: 4px;
   display: flex;
   flex-direction: column;
+  white-space: normal;
 }
 
 .cell-editor-actions {
@@ -1021,8 +1038,7 @@ watch(readyProducts, buildPreview, { deep: true })
 }
 
 .cell-textarea {
-  flex: 1;
-  width: 100%;
+  min-width: 250px;
   min-height: 70px;
   padding: 6px 8px;
   border: none;
@@ -1030,16 +1046,19 @@ watch(readyProducts, buildPreview, { deep: true })
   background: transparent;
   font-size: 11px;
   font-family: inherit;
-  resize: vertical;
+  resize: both;
   line-height: 1.4;
+  white-space: pre-wrap;
+  display: block;
 }
 
 .cell-content {
   display: block;
   padding: 4px 8px;
-  max-width: 350px;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .row-num-col {
@@ -1118,10 +1137,21 @@ watch(readyProducts, buildPreview, { deep: true })
 }
 
 .empty-required {
-  outline: 1px solid hsl(0 70% 50%) !important;
-  outline-offset: -1px;
+  box-shadow: inset 0 0 0 2px hsl(0 70% 50%) !important;
   background: rgba(255, 0, 0, 0.05) !important;
   position: relative;
+}
+
+.error-cell {
+  box-shadow: inset 0 0 0 2px hsl(0 70% 50%) !important;
+  background: rgba(255, 0, 0, 0.05) !important;
+  position: relative;
+}
+
+.action-col {
+  min-width: 60px !important;
+  max-width: 80px !important;
+  text-align: center;
 }
 
 .empty-placeholder {
@@ -1143,6 +1173,6 @@ watch(readyProducts, buildPreview, { deep: true })
   overflow: hidden;
   white-space: normal;
   line-height: 1.3;
-  max-width: 300px;
+  width: 100%;
 }
 </style>

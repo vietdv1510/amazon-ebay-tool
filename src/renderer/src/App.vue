@@ -103,6 +103,7 @@
         @save="handleSettingsSave"
       />
     </div>
+    <Toaster position="bottom-right" richColors />
   </div>
 </template>
 
@@ -112,6 +113,7 @@ import Workspace from './components/Workspace.vue'
 import ExportPreview from './components/ExportPreview.vue'
 import Queue from './components/Queue.vue'
 import Settings from './components/Settings.vue'
+import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {

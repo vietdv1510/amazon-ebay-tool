@@ -345,7 +345,6 @@ const cleanTitle = (title) => {
     .replace(/[【】「」『』]/g, ' ')  // CJK brackets → space
     .replace(/\s+/g, ' ')
     .trim()
-    .substring(0, 80)
 }
 
 // Build C:Brand, C:Color, etc. columns from aspectValues

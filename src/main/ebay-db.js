@@ -146,6 +146,26 @@ export function getSyncStatus() {
   }
 }
 
+export function searchCategoriesOffline(query) {
+  const database = getDb()
+  const q = `%${query}%`
+  const rows = database.prepare(`
+    SELECT categoryId, categoryName, parentId, level, isLeaf
+    FROM categories
+    WHERE categoryName LIKE ?
+    ORDER BY level ASC
+    LIMIT 20
+  `).all(q)
+
+  return rows.map(r => ({
+    categoryId: r.categoryId,
+    categoryName: r.categoryName,
+    categoryTreeNodeLevel: r.level,
+    relevancy: 'Offline Cache',
+    path: r.categoryName // Simple path fallback for offline
+  }))
+}
+
 export function setSyncMeta(key, value) {
   const database = getDb()
   database.prepare(`

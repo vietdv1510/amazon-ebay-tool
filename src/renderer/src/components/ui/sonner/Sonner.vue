@@ -1,13 +1,13 @@
 <script setup>
 import { reactiveOmit } from "@vueuse/core";
 import {
-  CircleCheckIcon,
-  InfoIcon,
+  CheckCircledIcon,
+  InfoCircledIcon,
   ReloadIcon,
-  OctagonXIcon,
-  TriangleAlertIcon,
+  CrossCircledIcon,
+  ExclamationTriangleIcon,
   Cross2Icon,
-} from '@radix-icons/vue';
+} from "@radix-icons/vue";
 import { Toaster as Sonner } from "vue-sonner";
 
 const props = defineProps({
@@ -53,16 +53,16 @@ const delegatedProps = reactiveOmit(props, "toastOptions");
     v-bind="delegatedProps"
   >
     <template #success-icon>
-      <CircleCheckIcon class="size-4" />
+      <CheckCircledIcon class="size-4" />
     </template>
     <template #info-icon>
-      <InfoIcon class="size-4" />
+      <InfoCircledIcon class="size-4" />
     </template>
     <template #warning-icon>
-      <TriangleAlertIcon class="size-4" />
+      <ExclamationTriangleIcon class="size-4" />
     </template>
     <template #error-icon>
-      <OctagonXIcon class="size-4" />
+      <CrossCircledIcon class="size-4" />
     </template>
     <template #loading-icon>
       <div>

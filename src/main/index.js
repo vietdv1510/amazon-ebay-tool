@@ -7,7 +7,7 @@ import fs from 'fs'
 import { crawlAmazon, cancelCrawl, closeBrowser } from './crawler'
 import { getCategorySuggestions, getCategoryAspects, getCategoryTree, clearTokenCache } from './ebay-api'
 import { fullSync } from './ebay-sync'
-import { getSyncStatus, closeDb } from './ebay-db'
+import { getSyncStatus, closeDb, searchCategoriesOffline } from './ebay-db'
 import path from 'path'
 
 // ─── Settings store (JSON file) ───────────────────────────────────────────────
@@ -202,8 +202,13 @@ ipcMain.handle('app:paths', () => ({
 ipcMain.handle('ebay:categorySuggestions', async (_, query) => {
   try {
     const settings = loadSettings()
-    const results = await getCategorySuggestions(query, settings)
-    return { ok: true, data: results }
+    if (settings.useEbayAI) {
+      const results = await getCategorySuggestions(query, settings)
+      return { ok: true, data: results }
+    } else {
+      const results = searchCategoriesOffline(query)
+      return { ok: true, data: results }
+    }
   } catch (e) {
     return { ok: false, error: e.message }
   }
