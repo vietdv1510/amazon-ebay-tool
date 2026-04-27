@@ -145,7 +145,7 @@
                   class="cell editable-cell whitespace-normal min-w-[150px] max-w-[350px]"
                   :class="{
                     'empty-required': isCellMissingRequired(row, col),
-                    'empty-cell': !row[col]
+                    'empty-cell': isValEmpty(row[col])
                   }"
                   :title="editingCell?.rowIdx === idx && editingCell?.col === col ? '' : (row[col] || '')"
                   @dblclick="startEdit(idx, col, row[col])"
@@ -162,13 +162,13 @@
                   </template>
                   <template v-else-if="col === '*Title'">
                     <div class="p-2 w-full h-full">
-                      <span v-if="!row[col] && isCellMissingRequired(row, col)" class="empty-placeholder">Bắt buộc</span>
+                      <span v-if="isValEmpty(row[col]) && isCellMissingRequired(row, col)" class="empty-placeholder">Bắt buộc</span>
                       <span v-else class="cell-content-title text-xs" :title="row[col]">{{ row[col] }}</span>
                     </div>
                   </template>
                   <template v-else>
                     <div class="cell-value-wrap w-full h-full">
-                      <span v-if="!row[col] && isCellMissingRequired(row, col)" class="empty-placeholder">Bắt buộc</span>
+                      <span v-if="isValEmpty(row[col]) && isCellMissingRequired(row, col)" class="empty-placeholder">Bắt buộc</span>
                       <span v-else class="cell-content">{{ truncate(row[col], 40) }}</span>
                       <span v-if="showCellUsageBadge(row, col)" class="cell-usage-tag" :class="'tag-' + getCellUsage(row, col)?.toLowerCase()">
                         {{ getCellUsageLabel(row, col) }}
@@ -314,16 +314,27 @@ const editingValue = ref('')
 const editInputRef = ref(null)
 
 const startEdit = async (rowIdx, col, currentValue) => {
+  // If editing another cell, commit it first
+  if (editingCell.value && (editingCell.value.rowIdx !== rowIdx || editingCell.value.col !== col)) {
+    commitEdit(editingCell.value.rowIdx, editingCell.value.col)
+  }
+
   editingCell.value = { rowIdx, col }
   editingValue.value = currentValue || ''
   await nextTick()
-  editInputRef.value?.focus?.()
-  editInputRef.value?.select?.()
+  const el = Array.isArray(editInputRef.value) ? editInputRef.value[0] : editInputRef.value
+  if (el) {
+    el.focus()
+    el.select()
+  }
 }
 
 const commitEdit = (rowIdx, col) => {
   if (editingCell.value?.rowIdx === rowIdx && editingCell.value?.col === col) {
-    previewRows.value[rowIdx][col] = editingValue.value
+    let val = editingValue.value
+    if (val !== undefined && val !== null) {
+      previewRows.value[rowIdx][col] = String(val).trim()
+    }
     editingCell.value = null
   }
 }
@@ -356,21 +367,24 @@ const PARENT_VARIATION_OPTIONAL = ['*StartPrice', '*Quantity']
 // Columns intentionally blank on single (no-variation) rows
 const SINGLE_OPTIONAL = ['*Relationship', '*RelationshipDetails']
 
+const isValEmpty = (val) => val == null || String(val).trim() === ''
+
 const isCellMissingRequired = (row, col) => {
+  const empty = isValEmpty(row[col])
   // Standard fixed required columns
   if (col.startsWith('*') && !col.startsWith('C:')) {
     if (row._rowType === 'child') return false
     if (row._rowType === 'parent' && PARENT_VARIATION_OPTIONAL.includes(col)) return false
     if (row._rowType === 'single' && SINGLE_OPTIONAL.includes(col)) return false
     if (row._rowType === 'parent' && SINGLE_OPTIONAL.includes(col)) return false
-    return !row[col]
+    return empty
   }
   // C: aspects — required only if THIS row's category marks it REQUIRED
   if (col.startsWith('C:')) {
     const usage = getCellUsage(row, col)
     if (usage !== 'REQUIRED') return false
     if (row._rowType === 'child') return false // aspect on parent only
-    return !row[col]
+    return empty
   }
   return false
 }
@@ -897,9 +911,12 @@ watch(readyProducts, buildPreview, { deep: true })
 }
 
 .cell-input {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  min-width: 120px;
+  min-width: 100%;
   padding: 4px 8px;
   border: 2px solid hsl(210 80% 55%);
   border-radius: 0;
@@ -908,6 +925,7 @@ watch(readyProducts, buildPreview, { deep: true })
   font-size: 11px;
   font-family: inherit;
   box-sizing: border-box;
+  z-index: 10;
 }
 
 .cell-content {
