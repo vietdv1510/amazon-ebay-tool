@@ -8,8 +8,8 @@
       </div>
 
       <div class="header-actions flex gap-2 items-center">
-        <Button variant="outline" size="sm" @click="refreshPreview">
-          <RefreshCw class="w-4 h-4 mr-2" />
+        <Button variant="outline" size="sm" @click="refreshPreview" :disabled="isRefreshing">
+          <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': isRefreshing }" />
           Làm mới
         </Button>
         <Button size="sm" @click="handleExport" :disabled="previewRows.length === 0">
@@ -334,7 +334,7 @@ const startEdit = async (rowIdx, col, currentValue) => {
   editingCell.value = { rowIdx, col }
   editingValue.value = currentValue || ''
   await nextTick()
-  const el = Array.isArray(editInputRef.value) ? editInputRef.value[0] : editInputRef.value
+  const el = (Array.isArray(editInputRef.value) ? editInputRef.value[0] : editInputRef.value) || document.querySelector('.cell-textarea')
   if (el) {
     el.focus()
     el.select()
@@ -564,7 +564,19 @@ const buildPreview = async () => {
   previewRows.value = rows
 }
 
-const refreshPreview = () => buildPreview()
+const isRefreshing = ref(false)
+
+const refreshPreview = async () => {
+  if (isRefreshing.value) return
+  isRefreshing.value = true
+  try {
+    await buildPreview()
+  } finally {
+    setTimeout(() => {
+      isRefreshing.value = false
+    }, 500)
+  }
+}
 
 // ─── Build helpers (copied from Workspace.vue to keep 1:1 parity) ─────────────
 
@@ -883,8 +895,12 @@ watch(readyProducts, buildPreview, { deep: true })
 
 
 .preview-table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: hsl(var(--muted));
   border: 1px solid rgba(128, 128, 128, 0.25);
+  border-top: none; /* Prevent double borders when scrolling */
   padding: 6px 8px;
   font-weight: 600;
   white-space: nowrap;
@@ -893,6 +909,7 @@ watch(readyProducts, buildPreview, { deep: true })
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: hsl(var(--muted-foreground));
+  box-shadow: 0 1px 0 rgba(128, 128, 128, 0.25); /* Bottom border that scrolls with sticky */
 }
 
 .preview-table td {
@@ -925,6 +942,7 @@ watch(readyProducts, buildPreview, { deep: true })
   top: -1px;
   left: -1px;
   min-width: calc(100% + 2px);
+  min-height: calc(100% + 2px);
   width: max-content;
   max-width: 400px;
   z-index: 50;
@@ -976,6 +994,7 @@ watch(readyProducts, buildPreview, { deep: true })
 }
 
 .cell-textarea {
+  flex: 1;
   width: 100%;
   min-height: 70px;
   padding: 6px 8px;
