@@ -52,33 +52,23 @@
       <!-- Legend -->
       <div v-if="readyProducts.length > 0" class="legend-card">
         <div class="legend-group">
-          <span class="legend-group-label">Ý nghĩa cột</span>
+          <span class="legend-group-label">Ý nghĩa cột & Ô</span>
           <div class="legend-items">
             <div class="legend-chip chip-req">
-              <span class="col-usage-badge badge-required" style="margin-left: 0;">R</span>
+              <span class="col-usage-badge badge-required" style="margin-left: 0;">Req</span>
               Required
             </div>
             <div class="legend-chip chip-rec">
-              <span class="col-usage-badge badge-recommended" style="margin-left: 0;">~</span>
+              <span class="col-usage-badge badge-recommended" style="margin-left: 0;">Rec</span>
               Recommended
             </div>
             <div class="legend-chip chip-opt">
-              <span class="col-usage-badge badge-optional" style="margin-left: 0;">O</span>
+              <span class="col-usage-badge badge-optional" style="margin-left: 0;">Opt</span>
               Optional
             </div>
-          </div>
-        </div>
-        <div class="legend-divider"></div>
-        <div class="legend-group">
-          <span class="legend-group-label">Trạng thái ô (Cell)</span>
-          <div class="legend-items">
             <div class="legend-chip chip-error">
               <span class="chip-dot dot-error"></span>
               Thiếu bắt buộc
-            </div>
-            <div class="legend-chip chip-note" style="background: transparent; border: none; padding: 0;">
-              <span class="chip-icon text-[11px] text-amber-500">⚡</span>
-              Khác Usage giữa các danh mục
             </div>
           </div>
         </div>
@@ -123,10 +113,9 @@
                 >
                   <div class="col-header-content">
                     <span>{{ col }}</span>
-                    <span v-if="isRequiredCol(col)" class="col-usage-badge badge-required">R</span>
-                    <span v-else-if="isRecommendedCol(col)" class="col-usage-badge badge-recommended">~</span>
-                    <span v-else-if="col.startsWith('C:')" class="col-usage-badge badge-optional">O</span>
-                    <span v-if="isMultiUsageCol(col)" class="col-multi-marker" title="Usage khác nhau giữa các category">⚡</span>
+                    <span v-if="isRequiredCol(col)" class="col-usage-badge badge-required">Req</span>
+                    <span v-else-if="isRecommendedCol(col)" class="col-usage-badge badge-recommended">Rec</span>
+                    <span v-else-if="col.startsWith('C:')" class="col-usage-badge badge-optional">Opt</span>
                   </div>
                 </th>
               </tr>
@@ -156,11 +145,7 @@
                   class="cell editable-cell whitespace-normal min-w-[150px] max-w-[350px]"
                   :class="{
                     'empty-required': isCellMissingRequired(row, col),
-                    'empty-cell': !row[col],
-                    'empty-ready': !isCellMissingRequired(row, col) && !row[col] && getCellUsage(row, col) !== 'OPTIONAL',
-                    'cell-required': row._rowType !== 'child' && getCellUsage(row, col) === 'REQUIRED' && !isCellMissingRequired(row, col),
-                    'cell-recommended': row._rowType !== 'child' && getCellUsage(row, col) === 'RECOMMENDED',
-                    'cell-optional': row._rowType !== 'child' && getCellUsage(row, col) === 'OPTIONAL'
+                    'empty-cell': !row[col]
                   }"
                   :title="editingCell?.rowIdx === idx && editingCell?.col === col ? '' : (row[col] || '')"
                   @dblclick="startEdit(idx, col, row[col])"
@@ -176,15 +161,17 @@
                     />
                   </template>
                   <template v-else-if="col === '*Title'">
-                    <div class="p-2">
-                      <span class="cell-content-title text-xs" :title="row[col]">{{ row[col] }}</span>
+                    <div class="p-2 w-full h-full">
+                      <span v-if="!row[col] && isCellMissingRequired(row, col)" class="empty-placeholder">Bắt buộc</span>
+                      <span v-else class="cell-content-title text-xs" :title="row[col]">{{ row[col] }}</span>
                     </div>
                   </template>
                   <template v-else>
-                    <div class="cell-value-wrap">
-                      <span class="cell-content">{{ truncate(row[col], 40) }}</span>
+                    <div class="cell-value-wrap w-full h-full">
+                      <span v-if="!row[col] && isCellMissingRequired(row, col)" class="empty-placeholder">Bắt buộc</span>
+                      <span v-else class="cell-content">{{ truncate(row[col], 40) }}</span>
                       <span v-if="showCellUsageBadge(row, col)" class="cell-usage-tag" :class="'tag-' + getCellUsage(row, col)?.toLowerCase()">
-                        {{ getCellUsage(row, col)?.charAt(0) }}
+                        {{ getCellUsageLabel(row, col) }}
                       </span>
                     </div>
                   </template>
@@ -311,6 +298,14 @@ const getCellUsage = (row, col) => {
   const catId = row._ebayCategory
   if (!catId || !catAspectMeta.value[catId]) return colHeaderUsage.value[col] || null
   return catAspectMeta.value[catId][col] || null
+}
+
+const getCellUsageLabel = (row, col) => {
+  const usage = getCellUsage(row, col)
+  if (usage === 'REQUIRED') return 'Req'
+  if (usage === 'RECOMMENDED') return 'Rec'
+  if (usage === 'OPTIONAL') return 'Opt'
+  return ''
 }
 
 // ─── Inline Editing ───────────────────────────────────────────────────────────
@@ -794,7 +789,6 @@ watch(readyProducts, buildPreview, { deep: true })
 .chip-error { background: hsl(0 80% 95%); border-color: hsl(0 70% 78%); color: hsl(0 65% 40%); }
 .dot-error { background: hsl(0 70% 58%); }
 
-/* Aspect usage chips */
 .chip-req { background: hsl(210 50% 94%); border-color: hsl(210 60% 78%); color: hsl(210 60% 35%); }
 .chip-req .chip-icon { color: hsl(210 70% 50%); }
 
@@ -804,14 +798,13 @@ watch(readyProducts, buildPreview, { deep: true })
 .chip-opt { background: hsl(270 30% 95%); border-color: hsl(270 25% 82%); color: hsl(270 30% 40%); }
 .chip-opt .chip-icon { color: hsl(270 40% 55%); }
 
-.chip-note { background: hsl(var(--muted) / 0.5); border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: 10px; }
-
 /* ─── Column header usage badges ─────────────────────────────────────────── */
 .col-usage-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
+  width: auto;
+  padding: 0 3px;
   height: 14px;
   border-radius: 3px;
   font-size: 8px;
@@ -847,7 +840,8 @@ watch(readyProducts, buildPreview, { deep: true })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 13px;
+  width: auto;
+  padding: 0 3px;
   height: 13px;
   border-radius: 3px;
   font-size: 8px;
@@ -951,18 +945,6 @@ watch(readyProducts, buildPreview, { deep: true })
   background: hsl(210 40% 96%);
 }
 
-.cell-required {
-  background: hsl(210 80% 97%);
-}
-
-.cell-recommended {
-  background: hsl(35 100% 97%);
-}
-
-.cell-optional {
-  background: hsl(270 40% 98%);
-}
-
 .recommended-col {
   background: hsl(30 100% 96%);
 }
@@ -1012,14 +994,17 @@ watch(readyProducts, buildPreview, { deep: true })
 }
 
 .empty-required {
-  background: hsl(0 80% 95%) !important;
+  outline: 1px solid hsl(0 70% 50%) !important;
+  outline-offset: -1px;
+  background: rgba(255, 0, 0, 0.05) !important;
   position: relative;
 }
 
-.empty-required::after {
-  content: '—';
-  color: hsl(0 70% 60%);
-  font-weight: 600;
+.empty-placeholder {
+  color: hsl(0 70% 50%);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 500;
 }
 
 .aspect-cell {
