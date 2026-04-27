@@ -50,35 +50,55 @@
       </div>
 
       <!-- Legend -->
-      <div v-if="readyProducts.length > 0" class="flex gap-4 mb-2 flex-shrink-0 flex-wrap">
-        <div class="flex items-center gap-1.5">
-          <span class="w-3 h-3 rounded-sm bg-blue-100 border border-blue-300 inline-block"></span>
-          <span class="text-[10px] text-muted-foreground">Parent</span>
+      <div v-if="readyProducts.length > 0" class="legend-card">
+        <div class="legend-group">
+          <span class="legend-group-label">Loại dòng</span>
+          <div class="legend-items">
+            <div class="legend-chip chip-parent">
+              <span class="chip-dot dot-parent"></span>
+              Parent
+            </div>
+            <div class="legend-chip chip-child">
+              <span class="chip-dot dot-child"></span>
+              Child / Variation
+            </div>
+            <div class="legend-chip chip-single">
+              <span class="chip-dot dot-single"></span>
+              Single
+            </div>
+            <div class="legend-chip chip-error">
+              <span class="chip-dot dot-error"></span>
+              Thiếu bắt buộc
+            </div>
+          </div>
         </div>
-        <div class="flex items-center gap-1.5">
-          <span class="w-3 h-3 rounded-sm bg-slate-50 border border-slate-200 inline-block"></span>
-          <span class="text-[10px] text-muted-foreground">Child / Variation</span>
+        <div class="legend-divider"></div>
+        <div class="legend-group">
+          <span class="legend-group-label">Cột aspect (C:)</span>
+          <div class="legend-items">
+            <div class="legend-chip chip-req">
+              <span class="chip-icon">✱</span>
+              Required
+            </div>
+            <div class="legend-chip chip-rec">
+              <span class="chip-icon">◆</span>
+              Recommended
+            </div>
+            <div class="legend-chip chip-opt">
+              <span class="chip-icon">○</span>
+              Optional
+            </div>
+          </div>
         </div>
-        <div class="flex items-center gap-1.5">
-          <span class="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300 inline-block"></span>
-          <span class="text-[10px] text-muted-foreground">Single (không biến thể)</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <span class="w-3 h-3 rounded-sm bg-red-100 border border-red-300 inline-block"></span>
-          <span class="text-[10px] text-muted-foreground">Thiếu bắt buộc</span>
-        </div>
-        <div class="legend-sep"></div>
-        <div class="flex items-center gap-1.5">
-          <span class="w-3 h-3 rounded-sm bg-blue-50 border border-blue-400 inline-block"></span>
-          <span class="text-[10px] text-muted-foreground">*C: Bắt buộc</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <span class="w-3 h-3 rounded-sm bg-orange-50 border border-orange-300 inline-block"></span>
-          <span class="text-[10px] text-muted-foreground">C: Nên có (Recommended)</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <span class="w-3 h-3 rounded-sm bg-purple-50 border border-purple-200 inline-block"></span>
-          <span class="text-[10px] text-muted-foreground">C: Tùy chọn (Optional)</span>
+        <div class="legend-divider"></div>
+        <div class="legend-group">
+          <span class="legend-group-label">Ghi chú</span>
+          <div class="legend-items">
+            <div class="legend-chip chip-note">
+              <span class="chip-icon text-[9px]">⚡</span>
+              Cùng cột, khác usage giữa các category sẽ hiển thị badge
+            </div>
+          </div>
         </div>
       </div>
 
@@ -99,12 +119,14 @@
                     'recommended-col': isRecommendedCol(col),
                     'aspect-col': col.startsWith('C:') && !isRequiredCol(col) && !isRecommendedCol(col)
                   }"
-                  :title="col + (isRecommendedCol(col) ? ' (Recommended)' : isRequiredCol(col) ? ' (Required)' : '')"
+                  :title="getColTooltip(col)"
                 >
                   <div class="col-header-content">
                     <span>{{ col }}</span>
-                    <span v-if="isRequiredCol(col)" class="required-star">*</span>
-                    <span v-else-if="isRecommendedCol(col)" class="recommended-star">~</span>
+                    <span v-if="isRequiredCol(col)" class="col-usage-badge badge-required">R</span>
+                    <span v-else-if="isRecommendedCol(col)" class="col-usage-badge badge-recommended">~</span>
+                    <span v-else-if="col.startsWith('C:')" class="col-usage-badge badge-optional">O</span>
+                    <span v-if="isMultiUsageCol(col)" class="col-multi-marker" title="Usage khác nhau giữa các category">⚡</span>
                   </div>
                 </th>
                 <th class="w-full border-0 bg-transparent"></th>
@@ -140,6 +162,7 @@
                     'cell-required': getCellUsage(row, col) === 'REQUIRED' && !isCellMissingRequired(row, col),
                     'cell-recommended': getCellUsage(row, col) === 'RECOMMENDED',
                     'cell-optional': getCellUsage(row, col) === 'OPTIONAL',
+                    'cell-mixed-usage': isCellMixedUsage(row, col),
                   }"
                   :title="editingCell?.rowIdx === idx && editingCell?.col === col ? '' : (row[col] || '')"
                   @dblclick="startEdit(idx, col, row[col])"
@@ -160,7 +183,12 @@
                     </div>
                   </template>
                   <template v-else>
-                    <span class="cell-content">{{ truncate(row[col], 40) }}</span>
+                    <div class="cell-value-wrap">
+                      <span class="cell-content">{{ truncate(row[col], 40) }}</span>
+                      <span v-if="showCellUsageBadge(row, col)" class="cell-usage-tag" :class="'tag-' + getCellUsage(row, col)?.toLowerCase()">
+                        {{ getCellUsage(row, col)?.charAt(0) }}
+                      </span>
+                    </div>
                   </template>
                 </td>
                 <td class="border-0 bg-transparent"></td>
@@ -223,6 +251,58 @@ const isRecommendedCol = (col) => {
   if (!col.startsWith('C:')) return false
   const usage = colHeaderUsage.value[col]
   return usage === 'RECOMMENDED'
+}
+
+/**
+ * Does this column have DIFFERENT usage levels across categories?
+ * e.g. Required in Cat A but Optional in Cat B
+ */
+const isMultiUsageCol = (col) => {
+  if (!col.startsWith('C:')) return false
+  const usages = new Set()
+  for (const catMeta of Object.values(catAspectMeta.value)) {
+    if (catMeta[col]) usages.add(catMeta[col])
+  }
+  return usages.size > 1
+}
+
+/**
+ * Is this specific cell's usage different from the header's strictest usage?
+ */
+const isCellMixedUsage = (row, col) => {
+  if (!col.startsWith('C:') || row._rowType === 'child') return false
+  const cellUsage = getCellUsage(row, col)
+  const headerUsage = colHeaderUsage.value[col]
+  return cellUsage && headerUsage && cellUsage !== headerUsage
+}
+
+/**
+ * Show per-cell usage badge when column has mixed usage across categories
+ */
+const showCellUsageBadge = (row, col) => {
+  if (!col.startsWith('C:') || row._rowType === 'child') return false
+  return isMultiUsageCol(col)
+}
+
+/**
+ * Build tooltip showing per-category usage breakdown
+ */
+const getColTooltip = (col) => {
+  if (!col.startsWith('C:')) return col
+  const parts = [col]
+  const categories = Object.entries(catAspectMeta.value)
+  if (categories.length <= 1) {
+    const usage = colHeaderUsage.value[col]
+    if (usage) parts.push(`(${usage})`)
+    return parts.join(' ')
+  }
+  // Multi-category: show breakdown
+  for (const [catId, meta] of categories) {
+    if (meta[col]) {
+      parts.push(`\n• Cat ${catId}: ${meta[col]}`)
+    }
+  }
+  return parts.join('')
 }
 
 /**
@@ -633,11 +713,167 @@ watch(readyProducts, buildPreview, { deep: true })
   line-height: 1.3;
 }
 
-.legend-sep {
+/* ─── Legend Card ────────────────────────────────────────────────────────── */
+.legend-card {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  flex-shrink: 0;
+}
+
+.legend-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 0 16px;
+}
+.legend-group:first-child { padding-left: 0; }
+.legend-group:last-child { padding-right: 0; }
+
+.legend-group-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.7;
+}
+
+.legend-divider {
   width: 1px;
+  background: hsl(var(--border));
+  align-self: stretch;
+  margin: 0;
+}
+
+.legend-items {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chip-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Row type chips */
+.chip-parent { background: hsl(210 100% 95%); border-color: hsl(210 80% 80%); color: hsl(210 70% 35%); }
+.dot-parent { background: hsl(210 80% 55%); }
+
+.chip-child { background: hsl(220 10% 96%); border-color: hsl(220 10% 82%); color: hsl(220 10% 40%); }
+.dot-child { background: hsl(220 10% 65%); }
+
+.chip-single { background: hsl(40 100% 94%); border-color: hsl(40 80% 72%); color: hsl(35 70% 35%); }
+.dot-single { background: hsl(35 85% 55%); }
+
+.chip-error { background: hsl(0 80% 95%); border-color: hsl(0 70% 78%); color: hsl(0 65% 40%); }
+.dot-error { background: hsl(0 70% 58%); }
+
+/* Aspect usage chips */
+.chip-req { background: hsl(210 50% 94%); border-color: hsl(210 60% 78%); color: hsl(210 60% 35%); }
+.chip-req .chip-icon { color: hsl(210 70% 50%); }
+
+.chip-rec { background: hsl(30 90% 94%); border-color: hsl(30 70% 76%); color: hsl(25 65% 35%); }
+.chip-rec .chip-icon { color: hsl(25 80% 50%); }
+
+.chip-opt { background: hsl(270 30% 95%); border-color: hsl(270 25% 82%); color: hsl(270 30% 40%); }
+.chip-opt .chip-icon { color: hsl(270 40% 55%); }
+
+.chip-note { background: hsl(var(--muted) / 0.5); border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: 10px; }
+
+/* ─── Column header usage badges ─────────────────────────────────────────── */
+.col-usage-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
   height: 14px;
-  background: var(--border);
-  align-self: center;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 3px;
+  flex-shrink: 0;
+}
+
+.badge-required { background: hsl(210 70% 50%); color: white; }
+.badge-recommended { background: hsl(25 80% 52%); color: white; }
+.badge-optional { background: hsl(270 30% 65%); color: white; }
+
+.col-multi-marker {
+  font-size: 9px;
+  margin-left: 2px;
+  cursor: help;
+  opacity: 0.7;
+}
+
+/* ─── Cell-level usage tag ───────────────────────────────────────────────── */
+.cell-value-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 2px 0 0;
+}
+
+.cell-usage-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.tag-required { background: hsl(210 70% 92%); color: hsl(210 70% 40%); border: 1px solid hsl(210 60% 78%); }
+.tag-recommended { background: hsl(30 90% 92%); color: hsl(25 65% 38%); border: 1px solid hsl(30 70% 76%); }
+.tag-optional { background: hsl(270 30% 93%); color: hsl(270 30% 45%); border: 1px solid hsl(270 25% 82%); }
+
+.cell-mixed-usage {
+  position: relative;
+}
+.cell-mixed-usage::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-top: 6px solid hsl(25 80% 55%);
+  z-index: 1;
 }
 
 
