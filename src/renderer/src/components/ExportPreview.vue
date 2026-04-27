@@ -459,7 +459,8 @@ const isPreviewLoading = ref(false)
 
 const buildPreview = async () => {
   isPreviewLoading.value = true
-  const rows = []
+  try {
+    const rows = []
   // Per-category aspect meta: { [catId]: { 'C:Name': usage } }
   const newCatMeta = {}
 
@@ -599,8 +600,11 @@ const buildPreview = async () => {
     return a.localeCompare(b)
   })
 
-  allColumns.value = sorted
-  previewRows.value = rows
+    allColumns.value = sorted
+    previewRows.value = rows
+  } finally {
+    isPreviewLoading.value = false
+  }
 }
 
 const isRefreshing = ref(false)
