@@ -483,6 +483,14 @@ const buildDescription = (row) => {
     parts.push('</ul>')
   }
 
+  if (row.images?.length > 0) {
+    parts.push('<div style="margin:16px 0">')
+    row.images.slice(0, 5).forEach(img => {
+      parts.push(`<img src="${img}" style="max-width:700px;width:100%;display:block;margin:8px 0" />`)
+    })
+    parts.push('</div>')
+  }
+
   if (row.description) {
     parts.push(`<p style="margin-top:12px">${escapeHtml(row.description.substring(0, 2000))}</p>`)
   }
