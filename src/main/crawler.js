@@ -79,12 +79,16 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     ]
     const titleSelectorStr = titleSelectors.join(', ')
 
+    // Tăng timeout lên 30s và log chi tiết
     await page.waitForSelector(titleSelectorStr, {
       state: 'attached',
-      timeout: 15000
+      timeout: 30000
     }).catch((err) => {
-      console.log('[Crawler] Cảnh báo: Không tìm thấy selector title ban đầu trong 15s. Có thể là thay đổi DOM từ Amazon.', err.message)
-    }) // non-fatal: proceed even if not found
+      console.log('[Crawler] ⚠️ Không tìm thấy selector title ban đầu trong 30s. Có thể DOM khác hoặc load chậm.', err.message)
+    })
+
+    // Đợi thêm 3-5s để JS render hoàn toất
+    await page.waitForTimeout(3000 + Math.random() * 2000)
 
     progressCb('[PROGRESS] Đang kiểm tra địa chỉ giao hàng...')
     if (options.forceUSLocation !== false) {
@@ -98,27 +102,41 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     let $ = cheerio.load(html)
 
     let title = ''
+    // Log: kiểm tra từng selector
+    console.log('[Crawler] 🔍 Đang tìm title với các selector:')
+    for (const sel of titleSelectors) {
+      const count = await page.$$(sel).then(els => els.length).catch(() => 0)
+      if (count > 0) {
+        const t = $(sel).first().text().trim()
+        console.log(`  [DEBUG] selector "${sel}" có ${count} element, text="${t.substring(0, 50)}..."`)
+      }
+    }
+
     // Try each selector one by one to log which one succeeded
     for (const sel of titleSelectors) {
       const t = $(sel).first().text().trim()
       if (t) {
         title = t
-        console.log(`[Crawler] Found title using DOM selector: ${sel}`)
+        console.log(`✅ [Crawler] Found title using DOM selector: ${sel}`)
         break
       }
     }
 
     if (!title) {
+      console.log('[Crawler] ⚠️ Cheerio không tìm thấy title, thử Playwright $eval...')
       // Playwright evaluation fallback (sometimes cheerio misses dynamically inserted nodes)
       title = await page.$eval(titleSelectorStr, el => el.textContent.trim()).catch(() => '')
-      if (title) console.log(`[Crawler] Found title using Playwright $eval fallback`)
+      if (title) {
+        console.log(`✅ [Crawler] Found title using Playwright $eval fallback`)
+      }
     }
 
     // Fallback lấy title từ thẻ <title> của trang nếu các selector chính không có
     if (!title) {
+      console.log('[Crawler] ⚠️ $eval thất bại, thử page.title() fallback...')
       const pageTitle = await page.title()
       if (pageTitle) {
-        console.log(`[Crawler] Fallback to page title: ${pageTitle}`)
+        console.log(`[Crawler] Page title raw: "${pageTitle}"`)
         // Amazon titles often look like "Amazon.com: Actual Product Title" or "Amazon.com : Actual Product Title"
         let cleanTitle = pageTitle.replace(/^Amazon\.com\s*:\s*/i, '')
         // If it starts with "Amazon.com: ", it will be removed. If not, maybe it still has other colons.
@@ -126,16 +144,29 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
            cleanTitle = pageTitle.split(':').slice(1).join(':').trim()
         }
         title = cleanTitle.trim()
-        if (title) console.log(`[Crawler] Extracted title from page <title>: ${title}`)
+        if (title) {
+          console.log(`✅ [Crawler] Extracted title from page <title>: ${title}`)
+        }
       }
+    }
+
+    // Debug: log HTML snippet nếu vẫn không có title
+    if (!title) {
+      console.error('[Crawler] ❌ Lỗi nghiêm trọng: Không thể trích xuất title từ HTML.')
+      console.error('[Crawler] Debug info:')
+      console.error(`  - Page URL: ${page.url()}`)
+      console.error(`  - Page title (raw): ${await page.title()}`)
+      console.error(`  - HTML length: ${html.length}`)
+      // Lưu một phần HTML để debug
+      console.error(`  - HTML snippet (first 2000 chars):\n${html.substring(0, 2000)}`)
+      console.error(`  - titleSelectors đã thử: ${titleSelectors.join(', ')}`)
     }
 
     if (!title && (html.toLowerCase().includes('captcha') || html.toLowerCase().includes('type the characters'))) {
       throw new Error('Amazon Anti-Bot Captcha — thử lại sau hoặc tắt Headless Mode.')
     }
     if (!title) {
-      console.error('[Crawler] Lỗi nghiêm trọng: Không thể trích xuất title từ HTML. Lưu dump HTML để debug.')
-      throw new Error('Không tìm thấy tiêu đề sản phẩm. Trang có thể load quá chậm, bị block, hoặc DOM đã bị Amazon thay đổi hoàn toàn.')
+      throw new Error('Không tìm thấy tiêu đề sản phẩm. Trang có thể load quá chậm, bị block, hoặc DOM đã bị Amazon thay đổi. Kiểm tra log để xem debug info.')
     }
 
     // Wait for other lazy-loaded sections before scraping them
