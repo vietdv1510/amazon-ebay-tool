@@ -9,9 +9,7 @@ import { Readable } from 'stream'
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function getBaseUrl(env) {
-  return env === 'production'
-    ? 'https://api.ebay.com'
-    : 'https://api.sandbox.ebay.com'
+  return env === 'production' ? 'https://api.ebay.com' : 'https://api.sandbox.ebay.com'
 }
 
 async function getAppToken(clientId, clientSecret, env) {
@@ -21,8 +19,8 @@ async function getAppToken(clientId, clientSecret, env) {
   const res = await fetch(`${base}/identity/v1/oauth2/token`, {
     method: 'POST',
     headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
     },
     body: 'grant_type=client_credentials&scope=https%3A%2F%2Fapi.ebay.com%2Foauth%2Fapi_scope'
   })
@@ -49,7 +47,7 @@ export async function syncCategoryTree(settings, onProgress) {
   onProgress?.({ step: 'tree', message: 'Đang tải Category Tree...', percent: 0 })
 
   const res = await fetch(`${base}/commerce/taxonomy/v1/category_tree/0`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}` }
   })
 
   if (!res.ok) throw new Error(`Category Tree API failed: ${res.status}`)
@@ -63,20 +61,19 @@ export async function syncCategoryTree(settings, onProgress) {
   db.exec('DELETE FROM categories')
 
   // Flatten tree → array
-  const insertStmt = db.prepare(`
-    INSERT OR REPLACE INTO categories (categoryId, categoryName, parentId, level, isLeaf)
-    VALUES (?, ?, ?, ?, ?)
-  `)
-
+  const insertStmt = db.prepare('INSERT OR REPLACE INTO categories (categoryId, categoryName, categoryPath, parentId, level, isLeaf) VALUES (?, ?, ?, ?, ?, ?)')
   let count = 0
+
   const insertAll = db.transaction(() => {
-    function walk(node, parentId, level) {
+    function walk(node, parentId, level, parentPath = '') {
       const children = node.childCategoryTreeNodes || []
       const isLeaf = children.length === 0 ? 1 : 0
-      insertStmt.run(node.category.categoryId, node.category.categoryName, parentId, level, isLeaf)
+      const currentPath = parentPath ? `${parentPath} > ${node.category.categoryName}` : node.category.categoryName
+
+      insertStmt.run(node.category.categoryId, node.category.categoryName, currentPath, parentId, level, isLeaf)
       count++
       for (const child of children) {
-        walk(child, node.category.categoryId, level + 1)
+        walk(child, node.category.categoryId, level + 1, currentPath)
       }
     }
     walk(data.rootCategoryNode, null, 0)
@@ -101,10 +98,14 @@ export async function syncAspects(settings, onProgress) {
   const token = await getAppToken(ebayClientId, ebayClientSecret, ebayEnv)
   const base = getBaseUrl(ebayEnv)
 
-  onProgress?.({ step: 'aspects', message: 'Đang tải bulk aspects (có thể mất 2-5 phút)...', percent: 0 })
+  onProgress?.({
+    step: 'aspects',
+    message: 'Đang tải bulk aspects (có thể mất 2-5 phút)...',
+    percent: 0
+  })
 
   const res = await fetch(`${base}/commerce/taxonomy/v1/category_tree/0/fetch_item_aspects`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}` }
   })
 
   if (!res.ok) throw new Error(`fetchItemAspects API failed: ${res.status}`)
@@ -114,7 +115,11 @@ export async function syncAspects(settings, onProgress) {
   // Download entire response as buffer
   const buffer = Buffer.from(await res.arrayBuffer())
   const sizeMB = (buffer.length / 1024 / 1024).toFixed(1)
-  onProgress?.({ step: 'aspects', message: `Downloaded ${sizeMB}MB, đang giải nén...`, percent: 30 })
+  onProgress?.({
+    step: 'aspects',
+    message: `Downloaded ${sizeMB}MB, đang giải nén...`,
+    percent: 30
+  })
 
   // Decompress gzip
   let jsonStr
@@ -133,7 +138,11 @@ export async function syncAspects(settings, onProgress) {
   const categoryAspects = data.categoryAspects || []
   const totalCats = categoryAspects.length
 
-  onProgress?.({ step: 'aspects', message: `Đang import ${totalCats} categories vào database...`, percent: 60 })
+  onProgress?.({
+    step: 'aspects',
+    message: `Đang import ${totalCats} categories vào database...`,
+    percent: 60
+  })
 
   const db = getDb()
 
@@ -210,7 +219,11 @@ export async function syncAspects(settings, onProgress) {
   setSyncMeta('aspectsVersion', data.categoryTreeVersion || 'unknown')
   setSyncMeta('lastSyncTime', new Date().toISOString())
 
-  onProgress?.({ step: 'aspects', message: `✓ Hoàn tất — ${totalCats} categories đã import`, percent: 100 })
+  onProgress?.({
+    step: 'aspects',
+    message: `✓ Hoàn tất — ${totalCats} categories đã import`,
+    percent: 100
+  })
 
   return totalCats
 }
@@ -228,7 +241,7 @@ export async function fullSync(settings, onProgress) {
     return {
       ok: true,
       categoryCount: catCount,
-      aspectCategoryCount: aspectCount,
+      aspectCategoryCount: aspectCount
     }
   } catch (err) {
     return { ok: false, error: err.message }
@@ -245,7 +258,7 @@ function decompressGzip(buffer) {
 
     readable.pipe(gunzip)
 
-    gunzip.on('data', chunk => chunks.push(chunk))
+    gunzip.on('data', (chunk) => chunks.push(chunk))
     gunzip.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
     gunzip.on('error', reject)
   })

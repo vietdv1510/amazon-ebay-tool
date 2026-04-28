@@ -272,7 +272,7 @@ const handleExport = async () => {
           '*Description': '',
           '*ConditionID': '',
           'PicURL': v.image || '',
-          '*Quantity': v.quantity || props.settings.defaultQuantity || 10,
+          '*Quantity': props.settings.defaultQuantity || v.quantity || 10,
           '*Format': '',
           '*StartPrice': v.price || r.sellPrice,
           '*Duration': '',

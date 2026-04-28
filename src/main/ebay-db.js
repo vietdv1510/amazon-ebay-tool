@@ -27,6 +27,7 @@ export function getDb() {
     CREATE TABLE IF NOT EXISTS categories (
       categoryId   TEXT PRIMARY KEY,
       categoryName TEXT NOT NULL,
+      categoryPath TEXT,
       parentId     TEXT,
       level        INTEGER DEFAULT 0,
       isLeaf       INTEGER DEFAULT 0
@@ -60,6 +61,14 @@ export function getDb() {
     CREATE INDEX IF NOT EXISTS idx_aspect_values_cat ON aspect_values(categoryId, aspectName);
     CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parentId);
   `)
+
+  // Migration: add categoryPath column for older databases
+  try {
+    const cols = db.pragma('table_info(categories)')
+    if (!cols.find(c => c.name === 'categoryPath')) {
+      db.exec('ALTER TABLE categories ADD COLUMN categoryPath TEXT')
+    }
+  } catch (_) {}
 
   return db
 }
@@ -148,21 +157,43 @@ export function getSyncStatus() {
 
 export function searchCategoriesOffline(query) {
   const database = getDb()
-  const q = `%${query}%`
-  const rows = database.prepare(`
-    SELECT categoryId, categoryName, parentId, level, isLeaf
+  const terms = query.trim().split(/\s+/).filter(t => t.length > 0)
+  if (terms.length === 0) return []
+
+  // Build WHERE: each term must appear in either categoryName or categoryPath
+  const conditions = terms.map(() => '(categoryName LIKE ? OR COALESCE(categoryPath, categoryName) LIKE ?)').join(' AND ')
+  const params = []
+  terms.forEach(t => {
+    params.push(`%${t}%`)
+    params.push(`%${t}%`)
+  })
+
+  let rows = database.prepare(`
+    SELECT categoryId, categoryName, categoryPath, parentId, level, isLeaf
     FROM categories
-    WHERE categoryName LIKE ?
-    ORDER BY level ASC
+    WHERE ${conditions}
+    ORDER BY level ASC, isLeaf DESC
     LIMIT 20
-  `).all(q)
+  `).all(...params)
+
+  // If strict AND returned nothing, try OR (any term matches)
+  if (rows.length === 0 && terms.length > 1) {
+    const orConditions = terms.map(() => '(categoryName LIKE ? OR COALESCE(categoryPath, categoryName) LIKE ?)').join(' OR ')
+    rows = database.prepare(`
+      SELECT categoryId, categoryName, categoryPath, parentId, level, isLeaf
+      FROM categories
+      WHERE ${orConditions}
+      ORDER BY level ASC, isLeaf DESC
+      LIMIT 20
+    `).all(...params)
+  }
 
   return rows.map(r => ({
     categoryId: r.categoryId,
     categoryName: r.categoryName,
     categoryTreeNodeLevel: r.level,
     relevancy: 'Offline Cache',
-    path: r.categoryName // Simple path fallback for offline
+    path: r.categoryPath || r.categoryName
   }))
 }
 

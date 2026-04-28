@@ -5,7 +5,12 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs'
 import { crawlAmazon, cancelCrawl, closeBrowser } from './crawler'
-import { getCategorySuggestions, getCategoryAspects, getCategoryTree, clearTokenCache } from './ebay-api'
+import {
+  getCategorySuggestions,
+  getCategoryAspects,
+  getCategoryTree,
+  clearTokenCache
+} from './ebay-api'
 import { fullSync } from './ebay-sync'
 import { getSyncStatus, closeDb, searchCategoriesOffline } from './ebay-db'
 import path from 'path'
@@ -13,35 +18,57 @@ import path from 'path'
 // ─── Settings store (JSON file) ───────────────────────────────────────────────
 const settingsPath = join(app.getPath('userData'), 'settings.json')
 
+const DEFAULT_SETTINGS = {
+  priceMultiplier: 1.5,
+  defaultCondition: '1000',
+  defaultFormat: 'FixedPrice',
+  defaultDuration: 'GTC',
+  defaultQuantity: 10,
+  crawlThreads: 3,
+  crawlDelay: 2,
+  crawlRetry: 3,
+  headlessMode: true,
+  ebayEnv: 'sandbox',
+  ebayClientId: '',
+  ebayClientSecret: '',
+  geminiApiKey: '',
+  useGemini: false,
+  useEbayAI: true,
+  forceUSLocation: true
+}
+
 function loadSettings() {
   try {
     if (fs.existsSync(settingsPath)) {
-      return JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+      const content = fs.readFileSync(settingsPath, 'utf-8')
+      console.log('[Settings] Raw content from disk:', content)
+      const saved = JSON.parse(content)
+      // Robust merge: only use saved value if it's not null/undefined
+      const merged = { ...DEFAULT_SETTINGS }
+      for (const key in saved) {
+        if (saved[key] !== null && saved[key] !== undefined) {
+          merged[key] = saved[key]
+        }
+      }
+      console.log('[Settings] Merged settings:', JSON.stringify(merged))
+      return merged
     }
   } catch (e) {
     console.error('Failed to load settings:', e)
   }
-  return {
-    priceMultiplier: 1.5,
-    defaultCondition: '1000',
-    defaultFormat: 'FixedPrice',
-    defaultDuration: 'GTC',
-    defaultQuantity: 10,
-    crawlThreads: 3,
-    crawlDelay: 2,
-    crawlRetry: 3,
-    headlessMode: true,
-    ebayEnv: 'sandbox',
-    ebayClientId: '',
-    ebayClientSecret: '',
-    geminiApiKey: '',
-    useGemini: false,
-    useEbayAI: true
-  }
+  return DEFAULT_SETTINGS
 }
 
 function saveSettings(settings) {
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+  console.log('[Settings] Saving to:', settingsPath)
+  console.log('[Settings] Data:', JSON.stringify(settings, null, 2))
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+    console.log('[Settings] Save successful')
+  } catch (err) {
+    console.error('[Settings] Save failed:', err)
+    throw err
+  }
 }
 
 // ─── Playwright Crawl Manager ────────────────────────────────────────────────
@@ -69,7 +96,6 @@ function createWindow() {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
-
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -176,6 +202,8 @@ ipcMain.handle('crawl:asin', async (_, asin) => {
       {
         headless: settings.headlessMode === true,
         delay: settings.crawlDelay ?? 2,
+        defaultQuantity: settings.defaultQuantity || 10,
+        forceUSLocation: settings.forceUSLocation !== false
       }
     )
     return { ok: true, data }
@@ -202,14 +230,28 @@ ipcMain.handle('app:paths', () => ({
 ipcMain.handle('ebay:categorySuggestions', async (_, query) => {
   try {
     const settings = loadSettings()
+    console.log(`[CategorySearch] query="${query}" useEbayAI=${settings.useEbayAI}`)
+
+    // Try AI mode first (if enabled)
     if (settings.useEbayAI) {
-      const results = await getCategorySuggestions(query, settings)
-      return { ok: true, data: results }
-    } else {
-      const results = searchCategoriesOffline(query)
-      return { ok: true, data: results }
+      try {
+        const results = await getCategorySuggestions(query, settings)
+        console.log(`[CategorySearch] AI results: ${results.length}`)
+        if (results.length > 0) return { ok: true, data: results }
+      } catch (aiErr) {
+        console.warn(`[CategorySearch] AI failed, falling back to offline:`, aiErr.message)
+      }
     }
+
+    // Offline search (always available as fallback)
+    const offlineResults = searchCategoriesOffline(query)
+    console.log(`[CategorySearch] Offline results: ${offlineResults.length}`)
+    if (offlineResults.length > 0) return { ok: true, data: offlineResults }
+
+    // Both modes returned empty
+    return { ok: true, data: [] }
   } catch (e) {
+    console.error(`[CategorySearch] ERROR:`, e.message)
     return { ok: false, error: e.message }
   }
 })

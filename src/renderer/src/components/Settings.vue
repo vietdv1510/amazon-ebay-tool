@@ -6,7 +6,9 @@
           <SettingsIcon class="w-8 h-8 text-primary" />
           Cài đặt
         </h2>
-        <p class="text-muted-foreground mt-2">Cấu hình Crawler, API và các thiết lập mặc định cho ứng dụng.</p>
+        <p class="text-muted-foreground mt-2">
+          Cấu hình Crawler, API và các thiết lập mặc định cho ứng dụng.
+        </p>
       </div>
 
       <Separator />
@@ -14,19 +16,36 @@
       <div class="grid gap-8">
         <!-- Section: Giá bán -->
         <div class="space-y-4">
-          <div class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground">
+          <div
+            class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"
+          >
             <DollarSign class="w-4 h-4" />
             <span>Giá bán</span>
           </div>
           <div class="grid grid-cols-2 gap-6">
             <div class="space-y-2">
               <Label>Nhân giá (Price Multiplier)</Label>
-              <Input type="number" step="0.1" min="1" v-model.number="form.priceMultiplier" />
-              <p class="text-[0.8rem] text-muted-foreground">Giá Amazon × {{ form.priceMultiplier }} = Giá eBay</p>
+              <Input
+                type="number"
+                step="0.1"
+                min="1"
+                v-model.number="form.priceMultiplier"
+                @input="saveNow"
+                @change="save"
+              />
+              <p class="text-[0.8rem] text-muted-foreground">
+                Giá Amazon × {{ form.priceMultiplier }} = Giá eBay
+              </p>
             </div>
             <div class="space-y-2">
               <Label>Số lượng mặc định (Quantity)</Label>
-              <Input type="number" min="1" v-model.number="form.defaultQuantity" />
+              <Input
+                type="number"
+                min="1"
+                v-model.number="form.defaultQuantity"
+                @input="saveNow"
+                @change="save"
+              />
             </div>
           </div>
         </div>
@@ -35,7 +54,9 @@
 
         <!-- Section: Crawler -->
         <div class="space-y-4">
-          <div class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground">
+          <div
+            class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"
+          >
             <Bot class="w-4 h-4" />
             <span>Playwright Crawler</span>
           </div>
@@ -57,9 +78,38 @@
           <div class="flex items-center justify-between space-x-2 pt-2">
             <div class="flex flex-col space-y-1">
               <Label>Ẩn trình duyệt (Headless Mode)</Label>
-              <p class="text-[0.8rem] text-muted-foreground">Khi bật, Playwright chạy ẩn — không mở cửa sổ Chrome. Khuyên dùng để tăng hiệu suất.</p>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Khi bật, Playwright chạy ẩn — không mở cửa sổ Chrome. Khuyên dùng để tăng hiệu suất.
+              </p>
             </div>
-            <Switch v-model="form.headlessMode" />
+            <SwitchRoot
+              v-model="form.headlessMode"
+              @update:model-value="() => saveNow()"
+              :class="cn(
+                'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
+              )"
+            >
+              <SwitchThumb class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+            </SwitchRoot>
+          </div>
+
+          <div class="flex items-center justify-between space-x-2 pt-2">
+            <div class="flex flex-col space-y-1">
+              <Label>Tự động đổi vùng sang Mỹ (Zip 10001)</Label>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Tự động thiết lập địa chỉ giao hàng tại Mỹ để lấy được giá chuẩn nhất (tránh bị lệch
+                giá khi ở Việt Nam).
+              </p>
+            </div>
+            <SwitchRoot
+              v-model="form.forceUSLocation"
+              @update:model-value="() => saveNow()"
+              :class="cn(
+                'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
+              )"
+            >
+              <SwitchThumb class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+            </SwitchRoot>
           </div>
         </div>
 
@@ -67,7 +117,9 @@
 
         <!-- Section: eBay -->
         <div class="space-y-4">
-          <div class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground">
+          <div
+            class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"
+          >
             <ShoppingCart class="w-4 h-4" />
             <span>eBay API</span>
           </div>
@@ -88,15 +140,29 @@
             </div>
             <div class="space-y-2">
               <Label>Client Secret (Cert ID)</Label>
-              <Input type="password" placeholder="eBay Cert ID..." v-model="form.ebayClientSecret" />
+              <Input
+                type="password"
+                placeholder="eBay Cert ID..."
+                v-model="form.ebayClientSecret"
+              />
             </div>
           </div>
           <div class="flex items-center justify-between space-x-2 pt-2">
             <div class="flex flex-col space-y-1">
               <Label>Dùng eBay AI Category Mapping</Label>
-              <p class="text-[0.8rem] text-muted-foreground">Tự động gợi ý category bằng eBay Taxonomy API khi có token hợp lệ.</p>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Tự động gợi ý category bằng eBay Taxonomy API khi có token hợp lệ.
+              </p>
             </div>
-            <Switch v-model="form.useEbayAI" />
+            <SwitchRoot
+              v-model="form.useEbayAI"
+              @update:model-value="() => saveNow()"
+              :class="cn(
+                'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
+              )"
+            >
+              <SwitchThumb class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+            </SwitchRoot>
           </div>
 
           <!-- eBay Data Sync -->
@@ -135,10 +201,28 @@
             </div>
 
             <!-- Sync status -->
-            <div v-if="syncStatus" class="text-xs text-muted-foreground space-y-0.5 p-3 rounded-md bg-muted/50">
-              <p>📂 Categories: <span class="font-mono text-foreground">{{ syncStatus.categoryCount?.toLocaleString() || 0 }}</span></p>
-              <p>📋 Aspects (categories): <span class="font-mono text-foreground">{{ syncStatus.aspectCategoryCount?.toLocaleString() || 0 }}</span></p>
-              <p v-if="syncStatus.lastSyncTime">🕐 Lần sync cuối: <span class="font-mono text-foreground">{{ formatSyncTime(syncStatus.lastSyncTime) }}</span></p>
+            <div
+              v-if="syncStatus"
+              class="text-xs text-muted-foreground space-y-0.5 p-3 rounded-md bg-muted/50"
+            >
+              <p>
+                📂 Categories:
+                <span class="font-mono text-foreground">{{
+                  syncStatus.categoryCount?.toLocaleString() || 0
+                }}</span>
+              </p>
+              <p>
+                📋 Aspects (categories):
+                <span class="font-mono text-foreground">{{
+                  syncStatus.aspectCategoryCount?.toLocaleString() || 0
+                }}</span>
+              </p>
+              <p v-if="syncStatus.lastSyncTime">
+                🕐 Lần sync cuối:
+                <span class="font-mono text-foreground">{{
+                  formatSyncTime(syncStatus.lastSyncTime)
+                }}</span>
+              </p>
               <p v-else class="text-amber-600">⚠ Chưa đồng bộ lần nào</p>
             </div>
           </div>
@@ -148,16 +232,28 @@
 
         <!-- Section: Gemini AI -->
         <div class="space-y-4">
-          <div class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground">
+          <div
+            class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"
+          >
             <Sparkles class="w-4 h-4" />
             <span>Gemini AI (Tùy chọn)</span>
           </div>
           <div class="flex items-center justify-between space-x-2">
             <div class="flex flex-col space-y-1">
               <Label>Bật tối ưu nội dung bằng Gemini</Label>
-              <p class="text-[0.8rem] text-muted-foreground">Dùng Gemini API để rewrite title/description phù hợp eBay.</p>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Dùng Gemini API để rewrite title/description phù hợp eBay.
+              </p>
             </div>
-            <Switch v-model="form.useGemini" />
+            <SwitchRoot
+              v-model="form.useGemini"
+              @update:model-value="() => saveNow()"
+              :class="cn(
+                'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
+              )"
+            >
+              <SwitchThumb class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+            </SwitchRoot>
           </div>
           <div class="space-y-2 pt-2" v-if="form.useGemini">
             <Label>Gemini API Key</Label>
@@ -169,7 +265,9 @@
 
         <!-- Section: eBay Listing defaults -->
         <div class="space-y-4">
-          <div class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground">
+          <div
+            class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"
+          >
             <ClipboardList class="w-4 h-4" />
             <span>Mặc định Listing</span>
           </div>
@@ -214,22 +312,30 @@
             <div class="space-y-2">
               <Label>Location (*Location)</Label>
               <Input type="text" placeholder="Ví dụ: US WAREHOUSE" v-model="form.defaultLocation" />
-              <p class="text-[0.8rem] text-muted-foreground">Địa điểm kho hàng xuất hiện trong listing</p>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Địa điểm kho hàng xuất hiện trong listing
+              </p>
             </div>
             <div class="space-y-2">
               <Label>Shipping Profile Name</Label>
               <Input type="text" placeholder="Ví dụ: Shipping" v-model="form.shippingProfileName" />
-              <p class="text-[0.8rem] text-muted-foreground">Tên Business Policy vận chuyển trên eBay</p>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Tên Business Policy vận chuyển trên eBay
+              </p>
             </div>
             <div class="space-y-2">
               <Label>Return Profile Name</Label>
               <Input type="text" placeholder="Ví dụ: Return" v-model="form.returnProfileName" />
-              <p class="text-[0.8rem] text-muted-foreground">Tên Business Policy đổi trả trên eBay</p>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Tên Business Policy đổi trả trên eBay
+              </p>
             </div>
             <div class="space-y-2">
               <Label>Payment Profile Name</Label>
               <Input type="text" placeholder="Ví dụ: Payment" v-model="form.paymentProfileName" />
-              <p class="text-[0.8rem] text-muted-foreground">Tên Business Policy thanh toán trên eBay</p>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Tên Business Policy thanh toán trên eBay
+              </p>
             </div>
           </div>
         </div>
@@ -246,21 +352,32 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, onUnmounted } from 'vue'
-import { DollarSign, Bot, ShoppingCart, Sparkles, ClipboardList, Save, Database, RefreshCw } from 'lucide-vue-next'
+import { reactive, ref, onMounted, onUnmounted, watch, nextTick, toRaw } from 'vue'
+import {
+  DollarSign,
+  Bot,
+  ShoppingCart,
+  Sparkles,
+  ClipboardList,
+  Save,
+  Database,
+  RefreshCw,
+  Settings as SettingsIcon
+} from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'vue-sonner'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
+import { SwitchRoot, SwitchThumb } from 'reka-ui'
 import { Separator } from '@/components/ui/separator'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValue
 } from '@/components/ui/select'
+import { cn } from '@/utils'
 
 const props = defineProps({
   initialSettings: { type: Object, required: true }
@@ -268,13 +385,38 @@ const props = defineProps({
 
 const emit = defineEmits(['save'])
 
-const form = reactive({ ...props.initialSettings })
+// Robust coercion: ensure specific keys have correct defaults if missing
+const coerceSettings = (raw) => {
+  const result = { ...raw }
+  if (result.headlessMode === undefined) result.headlessMode = true
+  if (result.useEbayAI === undefined) result.useEbayAI = true
+  if (result.forceUSLocation === undefined) result.forceUSLocation = true
+  if (result.useGemini === undefined) result.useGemini = false
+  return result
+}
+
+const form = reactive(coerceSettings(props.initialSettings))
+
+watch(
+  () => props.initialSettings,
+  (newVal) => {
+    if (newVal) {
+      console.log('[Settings] External sync')
+      Object.assign(form, coerceSettings(newVal))
+    }
+  },
+  { deep: true }
+)
+
+const saveNow = () => {
+  const data = toRaw(form)
+  console.log('[Settings] Auto-saving...')
+  emit('save', JSON.parse(JSON.stringify(data))) // Deep clone to be safe
+}
 
 const save = () => {
-  emit('save', { ...form })
-  toast.success('Lưu cài đặt thành công!', {
-    description: 'Các cấu hình của bạn đã được cập nhật.'
-  })
+  saveNow()
+  toast.success('Lưu cài đặt thành công!')
 }
 
 // ─── eBay Sync ─────────────────────────────────────────────────────────────────
@@ -320,13 +462,19 @@ const startSync = async () => {
   } catch (e) {
     syncProgress.value = { step: 'error', message: '✗ Lỗi: ' + e.message, percent: 0 }
   } finally {
-    setTimeout(() => { syncing.value = false }, 2000)
+    setTimeout(() => {
+      syncing.value = false
+    }, 2000)
   }
 }
 
 const formatSyncTime = (iso) => {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  return (
+    d.toLocaleDateString('vi-VN') +
+    ' ' +
+    d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  )
 }
 </script>

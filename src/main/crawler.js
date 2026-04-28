@@ -35,7 +35,7 @@ export async function closeBrowser() {
 }
 
 export async function crawlAmazon(asin, progressCb, options = {}) {
-  const { headless = true, delay = 2 } = options
+  const { headless = true, delay = 2, defaultQuantity = 10 } = options
   const b = await initBrowser(headless)
 
   const context = await b.newContext({
@@ -69,67 +69,135 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
     // Wait for product title to actually render (JS-driven pages load it late)
     progressCb('[PROGRESS] Đang chờ tiêu đề sản phẩm...')
-    await page.waitForSelector('#productTitle, span#title, h1.a-size-large', {
+    await page.waitForSelector('#productTitle, span#title, h1.a-size-large, #title', {
+      state: 'attached',
       timeout: 15000
     }).catch(() => {}) // non-fatal: proceed even if not found
 
-    // ── Try to set US delivery address ────────────────────────────────────
-    progressCb('[PROGRESS] Đang thiết lập vùng US...')
-    try {
+    progressCb('[PROGRESS] Đang kiểm tra địa chỉ giao hàng...')
+    if (options.forceUSLocation !== false) {
       await trySetUSDelivery(page)
-    } catch (_) {
-      // Non-critical, continue with whatever region is available
     }
-
+    
     progressCb('[PROGRESS] Trích xuất dữ liệu sản phẩm...')
 
     // ── Title ────────────────────────────────────────────────────────────
-    // html was already fetched after waitForSelector — use page.content() once here
-    const html = await page.content()
-    const $ = cheerio.load(html)
+    let html = await page.content()
+    let $ = cheerio.load(html)
 
-    const title =
+    let title =
       $('#productTitle').text().trim() ||
       $('span#title').text().trim() ||
       $('h1.a-size-large').text().trim() ||
-      await page.$eval('#productTitle, span#title, h1.a-size-large', el => el.textContent.trim()).catch(() => '')
+      await page.$eval('#productTitle, span#title, h1.a-size-large, #title', el => el.textContent.trim()).catch(() => '')
 
-    if (!title && html.includes('captcha')) {
+    // Fallback lấy title từ thẻ <title> của trang nếu các selector chính không có
+    if (!title) {
+      const pageTitle = await page.title()
+      if (pageTitle && pageTitle.includes(':')) {
+        title = pageTitle.split(':').slice(1).join(':').trim()
+      }
+    }
+
+    if (!title && (html.toLowerCase().includes('captcha') || html.toLowerCase().includes('type the characters'))) {
       throw new Error('Amazon Anti-Bot Captcha — thử lại sau hoặc tắt Headless Mode.')
     }
-    if (!title) throw new Error('Không tìm thấy tiêu đề sản phẩm.')
+    if (!title) throw new Error('Không tìm thấy tiêu đề sản phẩm. Có thể trang load quá chậm hoặc bị block.')
 
     // Wait for other lazy-loaded sections before scraping them
     await Promise.allSettled([
       page.waitForSelector('#feature-bullets', { timeout: 8000 }),
       page.waitForSelector('#availability', { timeout: 8000 }),
       page.waitForSelector('#wayfinding-breadcrumbs_feature_div, #wayfinding-breadcrumbs_container', { timeout: 8000 }),
+      page.waitForSelector('.a-price .a-offscreen', { timeout: 8000 }),
     ])
 
-    // ── Price — FIXED: use JS data first, then careful DOM parsing ──────
+    // Re-fetch HTML AFTER lazy sections loaded (captures JS-injected prices, variations)
+    html = await page.content()
+    $ = cheerio.load(html)
+
+    // ── Price ────────────────────────────────────────────────────────────
     progressCb('[PROGRESS] Đang lấy thông tin giá...')
     let price = 0
 
-    // Method 1 (BEST): Parse from embedded JS data
-    const jsPriceMatch = html.match(/"priceAmount"\s*:\s*([\d.]+)/)
-    if (jsPriceMatch) {
-      price = parseFloat(jsPriceMatch[1])
-    }
+    // Strategy A (PRIMARY): DOM selectors scoped to core price area — most reliable
+    // These selectors are scoped to the product's price section, avoiding carousel/related product prices
+    const priceSelectors = [
+      '#corePrice_feature_div .a-price .a-offscreen',
+      '#corePriceDisplay_desktop_feature_div .a-price .a-offscreen',
+      '#apex_desktop .a-price .a-offscreen',
+      '#buybox .a-price .a-offscreen',
+      '#centerCol #corePrice_feature_div .a-price .a-offscreen',
+      '#centerCol #corePriceDisplay_desktop_feature_div .a-price .a-offscreen',
+      '#priceblock_ourprice',
+      '#priceblock_dealprice',
+      '#priceblock_saleprice',
+    ]
+    for (const sel of priceSelectors) {
+      const el = $(sel).first()
+      const text = el.text().trim()
+      
+      // Check if this element is inside a carousel/related section
+      const isRelated = el.closest('#HLCXComparisonWidget_feature_div, #sims-consolidated-2_feature_div, #sp_detail, #reco-similar-items, .as-title-block').length > 0
+      if (isRelated) {
+        console.log(`[Crawler] Skipping price from related/sponsored section: ${sel}`)
+        continue
+      }
 
-    // Method 2: Parse whole+fraction from DOM
-    if (!price) {
-      const whole = $('#corePrice_feature_div .a-price-whole').first().text().replace(/[^0-9]/g, '')
-      const fraction = $('#corePrice_feature_div .a-price-fraction').first().text().replace(/[^0-9]/g, '')
-      if (whole) {
-        price = parseFloat(`${whole}.${fraction || '00'}`)
+      const match = text.match(/\$([\d,]+\.?\d*)/)
+      if (match) {
+        price = parseFloat(match[1].replace(',', ''))
+        if (price > 0) {
+          console.log(`[Crawler] Found price ${price} using selector: ${sel}`)
+          break
+        }
       }
     }
 
-    // Method 3: Fallback to first a-offscreen but only take first element
-    if (!price) {
-      const firstOffscreen = $('#corePrice_feature_div .a-offscreen').first().text().trim()
-      const match = firstOffscreen.match(/\$([\d,]+\.?\d*)/)
-      if (match) price = parseFloat(match[1].replace(',', ''))
+    // Strategy B: Playwright evaluate — targets only the main product price area
+    if (!price || price === 0) {
+      try {
+        price = await page.evaluate(() => {
+          // Scoped: only look inside the core price display area
+          const corePrice = document.querySelector('#corePrice_feature_div, #corePriceDisplay_desktop_feature_div, #apex_desktop')
+          if (corePrice) {
+            const offscreen = corePrice.querySelector('.a-price .a-offscreen')
+            if (offscreen) {
+              const m = offscreen.textContent.trim().match(/\$([\d,]+\.?\d*)/)
+              if (m) return parseFloat(m[1].replace(',', ''))
+            }
+          }
+          // Fallback: apexPriceToPay (still scoped)
+          const apexEl = document.querySelector('.a-price.apexPriceToPay .a-offscreen, .a-price.priceToPay .a-offscreen')
+          if (apexEl) {
+            const m = apexEl.textContent.trim().match(/\$([\d,]+\.?\d*)/)
+            if (m) return parseFloat(m[1].replace(',', ''))
+          }
+          return 0
+        })
+      } catch (_) {}
+    }
+
+    // Strategy C (LAST RESORT): JSON priceAmount regex — searches full HTML
+    // ⚠️ This can pick up prices from "Related Products" carousel, so only use as fallback
+    if (!price || price === 0) {
+      // Try to find priceAmount near the product's own ASIN to reduce false matches
+      const asinPriceMatch = html.match(new RegExp(`"${asin}"[\\s\\S]{0,500}"priceAmount"\\s*:\\s*([\\d.]+)`))
+      if (asinPriceMatch) {
+        const p = parseFloat(asinPriceMatch[1])
+        if (p > 0) price = p
+      }
+    }
+    if (!price || price === 0) {
+      // Final fallback: first priceAmount in the page (may be inaccurate)
+      const priceMatches = [...html.matchAll(/"priceAmount"\s*:\s*([\d.]+)/g)]
+      for (const m of priceMatches) {
+        const p = parseFloat(m[1])
+        if (p > 0) {
+          price = p
+          break
+        }
+      }
     }
 
     // ── Price Range ─────────────────────────────────────────────────────
@@ -345,7 +413,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
     // ── Variations — FIXED: comprehensive parsing ───────────────────────
     progressCb('[PROGRESS] Đang phân tích biến thể sản phẩm...')
-    const variations = await extractVariations($, html, page, price, progressCb)
+    const variations = await extractVariations($, html, page, price, progressCb, defaultQuantity)
 
     progressCb('[PROGRESS] ✓ Hoàn tất crawl!')
     return {
@@ -381,61 +449,56 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
  * Wrapped with a hard timeout to prevent hanging.
  */
 async function trySetUSDelivery(page) {
-  const result = await Promise.race([
-    _doSetUSDelivery(page),
-    new Promise(resolve => setTimeout(() => resolve('timeout'), 15000))
-  ])
-  if (result === 'timeout') {
-    console.log('[trySetUSDelivery] Timed out, closing popups...')
-    await page.keyboard.press('Escape').catch(() => {})
-    await page.waitForTimeout(1000)
-  }
-  // Ensure page is stable before continuing
-  await page.waitForLoadState('domcontentloaded').catch(() => {})
-  await page.waitForTimeout(500)
-}
+  try {
+    console.log('[trySetUSDelivery] Hardening location to US (10001)...')
+    
+    const result = await page.evaluate(async () => {
+      const wait = (ms) => new Promise(res => setTimeout(res, ms))
+      
+      // 1. Check current location
+      const locText = document.querySelector('#glow-ingress-block, #nav-global-location-popover-link')?.textContent || ''
+      if (locText.includes('10001') || locText.includes('New York')) return 'ALREADY_US'
 
-async function _doSetUSDelivery(page) {
-  const deliverTo = await page.$('#glow-ingress-block, #nav-global-location-popover-link')
-  if (!deliverTo) return
+      // 2. Open popover
+      const btn = document.querySelector('#nav-global-location-popover-link, #glow-ingress-block')
+      if (!btn) return 'NO_BUTTON'
+      btn.click()
+      await wait(1500)
 
-  const deliveryText = await deliverTo.textContent().catch(() => '')
-  if (deliveryText?.includes('United States') || deliveryText?.includes('US')) return
+      // 3. Enter Zip
+      const input = document.querySelector('#GLUXZipUpdateInput')
+      if (!input) return 'NO_INPUT'
+      input.value = '10001'
+      // Trigger input events so Amazon knows we typed
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+      await wait(500)
 
-  await deliverTo.click()
-  await page.waitForTimeout(1500)
+      // 4. Click Apply
+      const applyBtn = document.querySelector('#GLUXZipUpdate input[type="submit"], #GLUXZipUpdate .a-button-input')
+      if (!applyBtn) return 'NO_APPLY'
+      applyBtn.click()
+      await wait(2000)
 
-  const zipInput = await page.$('#GLUXZipUpdateInput')
-  if (zipInput) {
-    await zipInput.fill('10001')
-    const applyBtn = await page.$('#GLUXZipUpdate input[type="submit"], #GLUXZipUpdate .a-button-input')
-    if (applyBtn) {
-      await applyBtn.click()
-      await page.waitForTimeout(2500)
+      // 5. Click Continue/Done
+      const continueBtn = document.querySelector('.a-popover-footer .a-button-primary .a-button-input, #GLUXConfirmClose .a-button-input, button[name="glowDoneButton"]')
+      if (continueBtn) {
+        continueBtn.click()
+        return 'SUCCESS_CONTINUE'
+      }
+      
+      return 'SUCCESS_ZIP_ONLY'
+    })
+
+    console.log(`[trySetUSDelivery] Result: ${result}`)
+    
+    if (result.startsWith('SUCCESS')) {
+      await page.waitForTimeout(1000)
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      console.log('[trySetUSDelivery] Reloaded page to apply location.')
     }
-
-    // Handle "Continue" confirmation popup
-    const continueBtn = await page.$('.a-popover-footer .a-button-primary .a-button-input, #GLUXConfirmClose .a-button-input, .a-popover .a-button-primary .a-button-input')
-    if (continueBtn) {
-      await continueBtn.click()
-      await page.waitForTimeout(1500)
-    }
-    // Also try text-based button
-    const continueText = await page.$('input[aria-labelledby*="Continue"], button:has-text("Continue"), .a-button-primary:has-text("Continue")')
-    if (continueText) {
-      await continueText.click().catch(() => {})
-      await page.waitForTimeout(1500)
-    }
-
-    // Close any remaining popups
-    await page.keyboard.press('Escape').catch(() => {})
-    await page.waitForTimeout(500)
-
-    // Reload to refresh prices
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.waitForTimeout(2000)
-  } else {
-    await page.keyboard.press('Escape').catch(() => {})
+  } catch (err) {
+    console.error('[trySetUSDelivery] Error during hardening:', err)
   }
 }
 
@@ -443,7 +506,7 @@ async function _doSetUSDelivery(page) {
  * Enhanced variation extraction
  * Uses multiple strategies: twister JS data, DOM swatches, dimension display data
  */
-async function extractVariations($, html, page, basePrice, progressCb) {
+async function extractVariations($, html, page, basePrice, progressCb, defaultQuantity = 10) {
   const variations = []
   try {
     // ── Parse dimension names ──────────────────────────────────────────
@@ -476,17 +539,20 @@ async function extractVariations($, html, page, basePrice, progressCb) {
     if (twisterMatch) {
       try {
         // Extract price data per ASIN from twister model
-        const allPrices = [...html.matchAll(/"([A-Z0-9]{10})"\s*:\s*\{[^}]*"priceAmount"\s*:\s*([\d.]+)/g)]
+        const twisterContent = twisterMatch[1]
+        const allPrices = [...twisterContent.matchAll(/"([A-Z0-9]{10})"\s*:\s*\{[^}]*"priceAmount"\s*:\s*([\d.]+)/g)]
         for (const m of allPrices) {
           priceMap[m[1]] = parseFloat(m[2])
         }
-      } catch (_) {}
+      } catch (_) {
+        console.log('[extractVariations] Twister price extraction failed')
+      }
     }
 
     // ── Parse variation image data ──────────────────────────────────────
     let imageMap = {}
     // colorImages maps dimension value → image array
-    const colorImgsMatch = html.match(/"colorImages"\s*:\s*(\{[\s\S]*?\})\s*,\s*"colorToAsin/)
+    const colorImgsMatch = html.match(/"colorImages"\s*:\s*(\{[\s\S]*?\})\s*,\s*"(?:colorToAsin|alwaysIncludeTwister|initial|heroImage|imageGalleryData|twisterModel)/)
     if (colorImgsMatch) {
       try {
         const colorData = JSON.parse(colorImgsMatch[1])
@@ -505,6 +571,30 @@ async function extractVariations($, html, page, basePrice, progressCb) {
       try { colorToAsin = JSON.parse(c2aMatch[1]) } catch (_) {}
     }
 
+    // Helper: fuzzy match image from imageMap
+    const findVarImage = (displayValues) => {
+      // Exact match on first display value
+      for (const val of displayValues) {
+        if (imageMap[val]) return imageMap[val]
+      }
+      // Case-insensitive match
+      const lowerMap = {}
+      for (const key of Object.keys(imageMap)) {
+        lowerMap[key.toLowerCase().trim()] = imageMap[key]
+      }
+      for (const val of displayValues) {
+        if (lowerMap[val.toLowerCase().trim()]) return lowerMap[val.toLowerCase().trim()]
+      }
+      // Substring match
+      for (const val of displayValues) {
+        const normVal = val.toLowerCase().trim()
+        for (const [key, img] of Object.entries(imageMap)) {
+          if (key.toLowerCase().includes(normVal) || normVal.includes(key.toLowerCase())) return img
+        }
+      }
+      return ''
+    }
+
     // ── Strategy 1: Use displayMap (most reliable) ─────────────────────
     if (Object.keys(displayMap).length > 0 && dimNames.length > 0) {
       for (const [childAsin, displayValues] of Object.entries(displayMap)) {
@@ -518,23 +608,22 @@ async function extractVariations($, html, page, basePrice, progressCb) {
         })
 
         let varPrice = priceMap[childAsin] || basePrice
-        let varImage = ''
-
-        // Try to match image by first dimension value
-        const firstVal = displayValues[0] || ''
-        if (imageMap[firstVal]) varImage = imageMap[firstVal]
+        let varImage = findVarImage(displayValues)
 
         // Also try colorToAsin mapping
-        if (!varImage && colorToAsin[firstVal]?.asin) {
-          const mappedAsin = colorToAsin[firstVal].asin
-          if (imageMap[mappedAsin]) varImage = imageMap[mappedAsin]
+        if (!varImage) {
+          const firstVal = displayValues[0] || ''
+          if (colorToAsin[firstVal]?.asin) {
+            const mappedAsin = colorToAsin[firstVal].asin
+            if (imageMap[mappedAsin]) varImage = imageMap[mappedAsin]
+          }
         }
 
         variations.push({
           asin: childAsin,
           attributes,
           price: varPrice,
-          quantity: 10,
+          quantity: defaultQuantity,
           image: varImage,
         })
       }
@@ -554,7 +643,7 @@ async function extractVariations($, html, page, basePrice, progressCb) {
           asin: childAsin,
           attributes,
           price: priceMap[childAsin] || basePrice,
-          quantity: 10,
+          quantity: defaultQuantity,
           image: '',
         })
       }
@@ -562,7 +651,7 @@ async function extractVariations($, html, page, basePrice, progressCb) {
 
     // ── Strategy 3: Parse from DOM (fallback) ──────────────────────────
     if (variations.length === 0) {
-      const domVariations = await parseDOMVariations(page, dimNames, basePrice)
+      const domVariations = await parseDOMVariations(page, dimNames, basePrice, defaultQuantity)
       variations.push(...domVariations)
     }
 
@@ -583,28 +672,89 @@ async function extractVariations($, html, page, basePrice, progressCb) {
             timeout: 12000
           })
           await varPage.waitForTimeout(1500)
+          // Wait for price to render
+          await varPage.waitForSelector('.a-price .a-offscreen', { timeout: 5000 }).catch(() => {})
           const vHtml = await varPage.content()
+          const v$ = cheerio.load(vHtml)
 
-          // Parse price
-          const jsPrice = vHtml.match(/"priceAmount"\s*:\s*([\d.]+)/)
-          if (jsPrice) {
-            v.price = parseFloat(jsPrice[1])
-          } else {
-            // DOM fallback
-            const whole = await varPage.$eval('#corePrice_feature_div .a-price-whole', el =>
-              el.textContent.replace(/[^0-9]/g, '')
-            ).catch(() => '')
-            const frac = await varPage.$eval('#corePrice_feature_div .a-price-fraction', el =>
-              el.textContent.replace(/[^0-9]/g, '')
-            ).catch(() => '00')
-            if (whole) v.price = parseFloat(`${whole}.${frac}`)
+          // Parse price — DOM selectors FIRST (scoped to core price area)
+          let variantPrice = 0
+          const varPriceSelectors = [
+            '#corePrice_feature_div .a-price .a-offscreen',
+            '#corePriceDisplay_desktop_feature_div .a-price .a-offscreen',
+            '.a-price.apexPriceToPay .a-offscreen',
+            '.a-price.priceToPay .a-offscreen',
+            '#buybox .a-price .a-offscreen',
+            '#centerCol .a-price .a-offscreen',
+            '#priceblock_ourprice',
+            '#priceblock_dealprice',
+            '#corePrice_desktop .a-offscreen',
+            '#apex_offerDisplay_desktop .a-price .a-offscreen',
+          ]
+          for (const sel of varPriceSelectors) {
+            const txt = v$(sel).first().text().trim()
+            const pm = txt.match(/\$([\d,]+\.?\d*)/)
+            if (pm) {
+              variantPrice = parseFloat(pm[1].replace(',', ''))
+              if (variantPrice > 0) break
+            }
+          }
+
+          // Playwright evaluate fallback
+          if (!variantPrice) {
+            try {
+              variantPrice = await varPage.evaluate(() => {
+                const core = document.querySelector('#corePrice_feature_div, #corePriceDisplay_desktop_feature_div')
+                if (core) {
+                  const el = core.querySelector('.a-price .a-offscreen')
+                  if (el) {
+                    const m = el.textContent.trim().match(/\$([\d,]+\.?\d*)/)
+                    if (m) return parseFloat(m[1].replace(',', ''))
+                  }
+                }
+                return 0
+              })
+            } catch (_) {}
+          }
+
+          // JSON regex last resort
+          if (!variantPrice) {
+            // JSON regex last resort - strictly look for the current ASIN's price amount
+            const jsPriceMatches = [...vHtml.matchAll(new RegExp(`"${v.asin}"\\s*:\\s*\\{[^}]*"priceAmount"\\s*:\\s*([\\d.]+)`, 'g'))]
+            for (const m of jsPriceMatches) {
+              const p = parseFloat(m[1])
+              if (p > 0) { variantPrice = p; break }
+            }
+          }
+          
+          if (variantPrice > 0) {
+            v.price = variantPrice
           }
 
           // Also grab the main image for this variant if missing
           if (!v.image) {
-            v.image = await varPage.$eval('#landingImage', el =>
-              (el.getAttribute('data-old-hires') || el.src || '').replace(/\._.*_\./, '.')
+            v.image = await varPage.$eval('#landingImage, #imgBlkFront, #main-image, .a-dynamic-image, #imgTagWrapperId img', el =>
+              (el.getAttribute('data-old-hires') || el.getAttribute('data-a-dynamic-image') || el.src || '').replace(/\._.*_\./, '.')
             ).catch(() => '')
+            
+            // Handle data-a-dynamic-image which is a JSON string of URLs
+            if (v.image && v.image.startsWith('{')) {
+                try {
+                    const imgObj = JSON.parse(v.image)
+                    v.image = Object.keys(imgObj).sort((a,b) => imgObj[b][0] - imgObj[a][0])[0] // Get largest
+                } catch (_) {}
+            }
+
+            if (!v.image) {
+              const pat = /"colorImages"\s*:\s*\{\s*"initial"\s*:\s*(\[[\s\S]*?\])\s*\}/
+              const m = vHtml.match(pat)
+              if (m?.[1]) {
+                  try {
+                      const parsed = JSON.parse(m[1])
+                      v.image = parsed[0]?.hiRes || parsed[0]?.large || parsed[0]?.main || ''
+                  } catch (_) {}
+              }
+            }
           }
 
           await varPage.close()
@@ -624,7 +774,7 @@ async function extractVariations($, html, page, basePrice, progressCb) {
 /**
  * Parse variations directly from the DOM using Playwright
  */
-async function parseDOMVariations(page, dimNames, basePrice) {
+async function parseDOMVariations(page, dimNames, basePrice, defaultQuantity = 10) {
   const variations = []
 
   // Check for dropdown-style variations
@@ -647,7 +797,7 @@ async function parseDOMVariations(page, dimNames, basePrice) {
           asin: opt.value.length === 10 ? opt.value : `opt_${variations.length}`,
           attributes: { [readableName]: opt.text },
           price: basePrice,
-          quantity: 10,
+          quantity: defaultQuantity,
           image: '',
         })
       }
@@ -687,7 +837,7 @@ async function parseDOMVariations(page, dimNames, basePrice) {
           asin: data.asin,
           attributes: { [readableName]: data.title },
           price: basePrice,
-          quantity: 10,
+          quantity: defaultQuantity,
           image: data.img,
         })
       }
