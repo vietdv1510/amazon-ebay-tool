@@ -746,7 +746,7 @@ const handleExport = async (force = false) => {
     return clean
   })
 
-  const ws = xlsx.utils.json_to_sheet(exportRows)
+  const ws = xlsx.utils.json_to_sheet(exportRows, { header: allColumns.value })
   const csv = xlsx.utils.sheet_to_csv(ws)
   // eBay requires UTF-8 BOM for correct Unicode parsing
   const csvWithBom = '\uFEFF' + csv
