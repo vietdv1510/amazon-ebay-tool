@@ -4,14 +4,7 @@
     <div class="page-header">
       <div class="page-title flex items-center font-bold text-[15px]">
         <LayoutDashboard class="w-5 h-5 mr-2.5 flex-shrink-0" />
-        Xử lý & Export
-      </div>
-
-      <div class="header-actions flex gap-2">
-        <Button variant="outline" size="sm" @click="handleExport" :disabled="doneRows.length === 0">
-          <Download class="w-4 h-4 mr-2" />
-          Export CSV
-        </Button>
+        Xử lý Dữ liệu
       </div>
     </div>
 
@@ -132,7 +125,6 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import * as xlsx from 'xlsx'
 import DetailPanel from './DetailPanel.vue'
 
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
@@ -171,196 +163,7 @@ const onDetailUpdate = (updatedRow) => {
   selectedRow.value = { ...updatedRow }
 }
 
-// ─── Build HTML Description ───────────────────────────────────────────────────
-const buildDescription = (row) => {
-  const parts = []
-  parts.push('<div style="max-width:800px;margin:0 auto;font-family:Arial,sans-serif">')
-
-  // Bullet points
-  if (row.bulletPoints?.length > 0) {
-    parts.push('<h3 style="margin-bottom:8px">Product Features</h3>')
-    parts.push('<ul style="padding-left:18px">')
-    row.bulletPoints.forEach(bp => {
-      parts.push(`<li style="margin-bottom:4px">${escapeHtml(bp)}</li>`)
-    })
-    parts.push('</ul>')
-  }
-
-  // Main images (max 5 to keep desc size reasonable)
-  if (row.images?.length > 0) {
-    parts.push('<div style="margin:16px 0">')
-    row.images.slice(0, 5).forEach(img => {
-      parts.push(`<img src="${img}" style="max-width:700px;width:100%;display:block;margin:8px 0" />`)
-    })
-    parts.push('</div>')
-  }
-
-  // Text description
-  if (row.description) {
-    parts.push(`<p style="margin-top:12px">${escapeHtml(row.description.substring(0, 2000))}</p>`)
-  }
-
-  // Specs table
-  if (row.specs && Object.keys(row.specs).length > 0) {
-    parts.push('<h3 style="margin-top:16px;margin-bottom:8px">Specifications</h3>')
-    parts.push('<table style="border-collapse:collapse;width:100%">')
-    for (const [key, val] of Object.entries(row.specs)) {
-      parts.push(`<tr><td style="border:1px solid #ddd;padding:6px 10px;font-weight:bold;width:35%">${escapeHtml(key)}</td>`)
-      parts.push(`<td style="border:1px solid #ddd;padding:6px 10px">${escapeHtml(val)}</td></tr>`)
-    }
-    parts.push('</table>')
-  }
-
-  parts.push('</div>')
-  return parts.join('')
-}
-
-const escapeHtml = (str) => {
-  if (!str) return ''
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-// ─── Export ───────────────────────────────────────────────────────────────────
-const handleExport = async () => {
-  const exportPath = await window.api.dialog.saveFile({ defaultPath: 'ebay-upload-template.csv' })
-  if (!exportPath) return
-
-  const rows = []
-  const readyRows = doneRows.value.filter(r => isRowReady(r))
-  
-  if (readyRows.length === 0) {
-    alert('Không có sản phẩm nào sẵn sàng export.\nVui lòng chọn eBay Category cho từng sản phẩm trước.')
-    return
-  }
-
-  for (const r of readyRows) {
-    const description = buildDescription(r)
-    const aspectCols = buildAspectColumns(r)
-
-    if (r.variations && r.variations.length > 0) {
-      // ─ Parent row ─
-      const parentRelDetails = buildParentRelationshipDetails(r.variations)
-      rows.push({
-        '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
-        '*Category': r.ebayCategory || '',
-        '*Title': cleanTitle(r.title),
-        '*Description': description,
-        '*ConditionID': props.settings.defaultCondition || '1000',
-        'PicURL': (r.images || []).slice(0, 12).join('|'),
-        '*Quantity': '',
-        '*Format': props.settings.defaultFormat || 'FixedPrice',
-        '*StartPrice': '',
-        '*Duration': props.settings.defaultDuration || 'GTC',
-        '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
-        '*ReturnsAcceptedOption': 'ReturnsAccepted',
-        'CustomLabel': r.asin,
-        '*Relationship': '',
-        '*RelationshipDetails': parentRelDetails,
-        'ShippingProfileName': props.settings.shippingProfileName || '',
-        'ReturnProfileName': props.settings.returnProfileName || '',
-        'PaymentProfileName': props.settings.paymentProfileName || '',
-        ...aspectCols,
-      })
-
-      // ─ Child (Variation) rows ─
-      for (const v of r.variations) {
-        const childRelDetails = Object.entries(v.attributes || {}).map(([k, val]) => `${k}=${val}`).join('|')
-        rows.push({
-          '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': '',
-          '*Category': '',
-          '*Title': '',
-          '*Description': '',
-          '*ConditionID': '',
-          'PicURL': v.image || '',
-          '*Quantity': props.settings.defaultQuantity || v.quantity || 10,
-          '*Format': '',
-          '*StartPrice': v.price || r.sellPrice,
-          '*Duration': '',
-          '*Location': '',
-          '*ReturnsAcceptedOption': '',
-          'CustomLabel': v.asin || '',
-          '*Relationship': 'Variation',
-          '*RelationshipDetails': childRelDetails,
-          'ShippingProfileName': '',
-          'ReturnProfileName': '',
-          'PaymentProfileName': '',
-        })
-      }
-    } else {
-      // ─ Single product (no variations) ─
-      rows.push({
-        '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
-        '*Category': r.ebayCategory || '',
-        '*Title': cleanTitle(r.title),
-        '*Description': description,
-        '*ConditionID': props.settings.defaultCondition || '1000',
-        'PicURL': (r.images || []).slice(0, 12).join('|'),
-        '*Quantity': props.settings.defaultQuantity || 10,
-        '*Format': props.settings.defaultFormat || 'FixedPrice',
-        '*StartPrice': r.sellPrice,
-        '*Duration': props.settings.defaultDuration || 'GTC',
-        '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
-        '*ReturnsAcceptedOption': 'ReturnsAccepted',
-        'CustomLabel': r.asin,
-        '*Relationship': '',
-        '*RelationshipDetails': '',
-        'ShippingProfileName': props.settings.shippingProfileName || '',
-        'ReturnProfileName': props.settings.returnProfileName || '',
-        'PaymentProfileName': props.settings.paymentProfileName || '',
-        ...aspectCols,
-      })
-    }
-  }
-
-  const ws = xlsx.utils.json_to_sheet(rows)
-  const csv = xlsx.utils.sheet_to_csv(ws)
-  // eBay requires UTF-8 BOM for correct Unicode parsing
-  const csvWithBom = '\uFEFF' + csv
-  await window.api.file.write(exportPath, csvWithBom)
-  alert(`Export thành công! ${readyRows.length} sản phẩm (${rows.length} dòng CSV).`)
-}
-
-// Build parent RelationshipDetails: all dimension values combined
-// e.g. "Color=Red;Blue;Green|Size=S;M;L"
-const buildParentRelationshipDetails = (variations) => {
-  const dimValues = {}
-  for (const v of variations) {
-    for (const [key, val] of Object.entries(v.attributes || {})) {
-      if (!dimValues[key]) dimValues[key] = new Set()
-      if (val) dimValues[key].add(val)
-    }
-  }
-  return Object.entries(dimValues)
-    .map(([key, vals]) => `${key}=${[...vals].join(';')}`)
-    .join('|')
-}
-
-/**
- * Clean title for eBay: strip problematic chars, limit to 80 chars
- */
-const cleanTitle = (title) => {
-  if (!title) return ''
-  return title
-    .replace(/[\u{1F600}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // strip emoji
-    .replace(/[【】「」『』]/g, ' ')  // CJK brackets → space
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-// Build C:Brand, C:Color, etc. columns from aspectValues
-const buildAspectColumns = (row) => {
-  const cols = {}
-  if (row.aspectValues) {
-    for (const [name, val] of Object.entries(row.aspectValues)) {
-      if (val) cols[`C:${name}`] = val
-    }
-  }
-  // Ensure Brand is always present
-  if (!cols['C:Brand'] && row.brand) {
-    cols['C:Brand'] = row.brand
-  }
-  return cols
-}
+// Removed local export logic as it is now strictly handled in ExportPreview.vue
 
 // ─── Resizable Panel ─────────────────────────────────────────────────────────
 const panelWidth = ref(380)

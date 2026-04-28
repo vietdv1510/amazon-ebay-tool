@@ -12,10 +12,10 @@
       <!-- Logo + Toggle row -->
       <div class="sidebar-logo-row" :class="{ 'justify-center px-0': sidebarCollapsed }">
         <div
-          class="logo-icon flex-shrink-0 rounded-md bg-white/5 p-1"
+          class="logo-icon flex-shrink-0"
           :class="{ 'mx-auto': sidebarCollapsed }"
         >
-          <img src="./assets/logo.png" class="w-6 h-6 object-contain" alt="Logo" />
+          <img src="./assets/logo.png" class="w-7 h-7 object-contain" alt="Logo" />
         </div>
         <div v-if="!sidebarCollapsed" class="logo-text-wrap flex-1 min-w-0">
           <div class="logo-text font-bold tracking-tight">eBay Engine</div>
@@ -52,10 +52,10 @@
           class="w-full nav-btn"
           :class="sidebarCollapsed ? 'justify-center px-0' : 'justify-start'"
           @click="currentPage = 'workspace'"
-          :title="sidebarCollapsed ? 'Xử lý & Export' : ''"
+          :title="sidebarCollapsed ? 'Xử lý Dữ liệu' : ''"
         >
           <LayoutDashboard class="w-4 h-4 flex-shrink-0" :class="{ 'mr-2': !sidebarCollapsed }" />
-          <span v-if="!sidebarCollapsed">Xử lý & Export</span>
+          <span v-if="!sidebarCollapsed">Xử lý Dữ liệu</span>
           <Badge
             v-if="stats.total > 0 && !sidebarCollapsed"
             variant="outline"
@@ -99,14 +99,7 @@
         class="sidebar-footer flex flex-col gap-2 border-t border-border/40"
         :class="{ 'p-2': sidebarCollapsed, 'px-3 py-3': !sidebarCollapsed }"
       >
-        <!-- Bottom Logo Sync -->
-        <div
-          v-if="!sidebarCollapsed"
-          class="flex items-center gap-2 px-1 mb-1 opacity-40 hover:opacity-100 transition-opacity"
-        >
-          <img src="./assets/logo.png" class="w-4 h-4 object-contain grayscale" alt="Logo" />
-          <span class="text-[10px] font-medium tracking-widest uppercase">Nexs Tool v1.0</span>
-        </div>
+
 
         <button
           class="w-full flex items-center justify-center p-1.5 rounded-md hover:bg-muted/40 transition-all text-muted-foreground/60 hover:text-muted-foreground border border-transparent hover:border-border/30 group"
