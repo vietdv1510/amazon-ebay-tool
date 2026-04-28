@@ -29,8 +29,22 @@ export async function initBrowser(headless = true) {
 
 export async function closeBrowser() {
   if (browser) {
+    // Clean up any lingering active crawls before closing browser
+    console.log(`[Crawler] Closing browser, cleaning up ${activeCrawls.size} active crawl(s)...`)
+    for (const [asin, page] of activeCrawls.entries()) {
+      try {
+        if (!page.isClosed()) {
+          await page.close()
+        }
+      } catch (e) {
+        console.debug(`[Crawler] Error closing page for ASIN ${asin}:`, e.message)
+      }
+    }
+    activeCrawls.clear()
+
     await browser.close().catch(() => {})
     browser = null
+    console.log('[Crawler] Browser closed successfully')
   }
 }
 
@@ -240,7 +254,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
           }
           return 0
         })
-      } catch (_) {}
+      } catch (err) {
+        console.debug('[Crawler] Strategy B Playwright evaluate failed:', err.message)
+      }
     }
 
     // Strategy C (LAST RESORT): JSON priceAmount regex — searches full HTML
@@ -250,16 +266,33 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       const asinPriceMatch = html.match(new RegExp(`"${asin}"[\\s\\S]{0,500}"priceAmount"\\s*:\\s*([\\d.]+)`))
       if (asinPriceMatch) {
         const p = parseFloat(asinPriceMatch[1])
-        if (p > 0) price = p
+        if (p > 0) {
+          price = p
+          console.log(`[Crawler] Found price ${price} via ASIN-nearby priceAmount (Strategy C)`)
+        }
       }
     }
     if (!price || price === 0) {
-      // Final fallback: first priceAmount in the page (may be inaccurate)
+      // Final fallback: look for priceAmount in core price display area only
+      // Search in core price containers to avoid related product prices
+      const corePriceAreaMatch = html.match(/(corePrice|corePriceDisplay|apex_desktop|buybox)[\s\S]{0,300}"priceAmount"\s*:\s*([\d.]+)/)
+      if (corePriceAreaMatch) {
+        const p = parseFloat(corePriceAreaMatch[2])
+        if (p > 0) {
+          price = p
+          console.log(`[Crawler] Found price ${price} via core price area priceAmount (Strategy C fallback)`)
+        }
+      }
+    }
+    if (!price || price === 0) {
+      // Last resort: any priceAmount (WARNING: may be from related products)
+      console.warn('[Crawler] ⚠️ Using last-resort priceAmount - may be inaccurate!')
       const priceMatches = [...html.matchAll(/"priceAmount"\s*:\s*([\d.]+)/g)]
       for (const m of priceMatches) {
         const p = parseFloat(m[1])
         if (p > 0) {
           price = p
+          console.log(`[Crawler] Found price ${price} via any priceAmount (risky fallback)`)
           break
         }
       }
@@ -291,7 +324,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
           images = parsed
             .map(i => i.hiRes || i.large || i.mainUrl || '')
             .filter(Boolean)
-        } catch (_) {}
+        } catch (err) {
+          console.debug('[Crawler] Image data parse failed for pattern:', pat, 'Error:', err.message)
+        }
       }
     }
 
@@ -321,7 +356,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
             return [...new Set(urls)]
           }
         )
-      } catch (_) {}
+      } catch (err) {
+        console.debug('[Crawler] Method 3 DOM image extraction failed:', err.message)
+      }
     }
 
     // Method 4: Fallback to landing image
@@ -336,21 +373,65 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     images = [...new Set(images)].filter(url => url && url.startsWith('http'))
 
     // ── Brand ───────────────────────────────────────────────────────────
-    let brand = $('#bylineInfo').text()
-      .replace(/^Visit the\s+/i, '')
-      .replace(/^Brand:\s*/i, '')
-      .replace(/\s+Store$/i, '')
-      .trim()
+    let brand = ''
+    const brandSelectors = [
+      '#bylineInfo',
+      '#brand',
+      'a#brand',
+      '.a-link-normal .a-size-base[href*="/stores/"]',
+      '[data-hook="brand-name"]'
+    ]
+    for (const sel of brandSelectors) {
+      const text = $(sel).first().text().trim()
+      if (text) {
+        brand = text
+          .replace(/^Visit the\s+/i, '')
+          .replace(/^Brand:\s*/i, '')
+          .replace(/\s+Store$/i, '')
+          .trim()
+        if (brand) {
+          console.log(`[Crawler] Found brand "${brand}" using selector: ${sel}`)
+          break
+        }
+      }
+    }
 
     // ── Rating & Reviews ────────────────────────────────────────────────
     progressCb('[PROGRESS] Đang lấy đánh giá...')
-    const ratingText = $('#acrPopover .a-icon-alt').first().text().trim()
-    const ratingMatch = ratingText.match(/([\d.]+)\s*out/)
-    const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0
 
-    const reviewCountText = $('#acrCustomerReviewText').first().text().trim()
-    const reviewMatch = reviewCountText.match(/([\d,]+)/)
-    const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(',', ''), 10) : 0
+    let rating = 0
+    const ratingSelectors = [
+      '#acrPopover .a-icon-alt',
+      '[data-hook="rating-out-of-text"] .a-icon-alt',
+      '.a-icon-star .a-icon-alt',
+      '#averageCustomerReviews .a-icon-alt'
+    ]
+    for (const sel of ratingSelectors) {
+      const text = $(sel).first().text().trim()
+      const ratingMatch = text.match(/([\d.]+)\s*out/)
+      if (ratingMatch) {
+        rating = parseFloat(ratingMatch[1])
+        console.log(`[Crawler] Found rating ${rating} using selector: ${sel}`)
+        break
+      }
+    }
+
+    let reviewCount = 0
+    const reviewSelectors = [
+      '#acrCustomerReviewText',
+      '[data-hook="total-review-count"]',
+      '#acrCustomerReviewLink',
+      'a[href*="#customer-reviews"]'
+    ]
+    for (const sel of reviewSelectors) {
+      const text = $(sel).first().text().trim()
+      const reviewMatch = text.match(/([\d,]+)/)
+      if (reviewMatch) {
+        reviewCount = parseInt(reviewMatch[1].replace(/,/g, ''), 10)
+        console.log(`[Crawler] Found review count ${reviewCount} using selector: ${sel}`)
+        break
+      }
+    }
 
     // ── Bullet Points ───────────────────────────────────────────────────
     const bulletPoints = []
@@ -381,8 +462,12 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       }
       // Extract A+ images via Playwright (cheerio misses lazy-loaded)
       try {
+        // Expanded selectors for A+ content and description images
         const aplusImgs = await page.$$eval(
-          '#aplus-content img, #aplus img, #aplusProductDescription img',
+          '#aplus-content img, #aplus img, #aplusProductDescription img, ' +
+          '.aplus-module img, [data-aplus-component] img, ' +
+          '#descriptionAndDetails img, #productDetails_table img, ' +
+          '.a-spacing-medium img, .a-section img',
           els => els
             .filter(img => {
               const w = img.naturalWidth || img.width || 0
@@ -391,7 +476,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
               return (w > 10 && h > 10) || (!w && !h)
             })
             .map(img => {
-              let src = img.getAttribute('data-src') || img.src || ''
+              let src = img.getAttribute('data-src') ||
+                        img.getAttribute('data-a-dynamic-image') ||
+                        img.getAttribute('src') || ''
               // Convert to full resolution
               src = src.replace(/\._.*_\./, '.')
               return src
@@ -401,7 +488,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
         for (const src of aplusImgs) {
           if (!descriptionImages.includes(src)) descriptionImages.push(src)
         }
-      } catch (_) {}
+      } catch (err) {
+        console.debug('[Crawler] A+ image extraction failed:', err.message)
+      }
     }
 
     // ── Technical Specs ─────────────────────────────────────────────────
@@ -454,7 +543,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
           }
         })
       }
-    } catch (_) {}
+    } catch (err) {
+      console.debug('[Crawler] Important info extraction failed:', err.message)
+    }
 
     // ── Availability ────────────────────────────────────────────────────
     const availabilityText = $('#availability span').first().text().trim()
@@ -481,6 +572,48 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     const variations = await extractVariations($, html, page, price, progressCb, defaultQuantity)
 
     progressCb('[PROGRESS] ✓ Hoàn tất crawl!')
+
+    // ── Data Validation ─────────────────────────────────────────────────────
+    // Validate critical fields and sanitize
+
+    // Title must be non-empty and reasonable length
+    if (!title || title.length < 3) {
+      console.warn('[Crawler] ⚠️ Title quá ngắn hoặc rỗng:', title?.substring(0, 50))
+      title = title || ''
+    }
+    if (title.length > 500) {
+      title = title.substring(0, 500).trim() + '...'
+    }
+
+    // Price must be positive
+    if (!price || price <= 0 || isNaN(price)) {
+      console.error('[Crawler] ❌ Giá không hợp lệ:', price, '- ASIN:', asin)
+      price = 0
+    }
+
+    // Images must have at least one valid URL
+    if (!Array.isArray(images) || images.length === 0) {
+      console.warn('[Crawler] ⚠️ Không có ảnh sản phẩm - ASIN:', asin)
+      images = []
+    } else {
+      // Filter out any invalid URLs that slipped through
+      images = images.filter(url => url && typeof url === 'string' && url.startsWith('http'))
+    }
+
+    // ASIN format validation
+    if (!asin || !/^[A-Z0-9]{10}$/i.test(asin)) {
+      console.warn('[Crawler] ⚠️ ASIN format không hợp lệ:', asin)
+    }
+
+    // Ensure brand is string
+    if (typeof brand !== 'string') brand = ''
+
+    // Ensure arrays are initialized
+    if (!Array.isArray(bulletPoints)) bulletPoints = []
+    if (!Array.isArray(categories)) categories = []
+    if (!Array.isArray(variations)) variations = []
+    if (!Array.isArray(descriptionImages)) descriptionImages = []
+
     return {
       asin,
       title,
@@ -556,7 +689,12 @@ async function trySetUSDelivery(page) {
     })
 
     console.log(`[trySetUSDelivery] Result: ${result}`)
-    
+
+    // Warning if location not properly set
+    if (!result.startsWith('SUCCESS') && result !== 'ALREADY_US') {
+      console.warn(`[trySetUSDelivery] ⚠️ Location setting incomplete (${result}). Prices may be in local currency.`)
+    }
+
     if (result.startsWith('SUCCESS')) {
       await page.waitForTimeout(1000)
       await page.reload({ waitUntil: 'domcontentloaded' })
@@ -564,6 +702,7 @@ async function trySetUSDelivery(page) {
     }
   } catch (err) {
     console.error('[trySetUSDelivery] Error during hardening:', err)
+    console.warn('[trySetUSDelivery] ⚠️ Location setting failed - prices may be inaccurate!')
   }
 }
 
@@ -578,7 +717,9 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
     const dimNamesMatch = html.match(/"dimensions"\s*:\s*(\[.*?\])/)
     let dimNames = []
     if (dimNamesMatch) {
-      try { dimNames = JSON.parse(dimNamesMatch[1]) } catch (_) {}
+      try { dimNames = JSON.parse(dimNamesMatch[1]) } catch (err) {
+        console.debug('[extractVariations] Failed to parse dimensions:', err.message)
+      }
     }
 
     // ── Parse dimensionValuesDisplayData ────────────────────────────────
@@ -586,14 +727,18 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
     let displayMap = {}
     const dimDisplayMatch = html.match(/"dimensionValuesDisplayData"\s*:\s*(\{[\s\S]*?\})\s*,\s*"/)
     if (dimDisplayMatch) {
-      try { displayMap = JSON.parse(dimDisplayMatch[1]) } catch (_) {}
+      try { displayMap = JSON.parse(dimDisplayMatch[1]) } catch (err) {
+        console.debug('[extractVariations] Failed to parse dimensionValuesDisplayData:', err.message)
+      }
     }
 
     // ── Parse asinVariationValues ──────────────────────────────────────
     let asinMap = {}
     const asinVarMatch = html.match(/"asin_variation_values"\s*:\s*(\{[\s\S]*?\})\s*,\s*"/)
     if (asinVarMatch) {
-      try { asinMap = JSON.parse(asinVarMatch[1]) } catch (_) {}
+      try { asinMap = JSON.parse(asinVarMatch[1]) } catch (err) {
+        console.debug('[extractVariations] Failed to parse asin_variation_values:', err.message)
+      }
     }
 
     // ── Parse variation price data ──────────────────────────────────────
@@ -626,14 +771,18 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
             imageMap[key] = (imgs[0].hiRes || imgs[0].large || '')
           }
         }
-      } catch (_) {}
+      } catch (err) {
+        console.debug('[extractVariations] colorImages parse failed:', err.message)
+      }
     }
 
     // ── colorToAsin mapping ────────────────────────────────────────────
     let colorToAsin = {}
     const c2aMatch = html.match(/"colorToAsin"\s*:\s*(\{[\s\S]*?\})\s*[,}]\s*"/)
     if (c2aMatch) {
-      try { colorToAsin = JSON.parse(c2aMatch[1]) } catch (_) {}
+      try { colorToAsin = JSON.parse(c2aMatch[1]) } catch (err) {
+        console.debug('[extractVariations] colorToAsin parse failed:', err.message)
+      }
     }
 
     // Helper: fuzzy match image from imageMap
@@ -729,9 +878,10 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
         // Skip current ASIN (already have price) or if we already got price from JS
         if (v.price !== basePrice && v.price > 0) continue
 
+        let varPage = null
         try {
           progressCb(`[PROGRESS] Giá biến thể ${i + 1}/${variations.length}: ${v.asin}...`)
-          const varPage = await context.newPage()
+          varPage = await context.newPage()
           await varPage.goto(`https://www.amazon.com/dp/${v.asin}`, {
             waitUntil: 'domcontentloaded',
             timeout: 12000
@@ -779,19 +929,20 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
                 }
                 return 0
               })
-            } catch (_) {}
+            } catch (err) {
+              console.debug('[Crawler] Variant price evaluation failed:', err.message)
+            }
           }
 
-          // JSON regex last resort
+          // JSON regex last resort - strictly look for the current ASIN's price amount
           if (!variantPrice) {
-            // JSON regex last resort - strictly look for the current ASIN's price amount
             const jsPriceMatches = [...vHtml.matchAll(new RegExp(`"${v.asin}"\\s*:\\s*\\{[^}]*"priceAmount"\\s*:\\s*([\\d.]+)`, 'g'))]
             for (const m of jsPriceMatches) {
               const p = parseFloat(m[1])
               if (p > 0) { variantPrice = p; break }
             }
           }
-          
+
           if (variantPrice > 0) {
             v.price = variantPrice
           }
@@ -801,13 +952,15 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
             v.image = await varPage.$eval('#landingImage, #imgBlkFront, #main-image, .a-dynamic-image, #imgTagWrapperId img', el =>
               (el.getAttribute('data-old-hires') || el.getAttribute('data-a-dynamic-image') || el.src || '').replace(/\._.*_\./, '.')
             ).catch(() => '')
-            
+
             // Handle data-a-dynamic-image which is a JSON string of URLs
             if (v.image && v.image.startsWith('{')) {
                 try {
                     const imgObj = JSON.parse(v.image)
                     v.image = Object.keys(imgObj).sort((a,b) => imgObj[b][0] - imgObj[a][0])[0] // Get largest
-                } catch (_) {}
+                } catch (err) {
+                  console.debug(`[variation ${v.asin}] data-a-dynamic-image parse failed:`, err.message)
+                }
             }
 
             if (!v.image) {
@@ -817,15 +970,25 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
                   try {
                       const parsed = JSON.parse(m[1])
                       v.image = parsed[0]?.hiRes || parsed[0]?.large || parsed[0]?.main || ''
-                  } catch (_) {}
+                  } catch (err) {
+                    console.debug(`[variation ${v.asin}] colorImages parse failed:`, err.message)
+                  }
               }
             }
           }
 
-          await varPage.close()
         } catch (err) {
           // Non-critical: keep basePrice
           console.log(`[variation ${v.asin}] price fetch failed:`, err.message?.substring(0, 60))
+        } finally {
+          // Ensure varPage is always closed to prevent memory leak
+          if (varPage) {
+            try {
+              await varPage.close()
+            } catch (closeErr) {
+              console.log(`[variation ${v.asin}] error closing page:`, closeErr.message?.substring(0, 40))
+            }
+          }
         }
       }
     }
