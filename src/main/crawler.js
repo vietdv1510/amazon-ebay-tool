@@ -87,9 +87,8 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       '#productTitle',
       'span#title',
       'h1#title span',
-      'h1.a-size-large',
-      '#title',
-      'span.a-text-normal[data-a-size="b"]'
+      '#centerCol h1.a-size-large',
+      '#title'
     ]
     const titleSelectorStr = titleSelectors.join(', ')
 
