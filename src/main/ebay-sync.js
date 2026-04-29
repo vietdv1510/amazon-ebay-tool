@@ -1,6 +1,6 @@
 /**
  * eBay Data Sync Service
- * Tải bulk data từ eBay API → import vào SQLite local
+ * Download bulk data from eBay API → import to local SQLite
  */
 import { getDb, setSyncMeta, closeDb } from './ebay-db'
 import { createGunzip } from 'zlib'
@@ -37,14 +37,14 @@ async function getAppToken(clientId, clientSecret, env) {
 // ─── Sync Category Tree ────────────────────────────────────────────────────────
 
 /**
- * Tải toàn bộ category tree (1 API call) → lưu SQLite
+ * Download entire category tree (1 API call) → save to SQLite
  */
 export async function syncCategoryTree(settings, onProgress) {
   const { ebayClientId, ebayClientSecret, ebayEnv = 'sandbox' } = settings
   const token = await getAppToken(ebayClientId, ebayClientSecret, ebayEnv)
   const base = getBaseUrl(ebayEnv)
 
-  onProgress?.({ step: 'tree', message: 'Đang tải Category Tree...', percent: 0 })
+  onProgress?.({ step: 'tree', message: 'Downloading Category Tree...', percent: 0 })
 
   const res = await fetch(`${base}/commerce/taxonomy/v1/category_tree/0`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -55,7 +55,7 @@ export async function syncCategoryTree(settings, onProgress) {
   const data = await res.json()
   const db = getDb()
 
-  onProgress?.({ step: 'tree', message: 'Đang lưu categories vào database...', percent: 30 })
+  onProgress?.({ step: 'tree', message: 'Saving categories to database...', percent: 30 })
 
   // Clear old data
   db.exec('DELETE FROM categories')
@@ -82,7 +82,7 @@ export async function syncCategoryTree(settings, onProgress) {
   insertAll()
 
   setSyncMeta('treeVersion', data.categoryTreeVersion || 'unknown')
-  onProgress?.({ step: 'tree', message: `✓ Đã lưu ${count} categories`, percent: 100 })
+  onProgress?.({ step: 'tree', message: `✓ Saved ${count} categories`, percent: 100 })
 
   return count
 }
@@ -90,8 +90,8 @@ export async function syncCategoryTree(settings, onProgress) {
 // ─── Sync Aspects (Bulk Download) ──────────────────────────────────────────────
 
 /**
- * Tải toàn bộ aspects cho ALL leaf categories (1 API call) → lưu SQLite
- * File trả về là gzipped JSON, có thể nặng 100-200MB compressed
+ * Download all aspects for ALL leaf categories (1 API call) → save to SQLite
+ * Response file is gzipped JSON, can be 100-200MB compressed
  */
 export async function syncAspects(settings, onProgress) {
   const { ebayClientId, ebayClientSecret, ebayEnv = 'sandbox' } = settings
@@ -100,7 +100,7 @@ export async function syncAspects(settings, onProgress) {
 
   onProgress?.({
     step: 'aspects',
-    message: 'Đang tải bulk aspects (có thể mất 2-5 phút)...',
+    message: 'Downloading bulk aspects (may take 2-5 minutes)...',
     percent: 0
   })
 
@@ -110,14 +110,14 @@ export async function syncAspects(settings, onProgress) {
 
   if (!res.ok) throw new Error(`fetchItemAspects API failed: ${res.status}`)
 
-  onProgress?.({ step: 'aspects', message: 'Đang download file...', percent: 10 })
+  onProgress?.({ step: 'aspects', message: 'Downloading file...', percent: 10 })
 
   // Download entire response as buffer
   const buffer = Buffer.from(await res.arrayBuffer())
   const sizeMB = (buffer.length / 1024 / 1024).toFixed(1)
   onProgress?.({
     step: 'aspects',
-    message: `Downloaded ${sizeMB}MB, đang giải nén...`,
+    message: `Downloaded ${sizeMB}MB, decompressing...`,
     percent: 30
   })
 
@@ -130,7 +130,7 @@ export async function syncAspects(settings, onProgress) {
     jsonStr = buffer.toString('utf8')
   }
 
-  onProgress?.({ step: 'aspects', message: 'Đang parse JSON...', percent: 50 })
+  onProgress?.({ step: 'aspects', message: 'Parsing JSON...', percent: 50 })
 
   const data = JSON.parse(jsonStr)
   jsonStr = null // Free memory
@@ -140,7 +140,7 @@ export async function syncAspects(settings, onProgress) {
 
   onProgress?.({
     step: 'aspects',
-    message: `Đang import ${totalCats} categories vào database...`,
+    message: `Importing ${totalCats} categories into database...`,
     percent: 60
   })
 
@@ -176,7 +176,7 @@ export async function syncAspects(settings, onProgress) {
           const isRequired = constraint.aspectRequired === true
           const aspectUsage = constraint.aspectUsage || 'OPTIONAL'
 
-          // Phân loại 3 cấp
+          // Classify 3 tiers
           let usage
           if (isRequired) {
             usage = 'REQUIRED'
@@ -210,7 +210,7 @@ export async function syncAspects(settings, onProgress) {
     if (processed % 2000 === 0 || processed === totalCats) {
       onProgress?.({
         step: 'aspects',
-        message: `Đang import... ${processed}/${totalCats} categories`,
+        message: `Importing... ${processed}/${totalCats} categories`,
         percent
       })
     }
@@ -221,7 +221,7 @@ export async function syncAspects(settings, onProgress) {
 
   onProgress?.({
     step: 'aspects',
-    message: `✓ Hoàn tất — ${totalCats} categories đã import`,
+    message: `✓ Complete — ${totalCats} categories imported`,
     percent: 100
   })
 
@@ -231,7 +231,7 @@ export async function syncAspects(settings, onProgress) {
 // ─── Full Sync ─────────────────────────────────────────────────────────────────
 
 /**
- * Sync toàn bộ: Category Tree + Aspects
+ * Full sync: Category Tree + Aspects
  */
 export async function fullSync(settings, onProgress) {
   try {

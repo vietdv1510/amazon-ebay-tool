@@ -716,7 +716,7 @@ const validatePreview = () => {
       if (isCellMissingRequired(row, col)) {
         hasErrors = true
         // We do NOT add to validationErrors here because missing fields
-        // already have the empty-placeholder (Bắt buộc) visual indicator.
+        // already have the empty-placeholder (Required) visual indicator.
       }
     })
   })

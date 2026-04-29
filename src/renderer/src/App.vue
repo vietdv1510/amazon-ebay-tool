@@ -27,7 +27,7 @@
           v-if="!sidebarCollapsed"
           class="nav-label text-xs font-semibold text-muted-foreground px-2 py-1 uppercase tracking-wider"
         >
-          Công cụ
+          Tools
         </div>
 
         <Button
@@ -52,10 +52,10 @@
           class="w-full nav-btn"
           :class="sidebarCollapsed ? 'justify-center px-0' : 'justify-start'"
           @click="currentPage = 'workspace'"
-          :title="sidebarCollapsed ? 'Xử lý Dữ liệu' : ''"
+          :title="sidebarCollapsed ? 'Data Processing' : ''"
         >
           <LayoutDashboard class="w-4 h-4 flex-shrink-0" :class="{ 'mr-2': !sidebarCollapsed }" />
-          <span v-if="!sidebarCollapsed">Xử lý Dữ liệu</span>
+          <span v-if="!sidebarCollapsed">Data Processing</span>
           <Badge
             v-if="stats.total > 0 && !sidebarCollapsed"
             variant="outline"
@@ -79,7 +79,7 @@
           v-if="!sidebarCollapsed"
           class="nav-label text-xs font-semibold text-muted-foreground px-2 py-1 mt-4 uppercase tracking-wider"
         >
-          Cài đặt
+          Settings
         </div>
         <div v-else class="sidebar-divider my-2"></div>
 
@@ -88,10 +88,10 @@
           class="w-full nav-btn"
           :class="sidebarCollapsed ? 'justify-center px-0' : 'justify-start'"
           @click="currentPage = 'settings'"
-          :title="sidebarCollapsed ? 'Cài đặt' : ''"
+          :title="sidebarCollapsed ? 'Settings' : ''"
         >
           <SettingsIcon class="w-4 h-4 flex-shrink-0" :class="{ 'mr-2': !sidebarCollapsed }" />
-          <span v-if="!sidebarCollapsed">Cài đặt</span>
+          <span v-if="!sidebarCollapsed">Settings</span>
         </Button>
       </nav>
 
@@ -104,7 +104,7 @@
         <button
           class="w-full flex items-center justify-center p-1.5 rounded-md hover:bg-muted/40 transition-all text-muted-foreground/60 hover:text-muted-foreground border border-transparent hover:border-border/30 group"
           @click="sidebarCollapsed = !sidebarCollapsed"
-          :title="sidebarCollapsed ? 'Mở menu' : 'Thu menu'"
+          :title="sidebarCollapsed ? 'Expand menu' : 'Collapse menu'"
         >
           <ChevronLeft
             v-if="!sidebarCollapsed"
@@ -114,7 +114,7 @@
           <span
             v-if="!sidebarCollapsed"
             class="ml-2 text-[11px] font-medium opacity-50 group-hover:opacity-100"
-            >Thu nhỏ</span
+            >Collapse</span
           >
         </button>
       </div>

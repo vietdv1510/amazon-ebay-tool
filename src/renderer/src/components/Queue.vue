@@ -84,7 +84,7 @@
                   </a>
                 </TableCell>
 
-                <!-- Sản phẩm -->
+                <!-- Product -->
                 <TableCell>
                   <div class="flex items-start gap-2 max-w-[260px] whitespace-normal">
                     <div class="w-8 h-8 rounded border bg-muted/50 flex-shrink-0 overflow-hidden mt-0.5 flex items-center justify-center">
@@ -107,13 +107,13 @@
                   </div>
                 </TableCell>
 
-                <!-- Giá gốc -->
+                <!-- Original Price -->
                 <TableCell class="text-right">
                   <span v-if="row.originalPrice" class="font-semibold text-sm">${{ row.originalPrice }}</span>
                   <span v-else class="text-muted-foreground text-sm">—</span>
                 </TableCell>
 
-                <!-- Ảnh -->
+                <!-- Image -->
                 <TableCell class="text-center">
                   <Badge v-if="row.images?.length" variant="outline" class="text-xs tabular-nums">
                     {{ row.images.length }}
@@ -121,7 +121,7 @@
                   <span v-else class="text-muted-foreground">—</span>
                 </TableCell>
 
-                <!-- Biến thể -->
+                <!-- Variations -->
                 <TableCell class="text-center">
                   <Badge v-if="row.variations?.length" variant="secondary" class="text-xs tabular-nums">
                     {{ row.variations.length }}
@@ -129,7 +129,7 @@
                   <span v-else class="text-muted-foreground">—</span>
                 </TableCell>
 
-                <!-- Trạng thái -->
+                <!-- Status -->
                 <TableCell class="text-center">
                   <Badge 
                     :variant="row.status === 'DONE' ? 'default' : row.status === 'ERROR' ? 'destructive' : 'secondary'"
@@ -147,7 +147,7 @@
                   </Badge>
                 </TableCell>
 
-                <!-- Tiến trình -->
+                <!-- Progress -->
                 <TableCell>
                   <div class="text-[11px] text-muted-foreground font-mono truncate max-w-[250px]" :title="row.log">
                     {{ row.log }}

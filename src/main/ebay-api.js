@@ -1,7 +1,7 @@
 /**
  * eBay Taxonomy API Service
- * Dùng Application Token (Client Credentials) — không cần user login
- * Hỗ trợ SQLite local cache để giảm API calls
+ * Use Application Token (Client Credentials) — no user login required
+ * Support SQLite local cache to reduce API calls
  */
 import { getAspectsFromCache, getCategoryTreeFromCache } from './ebay-db'
 
@@ -19,7 +19,7 @@ function getBaseUrl(env) {
 }
 
 /**
- * Lấy Application OAuth token (tự cache + refresh)
+ * Get Application OAuth token (auto cache + refresh)
  */
 async function getAppToken(clientId, clientSecret, env = 'sandbox') {
   const cached = tokenCache[env]
@@ -54,12 +54,12 @@ async function getAppToken(clientId, clientSecret, env = 'sandbox') {
 }
 
 /**
- * Helper: gọi eBay API với token
+ * Helper: call eBay API with token
  */
 async function ebayGet(path, settings) {
   const { ebayClientId, ebayClientSecret, ebayEnv = 'sandbox' } = settings
   if (!ebayClientId || !ebayClientSecret) {
-    throw new Error('Chưa cấu hình eBay Client ID / Client Secret trong Settings.')
+    throw new Error('eBay Client ID / Client Secret not configured in Settings.')
   }
 
   const token = await getAppToken(ebayClientId, ebayClientSecret, ebayEnv)
@@ -82,12 +82,12 @@ async function ebayGet(path, settings) {
 }
 
 /**
- * Lấy danh sách category gợi ý từ title/keyword
- * Luôn call API (thuật toán AI search của eBay)
+ * Get list of suggested categories from title/keyword
+ * Always call API (eBay's AI search algorithm)
  * @returns Array of { categoryId, categoryName, categoryTreeNodeLevel, relevancy }
  */
 export async function getCategorySuggestions(query, settings) {
-  const encoded = encodeURIComponent(query.slice(0, 150)) // eBay giới hạn query length
+  const encoded = encodeURIComponent(query.slice(0, 150)) // eBay limits query length
   const data = await ebayGet(
     `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_category_suggestions?q=${encoded}`,
     settings
@@ -104,12 +104,12 @@ export async function getCategorySuggestions(query, settings) {
 }
 
 /**
- * Lấy Item Specifics (aspects) bắt buộc/tùy chọn cho 1 category
- * Ưu tiên đọc từ SQLite cache. Nếu cache miss thì fallback call API.
+ * Get mandatory/optional Item Specifics (aspects) for 1 category
+ * Prioritize reading from SQLite cache. Fallback to API call on cache miss.
  * @returns Array of aspect objects with 3-tier usage
  */
 export async function getCategoryAspects(categoryId, settings) {
-  // 1. Thử đọc từ SQLite cache trước
+  // 1. Try reading from SQLite cache first
   try {
     const cached = getAspectsFromCache(categoryId)
     if (cached && cached.length > 0) {
@@ -119,7 +119,7 @@ export async function getCategoryAspects(categoryId, settings) {
     console.warn('SQLite cache read failed, falling back to API:', e.message)
   }
 
-  // 2. Fallback: gọi API
+  // 2. Fallback: call API
   const data = await ebayGet(
     `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_item_aspects_for_category?category_id=${categoryId}`,
     settings
@@ -151,11 +151,11 @@ export async function getCategoryAspects(categoryId, settings) {
 }
 
 /**
- * Tìm top-level category tree
- * Ưu tiên đọc từ SQLite cache
+ * Find top-level category tree
+ * Prioritize reading from SQLite cache
  */
 export async function getCategoryTree(settings) {
-  // 1. Thử đọc từ SQLite cache trước
+  // 1. Try reading from SQLite cache first
   try {
     const cached = getCategoryTreeFromCache()
     if (cached && cached.length > 0) {
@@ -165,7 +165,7 @@ export async function getCategoryTree(settings) {
     console.warn('SQLite cache read failed, falling back to API:', e.message)
   }
 
-  // 2. Fallback: gọi API
+  // 2. Fallback: call API
   const data = await ebayGet(
     `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}`,
     settings
@@ -183,7 +183,7 @@ export async function getCategoryTree(settings) {
 }
 
 /**
- * Clear token cache (dùng khi user đổi credentials)
+ * Clear token cache (used when user changes credentials)
  */
 export function clearTokenCache() {
   tokenCache = { sandbox: null, production: null }

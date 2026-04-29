@@ -14,7 +14,7 @@
       <Separator />
 
       <div class="grid gap-8">
-        <!-- Section: Giá bán -->
+        <!-- Section: Selling Price -->
         <div class="space-y-4">
           <div
             class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"

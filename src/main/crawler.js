@@ -70,19 +70,19 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
   const page = await context.newPage()
   activeCrawls.set(asin, page)
-  progressCb('[PROGRESS] Khởi động trình duyệt...')
+  progressCb('[PROGRESS] Starting browser...')
 
   try {
     const url = `https://www.amazon.com/dp/${asin}`
-    progressCb(`[PROGRESS] Mở trang Amazon...`)
+    progressCb(`[PROGRESS] Opening Amazon page...`)
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 35000 })
 
     const waitMs = (delay * 1000) + Math.random() * 1000
-    progressCb('[PROGRESS] Đang chờ trang tải...')
+    progressCb('[PROGRESS] Waiting for page to load...')
     await page.waitForTimeout(waitMs)
 
     // Wait for product title to actually render (JS-driven pages load it late)
-    progressCb('[PROGRESS] Đang chờ tiêu đề sản phẩm...')
+    progressCb('[PROGRESS] Waiting for product title...')
     const titleSelectors = [
       '#productTitle',
       'span#title',
@@ -92,36 +92,36 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     ]
     const titleSelectorStr = titleSelectors.join(', ')
 
-    // Tăng timeout lên 30s và log chi tiết
+    // Increase timeout to 30s and log details
     await page.waitForSelector(titleSelectorStr, {
       state: 'attached',
       timeout: 30000
     }).catch((err) => {
-      console.log('[Crawler] ⚠️ Không tìm thấy selector title ban đầu trong 30s. Có thể DOM khác hoặc load chậm.', err.message)
+      console.log('[Crawler] ⚠️ Initial title selector not found within 30s. DOM might differ or page is loading slowly.', err.message)
     })
 
-    // Đợi thêm 3-5s để JS render hoàn toất
+    // Wait 3-5s for JS to finish rendering
     await page.waitForTimeout(3000 + Math.random() * 2000)
 
-    progressCb('[PROGRESS] Đang kiểm tra địa chỉ giao hàng...')
+    progressCb('[PROGRESS] Checking delivery address...')
     if (options.forceUSLocation !== false) {
       await trySetUSDelivery(page)
     }
     
-    progressCb('[PROGRESS] Trích xuất dữ liệu sản phẩm...')
+    progressCb('[PROGRESS] Extracting product data...')
 
     // ── Title ────────────────────────────────────────────────────────────
     let html = await page.content()
     let $ = cheerio.load(html)
 
     let title = ''
-    // Log: kiểm tra từng selector
-    console.log('[Crawler] 🔍 Đang tìm title với các selector:')
+    // Log: check each selector
+    console.log('[Crawler] 🔍 Searching for title using selectors:')
     for (const sel of titleSelectors) {
       const count = await page.$$(sel).then(els => els.length).catch(() => 0)
       if (count > 0) {
         const t = $(sel).first().text().trim()
-        console.log(`  [DEBUG] selector "${sel}" có ${count} element, text="${t.substring(0, 50)}..."`)
+        console.log(`  [DEBUG] selector "${sel}" has ${count} element(s), text="${t.substring(0, 50)}..."`)
       }
     }
 
@@ -136,7 +136,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     }
 
     if (!title) {
-      console.log('[Crawler] ⚠️ Cheerio không tìm thấy title, thử Playwright $eval...')
+      console.log('[Crawler] ⚠️ Cheerio failed to find title, trying Playwright $eval...')
       // Playwright evaluation fallback (sometimes cheerio misses dynamically inserted nodes)
       title = await page.$eval(titleSelectorStr, el => el.textContent.trim()).catch(() => '')
       if (title) {
@@ -144,9 +144,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       }
     }
 
-    // Fallback lấy title từ thẻ <title> của trang nếu các selector chính không có
+    // Fallback: extract title from page <title> tag if main selectors fail
     if (!title) {
-      console.log('[Crawler] ⚠️ $eval thất bại, thử page.title() fallback...')
+      console.log('[Crawler] ⚠️ $eval failed, trying page.title() fallback...')
       const pageTitle = await page.title()
       if (pageTitle) {
         console.log(`[Crawler] Page title raw: "${pageTitle}"`)
@@ -163,23 +163,23 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       }
     }
 
-    // Debug: log HTML snippet nếu vẫn không có title
+    // Debug: log HTML snippet if title is still missing
     if (!title) {
-      console.error('[Crawler] ❌ Lỗi nghiêm trọng: Không thể trích xuất title từ HTML.')
+      console.error('[Crawler] ❌ Critical Error: Could not extract title from HTML.')
       console.error('[Crawler] Debug info:')
       console.error(`  - Page URL: ${page.url()}`)
       console.error(`  - Page title (raw): ${await page.title()}`)
       console.error(`  - HTML length: ${html.length}`)
-      // Lưu một phần HTML để debug
+      // Save a snippet of HTML for debugging
       console.error(`  - HTML snippet (first 2000 chars):\n${html.substring(0, 2000)}`)
-      console.error(`  - titleSelectors đã thử: ${titleSelectors.join(', ')}`)
+      console.error(`  - titleSelectors tried: ${titleSelectors.join(', ')}`)
     }
 
     if (!title && (html.toLowerCase().includes('captcha') || html.toLowerCase().includes('type the characters'))) {
-      throw new Error('Amazon Anti-Bot Captcha — thử lại sau hoặc tắt Headless Mode.')
+      throw new Error('Amazon Anti-Bot Captcha — please try again later or disable Headless Mode.')
     }
     if (!title) {
-      throw new Error('Không tìm thấy tiêu đề sản phẩm. Trang có thể load quá chậm, bị block, hoặc DOM đã bị Amazon thay đổi. Kiểm tra log để xem debug info.')
+      throw new Error('Product title not found. Page might be loading too slowly, blocked, or Amazon DOM has changed. Check logs for debug info.')
     }
 
     // Wait for other lazy-loaded sections before scraping them
@@ -195,7 +195,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     $ = cheerio.load(html)
 
     // ── Price ────────────────────────────────────────────────────────────
-    progressCb('[PROGRESS] Đang lấy thông tin giá...')
+    progressCb('[PROGRESS] Fetching price information...')
     let price = 0
 
     // Strategy A (PRIMARY): DOM selectors scoped to core price area — most reliable
@@ -306,7 +306,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     }
 
     // ── Images — FIXED: multiple extraction methods ─────────────────────
-    progressCb('[PROGRESS] Đang tải hình ảnh...')
+    progressCb('[PROGRESS] Downloading images...')
     let images = []
 
     // Method 1: Parse from imageGalleryData or colorImages in JS
@@ -396,7 +396,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     }
 
     // ── Rating & Reviews ────────────────────────────────────────────────
-    progressCb('[PROGRESS] Đang lấy đánh giá...')
+    progressCb('[PROGRESS] Fetching reviews...')
 
     let rating = 0
     const ratingSelectors = [
@@ -493,7 +493,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     }
 
     // ── Technical Specs ─────────────────────────────────────────────────
-    progressCb('[PROGRESS] Đang lấy thông số kỹ thuật...')
+    progressCb('[PROGRESS] Fetching technical specifications...')
     const specs = {}
 
     $('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr').each((_, el) => {
@@ -524,7 +524,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     for (const sk of skipKeys) delete specs[sk]
 
     // ── Important Information (Safety, Ingredients, Directions) ────────
-    progressCb('[PROGRESS] Đang lấy thông tin quan trọng...')
+    progressCb('[PROGRESS] Fetching important information...')
     const importantInfo = {}
     try {
       const importantEl = $('#important-information, #importantInformation')
@@ -567,17 +567,17 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     })
 
     // ── Variations — FIXED: comprehensive parsing ───────────────────────
-    progressCb('[PROGRESS] Đang phân tích biến thể sản phẩm...')
+    progressCb('[PROGRESS] Analyzing product variations...')
     const variations = await extractVariations($, html, page, price, progressCb, defaultQuantity)
 
-    progressCb('[PROGRESS] ✓ Hoàn tất crawl!')
+    progressCb('[PROGRESS] ✓ Crawl completed!')
 
     // ── Data Validation ─────────────────────────────────────────────────────
     // Validate critical fields and sanitize
 
     // Title must be non-empty and reasonable length
     if (!title || title.length < 3) {
-      console.warn('[Crawler] ⚠️ Title quá ngắn hoặc rỗng:', title?.substring(0, 50))
+      console.warn('[Crawler] ⚠️ Title is too short or empty:', title?.substring(0, 50))
       title = title || ''
     }
     if (title.length > 500) {
@@ -586,13 +586,13 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
     // Price must be positive
     if (!price || price <= 0 || isNaN(price)) {
-      console.error('[Crawler] ❌ Giá không hợp lệ:', price, '- ASIN:', asin)
+      console.error('[Crawler] ❌ Invalid price:', price, '- ASIN:', asin)
       price = 0
     }
 
     // Images must have at least one valid URL
     if (!Array.isArray(images) || images.length === 0) {
-      console.warn('[Crawler] ⚠️ Không có ảnh sản phẩm - ASIN:', asin)
+      console.warn('[Crawler] ⚠️ No product images found - ASIN:', asin)
       images = []
     } else {
       // Filter out any invalid URLs that slipped through
@@ -601,7 +601,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
     // ASIN format validation
     if (!asin || !/^[A-Z0-9]{10}$/i.test(asin)) {
-      console.warn('[Crawler] ⚠️ ASIN format không hợp lệ:', asin)
+      console.warn('[Crawler] ⚠️ Invalid ASIN format:', asin)
     }
 
     // Ensure brand is string
@@ -870,7 +870,7 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
 
     // ── Fetch real prices per variation (navigate each ASIN) ────────────
     if (variations.length > 0) {
-      progressCb(`[PROGRESS] Lấy giá ${variations.length} biến thể...`)
+      progressCb(`[PROGRESS] Fetching prices for ${variations.length} variations...`)
       const context = page.context()
       for (let i = 0; i < variations.length; i++) {
         const v = variations[i]
@@ -879,7 +879,7 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
 
         let varPage = null
         try {
-          progressCb(`[PROGRESS] Giá biến thể ${i + 1}/${variations.length}: ${v.asin}...`)
+          progressCb(`[PROGRESS] Variation price ${i + 1}/${variations.length}: ${v.asin}...`)
           varPage = await context.newPage()
           await varPage.goto(`https://www.amazon.com/dp/${v.asin}`, {
             waitUntil: 'domcontentloaded',

@@ -61,7 +61,7 @@
         </div>
       </div>
 
-      <!-- Giá gốc Amazon -->
+      <!-- Amazon Original Price -->
       <div class="two-col" style="margin-top:6px">
         <div class="form-group">
           <Label class="text-muted-foreground text-xs">Giá gốc Amazon</Label>

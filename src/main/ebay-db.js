@@ -1,6 +1,6 @@
 /**
  * eBay SQLite Local Cache
- * Lưu toàn bộ Category Tree + Aspects offline để giảm API calls
+ * Save entire Category Tree + Aspects offline to reduce API calls
  */
 import Database from 'better-sqlite3'
 import { join } from 'path'
@@ -9,7 +9,7 @@ import { app } from 'electron'
 let db = null
 
 /**
- * Khởi tạo / mở database
+ * Initialize / open database
  */
 export function getDb() {
   if (db) return db
@@ -17,12 +17,12 @@ export function getDb() {
   const dbPath = join(app.getPath('userData'), 'ebay_cache.db')
   db = new Database(dbPath)
 
-  // Tối ưu performance
+  // Optimize performance
   db.pragma('journal_mode = WAL')
   db.pragma('synchronous = NORMAL')
   db.pragma('cache_size = -64000') // 64MB cache
 
-  // Tạo tables
+  // Create tables
   db.exec(`
     CREATE TABLE IF NOT EXISTS categories (
       categoryId   TEXT PRIMARY KEY,
@@ -76,8 +76,8 @@ export function getDb() {
 // ─── Category Queries ──────────────────────────────────────────────────────────
 
 /**
- * Lấy aspects cho 1 category từ SQLite
- * @returns Array giống format cũ của getCategoryAspects API
+ * Get aspects for 1 category from SQLite
+ * @returns Array in the same format as old getCategoryAspects API
  */
 export function getAspectsFromCache(categoryId) {
   const database = getDb()
@@ -92,7 +92,7 @@ export function getAspectsFromCache(categoryId) {
 
   if (aspects.length === 0) return null // Cache miss
 
-  // Lấy values cho từng aspect
+  // Get values for each aspect
   const valuesStmt = database.prepare(`
     SELECT value FROM aspect_values
     WHERE categoryId = ? AND aspectName = ?
@@ -109,7 +109,7 @@ export function getAspectsFromCache(categoryId) {
 }
 
 /**
- * Lấy category tree từ SQLite
+ * Get category tree from SQLite
  */
 export function getCategoryTreeFromCache() {
   const database = getDb()
@@ -117,12 +117,12 @@ export function getCategoryTreeFromCache() {
   const count = database.prepare('SELECT COUNT(*) as cnt FROM categories').get()
   if (count.cnt === 0) return null // Cache miss
 
-  // Lấy categories cấp 1
+  // Get level 1 categories
   const level1 = database.prepare(`
     SELECT categoryId, categoryName FROM categories WHERE level = 1 ORDER BY categoryName
   `).all()
 
-  // Lấy children cấp 2 cho mỗi cấp 1
+  // Get level 2 children for each level 1
   const childStmt = database.prepare(`
     SELECT categoryId, categoryName FROM categories WHERE parentId = ? ORDER BY categoryName LIMIT 30
   `)
@@ -205,7 +205,7 @@ export function setSyncMeta(key, value) {
 }
 
 /**
- * Đóng database connection
+ * Close database connection
  */
 export function closeDb() {
   if (db) {

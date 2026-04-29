@@ -226,7 +226,7 @@ ipcMain.handle('app:paths', () => ({
 
 // ─── eBay Taxonomy API ────────────────────────────────────────────────────────
 
-// Category suggestions từ title/keyword
+// Category suggestions from title/keyword
 ipcMain.handle('ebay:categorySuggestions', async (_, query) => {
   try {
     const settings = loadSettings()
@@ -256,7 +256,7 @@ ipcMain.handle('ebay:categorySuggestions', async (_, query) => {
   }
 })
 
-// Item Specifics (aspects) cho 1 category
+// Item Specifics (aspects) for 1 category
 ipcMain.handle('ebay:categoryAspects', async (_, categoryId) => {
   try {
     const settings = loadSettings()
@@ -267,7 +267,7 @@ ipcMain.handle('ebay:categoryAspects', async (_, categoryId) => {
   }
 })
 
-// Lấy category tree cấp 1+2 để build dropdown
+// Get category tree level 1+2 to build dropdown
 ipcMain.handle('ebay:categoryTree', async () => {
   try {
     const settings = loadSettings()
@@ -278,7 +278,7 @@ ipcMain.handle('ebay:categoryTree', async () => {
   }
 })
 
-// Clear token cache khi user đổi credentials
+// Clear token cache when user changes credentials
 ipcMain.handle('ebay:clearCache', () => {
   clearTokenCache()
   return { ok: true }
@@ -286,7 +286,7 @@ ipcMain.handle('ebay:clearCache', () => {
 
 // ─── eBay Data Sync ───────────────────────────────────────────────────────────
 
-// Sync toàn bộ category + aspects vào SQLite
+// Sync all categories + aspects to SQLite
 ipcMain.handle('ebay:syncData', async () => {
   try {
     const settings = loadSettings()
@@ -301,7 +301,7 @@ ipcMain.handle('ebay:syncData', async () => {
   }
 })
 
-// Lấy trạng thái sync hiện tại
+// Get current sync status
 ipcMain.handle('ebay:getSyncStatus', () => {
   try {
     return { ok: true, data: getSyncStatus() }
