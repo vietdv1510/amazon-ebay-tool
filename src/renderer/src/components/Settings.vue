@@ -412,24 +412,6 @@
               </p>
             </div>
 
-            <!-- Upload mode -->
-            <div class="flex items-center justify-between space-x-2">
-              <div class="flex flex-col space-y-1">
-                <Label>Tự động upload sau khi crawl</Label>
-                <p class="text-[0.8rem] text-muted-foreground">
-                  Bật: ảnh tự upload lên CDN ngay sau crawl. Tắt: hiện nút "Upload CDN" để xử lý thủ
-                  công.
-                </p>
-              </div>
-              <SwitchRoot
-                v-model="form.r2AutoUpload"
-                @update:model-value="() => saveNow()"
-                :class="switchClass"
-              >
-                <SwitchThumb :class="switchThumbClass" />
-              </SwitchRoot>
-            </div>
-
             <!-- WebP conversion -->
             <div class="flex items-center justify-between space-x-2">
               <div class="flex flex-col space-y-1">

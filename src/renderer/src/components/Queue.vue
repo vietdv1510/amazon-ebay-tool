@@ -13,16 +13,6 @@
           Import
         </Button>
 
-        <!-- CDN Upload button (manual mode only) -->
-        <Button
-          v-if="settings.useR2Cdn && !settings.r2AutoUpload"
-          variant="outline" size="sm"
-          @click="handleCdnUpload"
-          :disabled="!hasDoneRows || isCdnUploading"
-        >
-          <Cloud class="w-4 h-4 mr-2" :class="{ 'animate-pulse text-blue-500': isCdnUploading }" />
-          {{ isCdnUploading ? cdnUploadProgress : 'Upload CDN' }}
-        </Button>
 
         <Button v-if="!isCrawling" size="sm" :disabled="!hasPendingRows" @click="startCrawl">
           <Play class="w-4 h-4 mr-2" />

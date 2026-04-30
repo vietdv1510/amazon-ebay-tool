@@ -226,33 +226,38 @@ ipcMain.handle('crawl:asin', async (_, asin) => {
       }
     )
 
-    // R2 CDN: auto-upload images after crawl if enabled
-    if (settings.useR2Cdn && settings.r2AutoUpload && data.images?.length > 0) {
-      try {
-        progressCb('[PROGRESS] ☁️ Uploading images to CDN...')
-        data.images = await uploadToR2(data.images, asin, settings, (msg) => {
-          progressCb(`[PROGRESS] ${msg}`)
-        })
-        // Also upload variation images
-        if (data.variations?.length > 0) {
-          for (let vi = 0; vi < data.variations.length; vi++) {
-            const v = data.variations[vi]
-            if (v.image) {
-              const [cdnUrl] = await uploadToR2([v.image], `${asin}/var`, settings, () => {})
-              data.variations[vi].image = cdnUrl
+    // R2 CDN: always upload images after crawl if enabled
+    if (settings.useR2Cdn && data.images?.length > 0) {
+      // Validate R2 credentials
+      if (!settings.r2AccountId || !settings.r2AccessKeyId || !settings.r2SecretAccessKey || !settings.r2BucketName) {
+        progressCb('[PROGRESS] ⚠ CDN bật nhưng chưa cấu hình đầy đủ — vào Settings để nhập thông tin R2')
+      } else {
+        try {
+          progressCb('[PROGRESS] Uploading images to CDN...')
+          data.images = await uploadToR2(data.images, asin, settings, (msg) => {
+            progressCb(`[PROGRESS] ${msg}`)
+          })
+          // Also upload variation images
+          if (data.variations?.length > 0) {
+            for (let vi = 0; vi < data.variations.length; vi++) {
+              const v = data.variations[vi]
+              if (v.image) {
+                const [cdnUrl] = await uploadToR2([v.image], `${asin}/var`, settings, () => {})
+                data.variations[vi].image = cdnUrl
+              }
             }
           }
+          // Upload description images too
+          if (data.descriptionImages?.length > 0) {
+            data.descriptionImages = await uploadToR2(
+              data.descriptionImages, `${asin}/desc`, settings, () => {}
+            )
+          }
+          progressCb('[PROGRESS] ✓ Images uploaded to CDN')
+        } catch (r2Err) {
+          console.warn('[R2] Auto-upload failed, keeping original URLs:', r2Err.message)
+          progressCb(`[PROGRESS] ⚠ CDN upload lỗi: ${r2Err.message}`)
         }
-        // Upload description images too
-        if (data.descriptionImages?.length > 0) {
-          data.descriptionImages = await uploadToR2(
-            data.descriptionImages, `${asin}/desc`, settings, () => {}
-          )
-        }
-        progressCb('[PROGRESS] ✓ Images uploaded to CDN')
-      } catch (r2Err) {
-        console.warn('[R2] Auto-upload failed, keeping original URLs:', r2Err.message)
-        progressCb('[PROGRESS] ⚠ CDN upload failed — using original URLs')
       }
     }
 
