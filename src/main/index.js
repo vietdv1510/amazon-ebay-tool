@@ -5,6 +5,8 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs'
 import { crawlAmazon, cancelCrawl, closeBrowser } from './crawler'
+import { batchGenerate } from './ai-gen'
+import { uploadToR2, testR2Connection, resetR2Client } from './r2-uploader'
 import {
   getCategorySuggestions,
   getCategoryAspects,
@@ -31,10 +33,26 @@ const DEFAULT_SETTINGS = {
   ebayEnv: 'sandbox',
   ebayClientId: '',
   ebayClientSecret: '',
-  geminiApiKey: '',
-  useGemini: false,
   useEbayAI: true,
-  forceUSLocation: true
+  forceUSLocation: true,
+  // AI Gen (Gemini)
+  useGemini: false,
+  geminiApiKey: '',
+  geminiModel: 'gemini-3.1-flash-lite-preview',
+  aiRewriteTitle: true,
+  aiRewriteDescription: true,
+  aiTitlePrompt: '',
+  aiDescriptionPrompt: '',
+  // Cloudflare R2 CDN
+  useR2Cdn: false,
+  r2AutoUpload: true,
+  r2AccountId: '',
+  r2AccessKeyId: '',
+  r2SecretAccessKey: '',
+  r2BucketName: '',
+  r2CustomDomain: '',
+  r2ConvertWebp: true,
+  r2WebpQuality: 80
 }
 
 function loadSettings() {
@@ -189,16 +207,17 @@ ipcMain.handle('file:write', (_, filePath, content) => {
 ipcMain.handle('crawl:asin', async (_, asin) => {
   try {
     const settings = loadSettings()
+    const progressCb = (msg) => {
+      if (msg && mainWindow) {
+        mainWindow.webContents.send('crawl-progress', {
+          asin,
+          message: msg.replace('[PROGRESS]', '').trim()
+        })
+      }
+    }
     const data = await crawlAmazon(
       asin,
-      (msg) => {
-        if (msg && mainWindow) {
-          mainWindow.webContents.send('crawl-progress', {
-            asin,
-            message: msg.replace('[PROGRESS]', '').trim()
-          })
-        }
-      },
+      progressCb,
       {
         headless: settings.headlessMode === true,
         delay: settings.crawlDelay ?? 2,
@@ -206,6 +225,37 @@ ipcMain.handle('crawl:asin', async (_, asin) => {
         forceUSLocation: settings.forceUSLocation !== false
       }
     )
+
+    // R2 CDN: auto-upload images after crawl if enabled
+    if (settings.useR2Cdn && settings.r2AutoUpload && data.images?.length > 0) {
+      try {
+        progressCb('[PROGRESS] ☁️ Uploading images to CDN...')
+        data.images = await uploadToR2(data.images, asin, settings, (msg) => {
+          progressCb(`[PROGRESS] ${msg}`)
+        })
+        // Also upload variation images
+        if (data.variations?.length > 0) {
+          for (let vi = 0; vi < data.variations.length; vi++) {
+            const v = data.variations[vi]
+            if (v.image) {
+              const [cdnUrl] = await uploadToR2([v.image], `${asin}/var`, settings, () => {})
+              data.variations[vi].image = cdnUrl
+            }
+          }
+        }
+        // Upload description images too
+        if (data.descriptionImages?.length > 0) {
+          data.descriptionImages = await uploadToR2(
+            data.descriptionImages, `${asin}/desc`, settings, () => {}
+          )
+        }
+        progressCb('[PROGRESS] ✓ Images uploaded to CDN')
+      } catch (r2Err) {
+        console.warn('[R2] Auto-upload failed, keeping original URLs:', r2Err.message)
+        progressCb('[PROGRESS] ⚠ CDN upload failed — using original URLs')
+      }
+    }
+
     return { ok: true, data }
   } catch (e) {
     return { ok: false, error: e.message }
@@ -308,4 +358,65 @@ ipcMain.handle('ebay:getSyncStatus', () => {
   } catch (e) {
     return { ok: false, error: e.message }
   }
+})
+
+// ─── AI Content Generation ────────────────────────────────────────────────────
+
+ipcMain.handle('ai:batchGenerate', async (_, products) => {
+  try {
+    const settings = loadSettings()
+    if (!settings.useGemini || !settings.geminiApiKey) {
+      return { ok: false, error: 'Gemini AI chưa được bật hoặc thiếu API Key' }
+    }
+    const results = await batchGenerate(products, settings, (asin, message, total, current) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('ai-gen-progress', { asin, message, total, current })
+      }
+    })
+    // Ensure results are plain serializable objects
+    const safeResults = results.map(r => ({
+      asin: r.asin,
+      ok: !!r.ok,
+      title: r.title || null,
+      description: r.description || null,
+      error: r.error ? String(r.error) : null
+    }))
+    return { ok: true, data: safeResults }
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+// ─── Cloudflare R2 CDN ────────────────────────────────────────────────────────
+
+ipcMain.handle('r2:uploadImages', async (_, { images, asin }) => {
+  try {
+    const settings = loadSettings()
+    if (!settings.useR2Cdn) {
+      return { ok: false, error: 'R2 CDN chưa được bật' }
+    }
+    const cdnUrls = await uploadToR2(images, asin, settings, (msg) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('r2-upload-progress', { asin, message: msg })
+      }
+    })
+    return { ok: true, data: cdnUrls }
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('r2:testConnection', async () => {
+  try {
+    const settings = loadSettings()
+    const result = await testR2Connection(settings)
+    return { ok: !!result.ok, message: String(result.message || '') }
+  } catch (e) {
+    return { ok: false, message: String(e?.message || e) }
+  }
+})
+
+ipcMain.handle('r2:resetClient', () => {
+  resetR2Client()
+  return { ok: true }
 })

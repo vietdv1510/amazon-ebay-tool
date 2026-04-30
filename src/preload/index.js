@@ -48,6 +48,26 @@ const api = {
       ipcRenderer.on('ebay-sync-progress', (_, data) => callback(data))
       return () => ipcRenderer.removeAllListeners('ebay-sync-progress')
     },
+  },
+
+  // AI Content Generation
+  ai: {
+    batchGenerate: (products) => ipcRenderer.invoke('ai:batchGenerate', products),
+    onProgress: (callback) => {
+      ipcRenderer.on('ai-gen-progress', (_, data) => callback(data))
+      return () => ipcRenderer.removeAllListeners('ai-gen-progress')
+    }
+  },
+
+  // Cloudflare R2 CDN
+  r2: {
+    uploadImages: (payload) => ipcRenderer.invoke('r2:uploadImages', payload),
+    testConnection: () => ipcRenderer.invoke('r2:testConnection'),
+    resetClient: () => ipcRenderer.invoke('r2:resetClient'),
+    onUploadProgress: (callback) => {
+      ipcRenderer.on('r2-upload-progress', (_, data) => callback(data))
+      return () => ipcRenderer.removeAllListeners('r2-upload-progress')
+    }
   }
 }
 

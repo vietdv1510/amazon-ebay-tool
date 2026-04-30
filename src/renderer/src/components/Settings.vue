@@ -85,11 +85,9 @@
             <SwitchRoot
               v-model="form.headlessMode"
               @update:model-value="() => saveNow()"
-              :class="cn(
-                'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
-              )"
+              :class="switchClass"
             >
-              <SwitchThumb class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+              <SwitchThumb :class="switchThumbClass" />
             </SwitchRoot>
           </div>
 
@@ -104,11 +102,9 @@
             <SwitchRoot
               v-model="form.forceUSLocation"
               @update:model-value="() => saveNow()"
-              :class="cn(
-                'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
-              )"
+              :class="switchClass"
             >
-              <SwitchThumb class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+              <SwitchThumb :class="switchThumbClass" />
             </SwitchRoot>
           </div>
         </div>
@@ -157,11 +153,9 @@
             <SwitchRoot
               v-model="form.useEbayAI"
               @update:model-value="() => saveNow()"
-              :class="cn(
-                'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
-              )"
+              :class="switchClass"
             >
-              <SwitchThumb class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+              <SwitchThumb :class="switchThumbClass" />
             </SwitchRoot>
           </div>
 
@@ -230,17 +224,17 @@
 
         <Separator />
 
-        <!-- Section: Gemini AI -->
+        <!-- Section: AI Content Generation -->
         <div class="space-y-4">
           <div
             class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"
           >
             <Sparkles class="w-4 h-4" />
-            <span>Gemini AI (Tùy chọn)</span>
+            <span>AI Content Generation</span>
           </div>
           <div class="flex items-center justify-between space-x-2">
             <div class="flex flex-col space-y-1">
-              <Label>Bật tối ưu nội dung bằng Gemini</Label>
+              <Label>Bật tối ưu nội dung bằng AI</Label>
               <p class="text-[0.8rem] text-muted-foreground">
                 Dùng Gemini API để rewrite title/description phù hợp eBay.
               </p>
@@ -248,16 +242,246 @@
             <SwitchRoot
               v-model="form.useGemini"
               @update:model-value="() => saveNow()"
-              :class="cn(
-                'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
-              )"
+              :class="switchClass"
             >
-              <SwitchThumb class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+              <SwitchThumb :class="switchThumbClass" />
             </SwitchRoot>
           </div>
-          <div class="space-y-2 pt-2" v-if="form.useGemini">
-            <Label>Gemini API Key</Label>
-            <Input type="password" placeholder="AIza..." v-model="form.geminiApiKey" />
+
+          <!-- Expanded config when AI is ON -->
+          <div v-if="form.useGemini" class="space-y-4 pl-0 pt-2">
+            <div class="grid grid-cols-2 gap-6">
+              <div class="space-y-2">
+                <Label>Gemini API Key</Label>
+                <Input
+                  type="password"
+                  placeholder="AIza..."
+                  v-model="form.geminiApiKey"
+                  @change="saveNow"
+                />
+              </div>
+              <div class="space-y-2">
+                <Label>Model</Label>
+                <Select v-model="form.geminiModel" @update:model-value="saveNow">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gemini-3.1-flash-lite-preview"
+                      >Gemini 3.1 Flash Lite (Preview)</SelectItem
+                    >
+                    <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
+                    <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+                    <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                    <SelectItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <!-- Per-feature toggles -->
+            <div class="flex items-center justify-between space-x-2">
+              <div class="flex flex-col space-y-1">
+                <Label>Tự động rewrite Title (≤80 ký tự)</Label>
+                <p class="text-[0.8rem] text-muted-foreground">
+                  Rút gọn tiêu đề Amazon cho phù hợp eBay
+                </p>
+              </div>
+              <SwitchRoot
+                v-model="form.aiRewriteTitle"
+                @update:model-value="() => saveNow()"
+                :class="switchClass"
+              >
+                <SwitchThumb :class="switchThumbClass" />
+              </SwitchRoot>
+            </div>
+            <div class="flex items-center justify-between space-x-2">
+              <div class="flex flex-col space-y-1">
+                <Label>Tự động rewrite Description</Label>
+                <p class="text-[0.8rem] text-muted-foreground">Viết lại mô tả sản phẩm bằng AI</p>
+              </div>
+              <SwitchRoot
+                v-model="form.aiRewriteDescription"
+                @update:model-value="() => saveNow()"
+                :class="switchClass"
+              >
+                <SwitchThumb :class="switchThumbClass" />
+              </SwitchRoot>
+            </div>
+
+            <!-- Custom prompts -->
+            <div class="space-y-2">
+              <Label>Custom Prompt — Title</Label>
+              <textarea
+                v-model="form.aiTitlePrompt"
+                @change="saveNow"
+                rows="3"
+                placeholder="Để trống = dùng prompt mặc định. Dùng {title} làm placeholder cho title gốc."
+                class="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+            <div class="space-y-2">
+              <Label>Custom Prompt — Description</Label>
+              <textarea
+                v-model="form.aiDescriptionPrompt"
+                @change="saveNow"
+                rows="3"
+                placeholder="Để trống = dùng prompt mặc định. Placeholders: {title}, {bulletPoints}, {description}, {specs}"
+                class="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <!-- Section: Cloudflare R2 CDN -->
+        <div class="space-y-4">
+          <div
+            class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"
+          >
+            <Cloud class="w-4 h-4" />
+            <span>Cloudflare R2 CDN</span>
+          </div>
+          <div class="flex items-center justify-between space-x-2">
+            <div class="flex flex-col space-y-1">
+              <Label>Upload ảnh lên CDN bên thứ 3</Label>
+              <p class="text-[0.8rem] text-muted-foreground">
+                Thay link ảnh Amazon bằng link CDN riêng, tránh bị gỡ ảnh.
+              </p>
+            </div>
+            <SwitchRoot
+              v-model="form.useR2Cdn"
+              @update:model-value="() => saveNow()"
+              :class="switchClass"
+            >
+              <SwitchThumb :class="switchThumbClass" />
+            </SwitchRoot>
+          </div>
+
+          <!-- R2 config when ON -->
+          <div v-if="form.useR2Cdn" class="space-y-4 pt-2">
+            <div class="grid grid-cols-2 gap-6">
+              <div class="space-y-2">
+                <Label>Account ID</Label>
+                <Input
+                  type="text"
+                  placeholder="Cloudflare Account ID"
+                  v-model="form.r2AccountId"
+                  @change="saveNow"
+                />
+              </div>
+              <div class="space-y-2">
+                <Label>Bucket Name</Label>
+                <Input
+                  type="text"
+                  placeholder="my-images"
+                  v-model="form.r2BucketName"
+                  @change="saveNow"
+                />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-6">
+              <div class="space-y-2">
+                <Label>Access Key ID</Label>
+                <Input
+                  type="text"
+                  placeholder="R2 Access Key"
+                  v-model="form.r2AccessKeyId"
+                  @change="saveNow"
+                />
+              </div>
+              <div class="space-y-2">
+                <Label>Secret Access Key</Label>
+                <Input
+                  type="password"
+                  placeholder="R2 Secret Key"
+                  v-model="form.r2SecretAccessKey"
+                  @change="saveNow"
+                />
+              </div>
+            </div>
+            <div class="space-y-2">
+              <Label>Custom Domain (tùy chọn)</Label>
+              <Input
+                type="text"
+                placeholder="images.example.com — để trống = dùng URL R2 mặc định"
+                v-model="form.r2CustomDomain"
+                @change="saveNow"
+              />
+              <p class="text-[0.8rem] text-muted-foreground">
+                Đặt CNAME trỏ tới bucket R2. Không cần ghi https://
+              </p>
+            </div>
+
+            <!-- Upload mode -->
+            <div class="flex items-center justify-between space-x-2">
+              <div class="flex flex-col space-y-1">
+                <Label>Tự động upload sau khi crawl</Label>
+                <p class="text-[0.8rem] text-muted-foreground">
+                  Bật: ảnh tự upload lên CDN ngay sau crawl. Tắt: hiện nút "Upload CDN" để xử lý thủ
+                  công.
+                </p>
+              </div>
+              <SwitchRoot
+                v-model="form.r2AutoUpload"
+                @update:model-value="() => saveNow()"
+                :class="switchClass"
+              >
+                <SwitchThumb :class="switchThumbClass" />
+              </SwitchRoot>
+            </div>
+
+            <!-- WebP conversion -->
+            <div class="flex items-center justify-between space-x-2">
+              <div class="flex flex-col space-y-1">
+                <Label>Tự động convert sang WebP</Label>
+                <p class="text-[0.8rem] text-muted-foreground">
+                  WebP nhẹ hơn JPEG ~60%, eBay hỗ trợ đầy đủ.
+                </p>
+              </div>
+              <SwitchRoot
+                v-model="form.r2ConvertWebp"
+                @update:model-value="() => saveNow()"
+                :class="switchClass"
+              >
+                <SwitchThumb :class="switchThumbClass" />
+              </SwitchRoot>
+            </div>
+            <div v-if="form.r2ConvertWebp" class="space-y-2">
+              <Label>WebP Quality ({{ form.r2WebpQuality }}%)</Label>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                v-model.number="form.r2WebpQuality"
+                @change="saveNow"
+                class="w-full accent-primary"
+              />
+              <p class="text-[0.8rem] text-muted-foreground">
+                80% là mặc định — cân bằng giữa chất lượng và dung lượng.
+              </p>
+            </div>
+
+            <!-- Test connection -->
+            <div class="flex items-center gap-3 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                @click="testR2"
+                :disabled="r2Testing"
+                class="min-w-[160px]"
+              >
+                <Wifi class="w-4 h-4 mr-2" :class="{ 'animate-pulse': r2Testing }" />
+                {{ r2Testing ? 'Đang test...' : 'Test Connection' }}
+              </Button>
+              <span
+                v-if="r2TestResult"
+                :class="r2TestResult.ok ? 'text-green-500' : 'text-red-500'"
+                class="text-sm"
+              >
+                {{ r2TestResult.message }}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -362,6 +586,8 @@ import {
   Save,
   Database,
   RefreshCw,
+  Cloud,
+  Wifi,
   Settings as SettingsIcon
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
@@ -379,6 +605,13 @@ import {
 } from '@/components/ui/select'
 import { cn } from '@/utils'
 
+// Reusable switch styling
+const switchClass = cn(
+  'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input'
+)
+const switchThumbClass =
+  'pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0'
+
 const props = defineProps({
   initialSettings: { type: Object, required: true }
 })
@@ -391,7 +624,18 @@ const coerceSettings = (raw) => {
   if (result.headlessMode === undefined) result.headlessMode = true
   if (result.useEbayAI === undefined) result.useEbayAI = true
   if (result.forceUSLocation === undefined) result.forceUSLocation = true
+  // AI Gen defaults
   if (result.useGemini === undefined) result.useGemini = false
+  if (!result.geminiModel) result.geminiModel = 'gemini-3.1-flash-lite-preview'
+  if (result.aiRewriteTitle === undefined) result.aiRewriteTitle = true
+  if (result.aiRewriteDescription === undefined) result.aiRewriteDescription = true
+  if (!result.aiTitlePrompt) result.aiTitlePrompt = ''
+  if (!result.aiDescriptionPrompt) result.aiDescriptionPrompt = ''
+  // R2 CDN defaults
+  if (result.useR2Cdn === undefined) result.useR2Cdn = false
+  if (result.r2AutoUpload === undefined) result.r2AutoUpload = true
+  if (result.r2ConvertWebp === undefined) result.r2ConvertWebp = true
+  if (!result.r2WebpQuality) result.r2WebpQuality = 80
   return result
 }
 
@@ -417,6 +661,29 @@ const saveNow = () => {
 const save = () => {
   saveNow()
   toast.success('Lưu cài đặt thành công!')
+}
+
+// ─── R2 Test Connection ────────────────────────────────────────────────────────
+const r2Testing = ref(false)
+const r2TestResult = ref(null)
+
+const testR2 = async () => {
+  r2Testing.value = true
+  r2TestResult.value = null
+  try {
+    // Save current settings first so main process has the latest
+    saveNow()
+    await window.api.r2.resetClient()
+    const result = await window.api.r2.testConnection()
+    r2TestResult.value = result
+    if (result.ok) toast.success(result.message)
+    else toast.error(result.message)
+  } catch (e) {
+    r2TestResult.value = { ok: false, message: e.message }
+    toast.error(e.message)
+  } finally {
+    r2Testing.value = false
+  }
 }
 
 // ─── eBay Sync ─────────────────────────────────────────────────────────────────

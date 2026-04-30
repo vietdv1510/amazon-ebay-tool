@@ -8,6 +8,17 @@
       </div>
 
       <div class="header-actions flex gap-2 items-center">
+          <!-- AI Gen button -->
+          <Button
+            v-if="settings.useGemini"
+            variant="outline" size="sm"
+            @click="handleAiGen"
+            :disabled="readyProducts.length === 0 || isAiGenerating"
+          >
+            <Sparkles class="w-4 h-4 mr-2" :class="{ 'animate-pulse text-amber-500': isAiGenerating }" />
+            {{ isAiGenerating ? aiGenProgress : 'AI Gen' }}
+          </Button>
+
           <Button size="sm" variant="destructive" @click="handleExport(true)" :disabled="previewRows.length === 0" title="Ép xuất không cần kiểm tra lỗi">
             Export thô (Bỏ qua lỗi)
           </Button>
@@ -217,7 +228,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   FileSpreadsheet, Download, RefreshCw, AlertTriangle,
-  Package, Rows3, Columns3, Check, X
+  Package, Rows3, Columns3, Check, X, Sparkles
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -226,6 +237,71 @@ const props = defineProps({
 
 const previewRows = ref([])
 const allColumns = ref([])
+
+// ─── AI Gen ──────────────────────────────────────────────────────────────
+const isAiGenerating = ref(false)
+const aiGenProgress = ref('✨ AI Gen')
+
+const handleAiGen = async () => {
+  if (readyProducts.value.length === 0) return
+
+  isAiGenerating.value = true
+  aiGenProgress.value = `0/${readyProducts.value.length}`
+
+  const unsub = window.api.ai.onProgress(({ asin, message, total, current }) => {
+    aiGenProgress.value = `${current}/${total}`
+  })
+
+  try {
+    const products = JSON.parse(JSON.stringify(readyProducts.value.map(r => ({
+      asin: r.asin,
+      title: r._originalTitle || r.title,
+      bulletPoints: r.bulletPoints || [],
+      description: r._originalDescription || r.description || '',
+      specs: r.specs || {}
+    }))))
+
+    const res = await window.api.ai.batchGenerate(products)
+
+    // Save scroll position before updating data
+    const scrollContainer = document.querySelector('.workspace-root')
+    const scrollTop = scrollContainer?.scrollTop || 0
+
+    if (res.ok) {
+      // Apply results to globalRowData (shared store)
+      for (const result of res.data) {
+        const row = rowData.value.find(r => r.asin === result.asin)
+        if (row && result.ok) {
+          // Save originals for re-gen
+          if (!row._originalTitle) row._originalTitle = row.title
+          if (!row._originalDescription) row._originalDescription = row.description || row.descriptionHtml || ''
+          if (result.title) row.title = result.title
+          if (result.description) {
+            row.descriptionHtml = result.description
+            row.description = result.description
+          }
+          row._aiGenerated = true
+        }
+      }
+
+      // Restore scroll after Vue re-render
+      nextTick(() => {
+        if (scrollContainer) scrollContainer.scrollTop = scrollTop
+      })
+
+      const successCount = res.data.filter(r => r.ok).length
+      toast.success(`AI Gen hoàn tất: ${successCount}/${readyProducts.value.length} sản phẩm`)
+    } else {
+      toast.error('Lỗi AI Gen: ' + res.error)
+    }
+  } catch (e) {
+    toast.error('Lỗi AI Gen: ' + e.message)
+  } finally {
+    isAiGenerating.value = false
+    aiGenProgress.value = 'AI Gen'
+    unsub()
+  }
+}
 
 const validationErrors = computed(() => {
   const errors = {}

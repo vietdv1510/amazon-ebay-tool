@@ -13,6 +13,17 @@
           Import
         </Button>
 
+        <!-- CDN Upload button (manual mode only) -->
+        <Button
+          v-if="settings.useR2Cdn && !settings.r2AutoUpload"
+          variant="outline" size="sm"
+          @click="handleCdnUpload"
+          :disabled="!hasDoneRows || isCdnUploading"
+        >
+          <Cloud class="w-4 h-4 mr-2" :class="{ 'animate-pulse text-blue-500': isCdnUploading }" />
+          {{ isCdnUploading ? cdnUploadProgress : 'Upload CDN' }}
+        </Button>
+
         <Button v-if="!isCrawling" size="sm" :disabled="!hasPendingRows" @click="startCrawl">
           <Play class="w-4 h-4 mr-2" />
           Start Crawl
@@ -183,7 +194,7 @@ import * as xlsx from 'xlsx'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Play, Pause, Square, Search, Trash2, FolderOpen, ArrowRight, ExternalLink, Settings, Download, X, ListOrdered, Upload, CheckCircle2, AlertCircle, Clock, Loader2, Star, Image as ImageIcon } from 'lucide-vue-next'
+import { RefreshCw, Play, Pause, Square, Search, Trash2, FolderOpen, ArrowRight, ExternalLink, Settings, Download, X, ListOrdered, Upload, CheckCircle2, AlertCircle, Clock, Loader2, Star, Image as ImageIcon, Sparkles, Cloud } from 'lucide-vue-next'
 
 const props = defineProps({
   settings: { type: Object, required: true }
@@ -220,6 +231,93 @@ const stats = computed(() => {
 watch(stats, (s) => emit('stats-update', s))
 
 const hasPendingRows = computed(() => rowData.value.some(r => r.status === 'PENDING' || r.status === 'ERROR'))
+const hasDoneRows = computed(() => rowData.value.some(r => r.status === 'DONE'))
+
+// ─── AI Gen ──────────────────────────────────────────────────────────────
+const isAiGenerating = ref(false)
+const aiGenProgress = ref('✨ AI Gen')
+
+const handleAiGen = async () => {
+  const doneRows = rowData.value.filter(r => r.status === 'DONE')
+  if (doneRows.length === 0) return
+
+  isAiGenerating.value = true
+  aiGenProgress.value = `0/${doneRows.length}`
+
+  // Listen for progress
+  const unsub = window.api.ai.onProgress(({ asin, message, total, current }) => {
+    aiGenProgress.value = `${current}/${total}`
+  })
+
+  try {
+    // Always send ORIGINAL content to AI (not previously gen'd)
+    const products = JSON.parse(JSON.stringify(doneRows.map(r => ({
+      asin: r.asin,
+      title: r._originalTitle || r.title,
+      bulletPoints: r.bulletPoints || [],
+      description: r._originalDescription || r.description || '',
+      specs: r.specs || {}
+    }))))
+
+    const res = await window.api.ai.batchGenerate(products)
+    if (res.ok) {
+      // Apply results to store
+      for (const result of res.data) {
+        const row = rowData.value.find(r => r.asin === result.asin)
+        if (row && result.ok) {
+          // Save originals for re-gen
+          if (!row._originalTitle) row._originalTitle = row.title
+          if (!row._originalDescription) row._originalDescription = row.description || row.descriptionHtml || ''
+          if (result.title) row.title = result.title
+          if (result.description) {
+            row.descriptionHtml = result.description
+            row.description = result.description
+          }
+          row._aiGenerated = true
+        }
+      }
+      const successCount = res.data.filter(r => r.ok).length
+      alert(`✨ AI Gen hoàn tất: ${successCount}/${doneRows.length} sản phẩm`)
+    } else {
+      alert('Lỗi AI Gen: ' + res.error)
+    }
+  } catch (e) {
+    alert('Lỗi AI Gen: ' + e.message)
+  } finally {
+    isAiGenerating.value = false
+    aiGenProgress.value = 'AI Gen'
+    unsub()
+  }
+}
+
+// ─── CDN Upload (Manual mode) ────────────────────────────────────────────
+const isCdnUploading = ref(false)
+const cdnUploadProgress = ref('Upload CDN')
+
+const handleCdnUpload = async () => {
+  const doneRows = rowData.value.filter(r => r.status === 'DONE' && r.images?.length > 0)
+  if (doneRows.length === 0) return
+
+  isCdnUploading.value = true
+  let processed = 0
+
+  try {
+    for (const row of doneRows) {
+      cdnUploadProgress.value = `${++processed}/${doneRows.length}`
+      const res = await window.api.r2.uploadImages({ images: JSON.parse(JSON.stringify(row.images)), asin: row.asin })
+      if (res.ok) {
+        row.images = res.data
+        row._cdnUploaded = true
+      }
+    }
+    alert(`CDN upload hoàn tất: ${processed}/${doneRows.length} sản phẩm`)
+  } catch (e) {
+    alert('Lỗi CDN upload: ' + e.message)
+  } finally {
+    isCdnUploading.value = false
+    cdnUploadProgress.value = 'Upload CDN'
+  }
+}
 
 const progressPct = computed(() => {
   if (stats.value.total === 0) return 0
