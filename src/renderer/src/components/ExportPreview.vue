@@ -66,12 +66,23 @@
           <div class="legend-items">
             <div class="legend-chip chip-req">
               <span class="col-usage-badge badge-required" style="margin-left: 0;">Req</span>
+              <span>Bắt buộc</span>
+            </div>
+            <div class="legend-chip chip-cond">
+              <span class="col-usage-badge badge-conditional" style="margin-left: 0;">Cond</span>
+              <span>Theo loại dòng</span>
             </div>
             <div class="legend-chip chip-rec">
               <span class="col-usage-badge badge-recommended" style="margin-left: 0;">Rec</span>
+              <span>Nên có</span>
             </div>
             <div class="legend-chip chip-opt">
               <span class="col-usage-badge badge-optional" style="margin-left: 0;">Opt</span>
+              <span>Không bắt buộc</span>
+            </div>
+            <div class="legend-chip chip-mix">
+              <span class="col-usage-badge badge-mixed" style="margin-left: 0;">Mix</span>
+              <span>Khác theo danh mục</span>
             </div>
           </div>
         </div>
@@ -123,16 +134,18 @@
                   :class="{
                     'required-col': isRequiredCol(col),
                     'recommended-col': isRecommendedCol(col),
-                    'aspect-col': col.startsWith('C:') && !isRequiredCol(col) && !isRecommendedCol(col),
+                    'aspect-col': isAspectCol(col) && !isRequiredCol(col) && !isRecommendedCol(col),
                     'action-col': col.startsWith('*Action')
                   }"
                   :title="getColTooltip(col)"
                 >
                   <div class="col-header-content">
                     <span>{{ col }}</span>
-                    <span v-if="isRequiredCol(col)" class="col-usage-badge badge-required">Req</span>
+                    <span v-if="isMixedUsageCol(col)" class="col-usage-badge badge-mixed">Mix</span>
+                    <span v-else-if="isConditionalRequiredCol(col)" class="col-usage-badge badge-conditional">Cond</span>
+                    <span v-else-if="isRequiredCol(col)" class="col-usage-badge badge-required">Req</span>
                     <span v-else-if="isRecommendedCol(col)" class="col-usage-badge badge-recommended">Rec</span>
-                    <span v-else-if="col.startsWith('C:')" class="col-usage-badge badge-optional">Opt</span>
+                    <span v-else-if="isOptionalCol(col)" class="col-usage-badge badge-optional">Opt</span>
                   </div>
                 </th>
               </tr>
@@ -242,6 +255,28 @@ const allColumns = ref([])
 const isAiGenerating = ref(false)
 const aiGenProgress = ref('✨ AI Gen')
 
+const isAiResultOk = (result) =>
+  result?.ok === true || result?.success === true || !!result?.title || !!result?.description
+
+const getTableScrollState = () => {
+  const el = document.querySelector('.table-scroll-wrapper')
+  return {
+    el,
+    top: el?.scrollTop || 0,
+    left: el?.scrollLeft || 0
+  }
+}
+
+const restoreTableScrollState = async (state) => {
+  await nextTick()
+  requestAnimationFrame(() => {
+    const el = document.querySelector('.table-scroll-wrapper') || state.el
+    if (!el) return
+    el.scrollTop = state.top
+    el.scrollLeft = state.left
+  })
+}
+
 const handleAiGen = async () => {
   if (readyProducts.value.length === 0) return
 
@@ -263,15 +298,14 @@ const handleAiGen = async () => {
 
     const res = await window.api.ai.batchGenerate(products)
 
-    // Save scroll position before updating data
-    const scrollContainer = document.querySelector('.workspace-root')
-    const scrollTop = scrollContainer?.scrollTop || 0
+    // Save table scroll before preview rows rebuild after AI updates.
+    const scrollState = getTableScrollState()
 
     if (res.ok) {
       // Apply results to globalRowData (shared store)
       for (const result of res.data) {
         const row = rowData.value.find(r => r.asin === result.asin)
-        if (row && result.ok) {
+        if (row && isAiResultOk(result)) {
           // Save originals for re-gen
           if (!row._originalTitle) row._originalTitle = row.title
           if (!row._originalDescription) row._originalDescription = row.description || row.descriptionHtml || ''
@@ -284,13 +318,16 @@ const handleAiGen = async () => {
         }
       }
 
-      // Restore scroll after Vue re-render
-      nextTick(() => {
-        if (scrollContainer) scrollContainer.scrollTop = scrollTop
-      })
+      await restoreTableScrollState(scrollState)
 
-      const successCount = res.data.filter(r => r.ok).length
-      toast.success(`AI Gen hoàn tất: ${successCount}/${readyProducts.value.length} sản phẩm`)
+      const successCount = res.data.filter(isAiResultOk).length
+      const failed = res.data.filter(r => !isAiResultOk(r))
+      if (failed.length > 0) {
+        const firstError = failed[0]?.error ? `: ${failed[0].error}` : ''
+        toast.error(`AI Gen lỗi ${failed.length}/${readyProducts.value.length} sản phẩm${firstError}`)
+      } else {
+        toast.success(`AI Gen hoàn tất: ${successCount}/${readyProducts.value.length} sản phẩm`)
+      }
     } else {
       toast.error('Lỗi AI Gen: ' + res.error)
     }
@@ -337,26 +374,41 @@ const colHeaderUsage = computed(() => {
   return result
 })
 
+const isAspectCol = (col) => col.startsWith('C:') || col.startsWith('*C:')
+const aspectMetaKey = (col) => col.replace(/^\*?C:/, 'C:')
+const aspectNameFromCol = (col) => col.replace(/^\*?C:/, '')
+const getAspectHeader = (aspectName, usage) => `${usage === 'REQUIRED' ? '*C:' : 'C:'}${aspectName}`
+
 // Header helpers
 const isRequiredCol = (col) => {
-  if (col.startsWith('*') && !col.startsWith('C:')) return true // standard fixed required
-  return col.startsWith('C:') && colHeaderUsage.value[col] === 'REQUIRED'
+  if (col.startsWith('*') && !isAspectCol(col)) return getColumnRequiredState(col) === 'REQUIRED'
+  return isAspectCol(col) && colHeaderUsage.value[aspectMetaKey(col)] === 'REQUIRED'
+}
+const isConditionalRequiredCol = (col) => {
+  if (col.startsWith('*') && !isAspectCol(col)) return getColumnRequiredState(col) === 'CONDITIONAL'
+  return false
 }
 const isRecommendedCol = (col) => {
-  if (!col.startsWith('C:')) return false
-  const usage = colHeaderUsage.value[col]
+  if (!isAspectCol(col)) return false
+  const usage = colHeaderUsage.value[aspectMetaKey(col)]
   return usage === 'RECOMMENDED'
 }
+const isOptionalCol = (col) =>
+  !isMixedUsageCol(col) &&
+  !isConditionalRequiredCol(col) &&
+  !isRequiredCol(col) &&
+  !isRecommendedCol(col)
 
 /**
  * Does this column have DIFFERENT usage levels across categories?
  * e.g. Required in Cat A but Optional in Cat B
  */
-const isMultiUsageCol = (col) => {
-  if (!col.startsWith('C:')) return false
+const isMixedUsageCol = (col) => {
+  if (!isAspectCol(col)) return false
+  const key = aspectMetaKey(col)
   const usages = new Set()
   for (const catMeta of Object.values(catAspectMeta.value)) {
-    usages.add(catMeta[col] || 'OPTIONAL')
+    usages.add(catMeta[key] || 'OPTIONAL')
   }
   return usages.size > 1
 }
@@ -365,9 +417,9 @@ const isMultiUsageCol = (col) => {
  * Is this specific cell's usage different from the header's strictest usage?
  */
 const isCellMixedUsage = (row, col) => {
-  if (!col.startsWith('C:') || row._rowType === 'child') return false
+  if (!isAspectCol(col) || row._rowType === 'child') return false
   const cellUsage = getCellUsage(row, col)
-  const headerUsage = colHeaderUsage.value[col]
+  const headerUsage = colHeaderUsage.value[aspectMetaKey(col)]
   return cellUsage && headerUsage && cellUsage !== headerUsage
 }
 
@@ -375,27 +427,32 @@ const isCellMixedUsage = (row, col) => {
  * Show per-cell usage badge when column has mixed usage across categories
  */
 const showCellUsageBadge = (row, col) => {
-  if (!col.startsWith('C:') || row._rowType === 'child') return false
-  return isMultiUsageCol(col)
+  if (!isAspectCol(col) || row._rowType === 'child') return false
+  return isMixedUsageCol(col)
 }
 
 /**
  * Build tooltip showing per-category usage breakdown
  */
 const getColTooltip = (col) => {
-  if (!col.startsWith('C:')) return col
+  if (!isAspectCol(col)) {
+    const state = getColumnRequiredState(col)
+    if (state === 'REQUIRED') return `${col} (REQUIRED)`
+    if (state === 'CONDITIONAL') return `${col} (CONDITIONAL)`
+    return `${col} (OPTIONAL)`
+  }
   const parts = [col]
+  const key = aspectMetaKey(col)
   const categories = Object.entries(catAspectMeta.value)
   if (categories.length <= 1) {
-    const usage = colHeaderUsage.value[col]
+    const usage = colHeaderUsage.value[key]
     if (usage) parts.push(`(${usage})`)
     return parts.join(' ')
   }
   // Multi-category: show breakdown
+  if (isMixedUsageCol(col)) parts.push('(MIXED)')
   for (const [catId, meta] of categories) {
-    if (meta[col]) {
-      parts.push(`\n• Cat ${catId}: ${meta[col]}`)
-    }
+    parts.push(`\n• Cat ${catId}: ${meta[key] || 'OPTIONAL'}`)
   }
   return parts.join('')
 }
@@ -405,10 +462,11 @@ const getColTooltip = (col) => {
  * Returns 'REQUIRED'|'RECOMMENDED'|'OPTIONAL'|null
  */
 const getCellUsage = (row, col) => {
-  if (!col.startsWith('C:')) return null
+  if (!isAspectCol(col)) return null
   const catId = row._ebayCategory
-  if (!catId || !catAspectMeta.value[catId]) return colHeaderUsage.value[col] || 'OPTIONAL'
-  return catAspectMeta.value[catId][col] || 'OPTIONAL'
+  const key = aspectMetaKey(col)
+  if (!catId || !catAspectMeta.value[catId]) return colHeaderUsage.value[key] || 'OPTIONAL'
+  return catAspectMeta.value[catId][key] || 'OPTIONAL'
 }
 
 const getCellUsageLabel = (row, col) => {
@@ -417,6 +475,23 @@ const getCellUsageLabel = (row, col) => {
   if (usage === 'RECOMMENDED') return 'Rec'
   if (usage === 'OPTIONAL') return 'Opt'
   return ''
+}
+
+const isStandardCellRequired = (row, col) => {
+  if ((!col.startsWith('*') || isAspectCol(col)) && col !== 'Relationship' && col !== 'RelationshipDetails') return false
+  const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType] || []
+  return requiredCols.includes(col)
+}
+
+const getColumnRequiredState = (col) => {
+  if ((!col.startsWith('*') || isAspectCol(col)) && col !== 'Relationship' && col !== 'RelationshipDetails') return 'OPTIONAL'
+  const relevantRows = previewRows.value.filter((row) => col in row)
+  if (relevantRows.length === 0) return 'OPTIONAL'
+
+  const requiredCount = relevantRows.filter((row) => isStandardCellRequired(row, col)).length
+  if (requiredCount === 0) return 'OPTIONAL'
+  if (requiredCount === relevantRows.length) return 'REQUIRED'
+  return 'CONDITIONAL'
 }
 
 // ─── Inline Editing ───────────────────────────────────────────────────────────
@@ -454,44 +529,41 @@ const cancelEdit = () => {
   editingCell.value = null
 }
 
-// Required columns in eBay File Exchange
-const REQUIRED_COLUMNS = [
-  '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)',
+// Required columns in eBay File Exchange for item/listing rows.
+const ACTION_HEADER = '*Action(SiteID=US|Country=Thailand|Currency=USD|Version=1193|CC=UTF-8)'
+const ALWAYS_REQUIRED_COLUMNS = [
+  ACTION_HEADER,
   '*Category',
   '*Title',
   '*Description',
   '*ConditionID',
   '*Format',
-  '*StartPrice',
   '*Duration',
   '*Location',
+  '*DispatchTimeMax',
   '*ReturnsAcceptedOption'
 ]
+
+const ROW_REQUIRED_COLUMNS = {
+  parent: [...ALWAYS_REQUIRED_COLUMNS, 'RelationshipDetails'],
+  child: ['Relationship', 'RelationshipDetails', '*Quantity', '*StartPrice'],
+  single: [...ALWAYS_REQUIRED_COLUMNS, '*StartPrice', '*Quantity']
+}
 
 const readyProducts = computed(() =>
   rowData.value.filter(r => r.status === 'DONE' && isRowReady(r))
 )
-
-// Columns intentionally blank on parent-variation rows
-const PARENT_VARIATION_OPTIONAL = ['*StartPrice', '*Quantity']
-
-// Columns intentionally blank on single (no-variation) rows
-const SINGLE_OPTIONAL = ['*Relationship', '*RelationshipDetails']
 
 const isValEmpty = (val) => val == null || String(val).trim() === ''
 
 const isCellMissingRequired = (row, col) => {
   const empty = isValEmpty(row[col])
   // Standard fixed required columns
-  if (col.startsWith('*') && !col.startsWith('C:')) {
-    if (row._rowType === 'child') return false
-    if (row._rowType === 'parent' && PARENT_VARIATION_OPTIONAL.includes(col)) return false
-    if (row._rowType === 'single' && SINGLE_OPTIONAL.includes(col)) return false
-    if (row._rowType === 'parent' && SINGLE_OPTIONAL.includes(col)) return false
-    return empty
+  if ((col.startsWith('*') && !isAspectCol(col)) || col === 'Relationship' || col === 'RelationshipDetails') {
+    return isStandardCellRequired(row, col) && empty
   }
   // C: aspects — required only if THIS row's category marks it REQUIRED
-  if (col.startsWith('C:')) {
+  if (isAspectCol(col)) {
     const usage = getCellUsage(row, col)
     if (usage !== 'REQUIRED') return false
     if (row._rowType === 'child') return false // aspect on parent only
@@ -537,144 +609,149 @@ const buildPreview = async () => {
   isPreviewLoading.value = true
   try {
     const rows = []
-  // Per-category aspect meta: { [catId]: { 'C:Name': usage } }
-  const newCatMeta = {}
+    // Per-category aspect meta: { [catId]: { 'C:Name': usage } }
+    const newCatMeta = {}
+    const categoryIds = [...new Set(readyProducts.value.map((r) => r.ebayCategory).filter(Boolean))]
 
-  for (const r of readyProducts.value) {
-    // Fetch aspect meta for this category (deduplicated)
-    if (r.ebayCategory && !newCatMeta[r.ebayCategory]) {
-      newCatMeta[r.ebayCategory] = {} // mark as loading (prevent duplicate fetch)
+    for (const categoryId of categoryIds) {
+      newCatMeta[categoryId] = {}
       try {
-        const res = await window.api.ebay.categoryAspects(r.ebayCategory)
+        const res = await window.api.ebay.categoryAspects(categoryId)
         if (res.ok) {
           const catMap = {}
           for (const asp of res.data) {
             catMap[`C:${asp.name}`] = asp.usage // REQUIRED | RECOMMENDED | OPTIONAL
           }
-          newCatMeta[r.ebayCategory] = catMap
+          newCatMeta[categoryId] = catMap
         }
-      } catch (e) { /* ignore — catMeta stays empty {} for this cat */ }
+      } catch (e) { /* ignore: catMeta stays empty {} for this cat */ }
     }
-    const description = buildDescription(r)
-    const aspectCols = buildAspectColumns(r)
 
-    // Ensure REQUIRED aspects are included in aspectCols even if empty
-    if (newCatMeta[r.ebayCategory]) {
-      for (const [colName, usage] of Object.entries(newCatMeta[r.ebayCategory])) {
-        if (usage === 'REQUIRED' && !(colName in aspectCols)) {
-          aspectCols[colName] = ''
+    const strictestUsage = getStrictestAspectUsage(newCatMeta)
+
+    for (const r of readyProducts.value) {
+      const description = buildDescription(r)
+      const aspectCols = buildAspectColumns(r, newCatMeta[r.ebayCategory], strictestUsage)
+
+      // Ensure REQUIRED aspects are included in aspectCols even if empty.
+      if (newCatMeta[r.ebayCategory]) {
+        for (const [colName, usage] of Object.entries(newCatMeta[r.ebayCategory])) {
+          if (usage === 'REQUIRED' && !(colName in aspectCols)) {
+            aspectCols[getAspectHeader(aspectNameFromCol(colName), strictestUsage[colName])] = ''
+          }
         }
       }
-    }
 
-    if (r.variations && r.variations.length > 0) {
-      // Parent row
-      const parentRelDetails = buildParentRelationshipDetails(r.variations)
-      rows.push({
-        _rowType: 'parent',
-        _ebayCategory: r.ebayCategory || '',
-        '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
-        '*Category': r.ebayCategory || '',
-        '*Title': cleanTitle(r.title),
-        '*Description': description,
-        '*ConditionID': props.settings.defaultCondition || '1000',
-        'PicURL': (r.images || []).slice(0, 12).join('|'),
-        '*Quantity': '',
-        '*Format': props.settings.defaultFormat || 'FixedPrice',
-        '*StartPrice': '',
-        '*Duration': props.settings.defaultDuration || 'GTC',
-        '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
-        '*ReturnsAcceptedOption': 'ReturnsAccepted',
-        'CustomLabel': r.asin,
-        '*Relationship': '',
-        '*RelationshipDetails': parentRelDetails,
-        'ShippingProfileName': props.settings.shippingProfileName || '',
-        'ReturnProfileName': props.settings.returnProfileName || '',
-        'PaymentProfileName': props.settings.paymentProfileName || '',
-        ...aspectCols,
-      })
-
-      // Child rows
-      for (const v of r.variations) {
-        const childRelDetails = Object.entries(v.attributes || {})
-          .map(([k, val]) => `${k}=${val}`)
-          .join('|')
+      if (r.variations && r.variations.length > 0) {
+        // Parent row
+        const parentRelDetails = buildParentRelationshipDetails(r.variations)
         rows.push({
-          _rowType: 'child',
+          _rowType: 'parent',
           _ebayCategory: r.ebayCategory || '',
-          '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': '',
-          '*Category': '',
-          '*Title': '',
-          '*Description': '',
-          '*ConditionID': '',
-          'PicURL': v.image || '',
-          '*Quantity': props.settings.defaultQuantity || v.quantity || 10,
-          '*Format': '',
-          '*StartPrice': v.price || r.sellPrice,
-          '*Duration': '',
-          '*Location': '',
-          '*ReturnsAcceptedOption': '',
-          'CustomLabel': v.asin || '',
-          '*Relationship': 'Variation',
-          '*RelationshipDetails': childRelDetails,
-          'ShippingProfileName': '',
-          'ReturnProfileName': '',
-          'PaymentProfileName': '',
+          [ACTION_HEADER]: 'Add',
+          '*Category': r.ebayCategory || '',
+          '*Title': cleanTitle(r.title),
+          '*Description': description,
+          '*ConditionID': props.settings.defaultCondition || '1000',
+          'PicURL': (r.images || []).slice(0, 12).join('|'),
+          '*Quantity': '',
+          '*Format': props.settings.defaultFormat || 'FixedPrice',
+          '*StartPrice': '',
+          '*Duration': props.settings.defaultDuration || 'GTC',
+          '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
+          '*DispatchTimeMax': props.settings.dispatchTimeMax || '2',
+          '*ReturnsAcceptedOption': 'ReturnsAccepted',
+          'CustomLabel': r.asin,
+          'Relationship': '',
+          'RelationshipDetails': parentRelDetails,
+          'ShippingProfileName': props.settings.shippingProfileName || '',
+          'ReturnProfileName': props.settings.returnProfileName || '',
+          'PaymentProfileName': props.settings.paymentProfileName || '',
+          ...aspectCols,
+        })
+
+        // Child rows
+        for (const v of r.variations) {
+          const childRelDetails = Object.entries(v.attributes || {})
+            .map(([k, val]) => `${k}=${val}`)
+            .join('|')
+          rows.push({
+            _rowType: 'child',
+            _ebayCategory: r.ebayCategory || '',
+            [ACTION_HEADER]: '',
+            '*Category': '',
+            '*Title': '',
+            '*Description': '',
+            '*ConditionID': '',
+            'PicURL': v.image || '',
+            '*Quantity': props.settings.defaultQuantity || v.quantity || 10,
+            '*Format': '',
+            '*StartPrice': v.price || r.sellPrice,
+            '*Duration': '',
+            '*Location': '',
+            '*DispatchTimeMax': '',
+            '*ReturnsAcceptedOption': '',
+            'CustomLabel': v.asin || '',
+            'Relationship': 'Variation',
+            'RelationshipDetails': childRelDetails,
+            'ShippingProfileName': '',
+            'ReturnProfileName': '',
+            'PaymentProfileName': '',
+          })
+        }
+      } else {
+        // Single product
+        rows.push({
+          _rowType: 'single',
+          _ebayCategory: r.ebayCategory || '',
+          [ACTION_HEADER]: 'Add',
+          '*Category': r.ebayCategory || '',
+          '*Title': cleanTitle(r.title),
+          '*Description': description,
+          '*ConditionID': props.settings.defaultCondition || '1000',
+          'PicURL': (r.images || []).slice(0, 12).join('|'),
+          '*Quantity': props.settings.defaultQuantity || 10,
+          '*Format': props.settings.defaultFormat || 'FixedPrice',
+          '*StartPrice': r.sellPrice,
+          '*Duration': props.settings.defaultDuration || 'GTC',
+          '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
+          '*DispatchTimeMax': props.settings.dispatchTimeMax || '2',
+          '*ReturnsAcceptedOption': 'ReturnsAccepted',
+          'CustomLabel': r.asin,
+          'Relationship': '',
+          'RelationshipDetails': '',
+          'ShippingProfileName': props.settings.shippingProfileName || '',
+          'ReturnProfileName': props.settings.returnProfileName || '',
+          'PaymentProfileName': props.settings.paymentProfileName || '',
+          ...aspectCols,
         })
       }
-    } else {
-      // Single product
-      rows.push({
-        _rowType: 'single',
-        _ebayCategory: r.ebayCategory || '',
-        '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)': 'Add',
-        '*Category': r.ebayCategory || '',
-        '*Title': cleanTitle(r.title),
-        '*Description': description,
-        '*ConditionID': props.settings.defaultCondition || '1000',
-        'PicURL': (r.images || []).slice(0, 12).join('|'),
-        '*Quantity': props.settings.defaultQuantity || 10,
-        '*Format': props.settings.defaultFormat || 'FixedPrice',
-        '*StartPrice': r.sellPrice,
-        '*Duration': props.settings.defaultDuration || 'GTC',
-        '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
-        '*ReturnsAcceptedOption': 'ReturnsAccepted',
-        'CustomLabel': r.asin,
-        '*Relationship': '',
-        '*RelationshipDetails': '',
-        'ShippingProfileName': props.settings.shippingProfileName || '',
-        'ReturnProfileName': props.settings.returnProfileName || '',
-        'PaymentProfileName': props.settings.paymentProfileName || '',
-        ...aspectCols,
-      })
     }
-  }
 
-  catAspectMeta.value = newCatMeta
+    catAspectMeta.value = newCatMeta
 
-  // Collect all unique columns (exclude internal _ prefixed fields)
-  const colSet = new Set()
-  for (const row of rows) {
-    for (const key of Object.keys(row)) {
-      if (!key.startsWith('_')) colSet.add(key)
+    // Collect all unique columns (exclude internal _ prefixed fields)
+    const colSet = new Set()
+    for (const row of rows) {
+      for (const key of Object.keys(row)) {
+        if (!key.startsWith('_')) colSet.add(key)
+      }
     }
-  }
 
-  // Sort: std required → *C: required → C: recommended → C: optional → others
-  // Use colHeaderUsage (computed from catAspectMeta) for sorting
-  const sorted = [...colSet].sort((a, b) => {
-    const rank = (c) => {
-      if (c.startsWith('*') && !c.startsWith('C:')) return 0
-      const u = colHeaderUsage.value[c]
-      if (c.startsWith('C:') && u === 'REQUIRED') return 1
-      if (c.startsWith('C:') && u === 'RECOMMENDED') return 2
-      if (c.startsWith('C:')) return 3
-      return 1.5
-    }
-    const diff = rank(a) - rank(b)
-    if (diff !== 0) return diff
-    return a.localeCompare(b)
-  })
+    // Sort: std required -> *C: required -> C: recommended -> C: optional -> others
+    const sorted = [...colSet].sort((a, b) => {
+      const rank = (c) => {
+        if (c.startsWith('*') && !isAspectCol(c)) return 0
+        const u = strictestUsage[aspectMetaKey(c)]
+        if (isAspectCol(c) && u === 'REQUIRED') return 1
+        if (isAspectCol(c) && u === 'RECOMMENDED') return 2
+        if (isAspectCol(c)) return 3
+        return 1.5
+      }
+      const diff = rank(a) - rank(b)
+      if (diff !== 0) return diff
+      return a.localeCompare(b)
+    })
 
     allColumns.value = sorted
     previewRows.value = rows
@@ -743,15 +820,34 @@ const escapeHtml = (str) => {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-const buildAspectColumns = (row) => {
-  const cols = {}
-  if (row.aspectValues) {
-    for (const [name, val] of Object.entries(row.aspectValues)) {
-      if (val) cols[`C:${name}`] = val
+const getStrictestAspectUsage = (categoryMetaById) => {
+  const rank = { REQUIRED: 3, RECOMMENDED: 2, OPTIONAL: 1 }
+  const result = {}
+  for (const categoryMeta of Object.values(categoryMetaById)) {
+    for (const [col, usage] of Object.entries(categoryMeta)) {
+      if (!result[col] || rank[usage] > rank[result[col]]) {
+        result[col] = usage
+      }
     }
   }
-  if (!cols['C:Brand'] && row.brand) {
-    cols['C:Brand'] = row.brand
+  return result
+}
+
+const buildAspectColumns = (row, categoryMeta = null, strictestUsage = {}) => {
+  const cols = {}
+  const allowedAspects = categoryMeta ? new Set(Object.keys(categoryMeta).map((col) => col.replace(/^C:/, ''))) : null
+
+  if (row.aspectValues) {
+    for (const [name, val] of Object.entries(row.aspectValues)) {
+      if (val && (!allowedAspects || allowedAspects.has(name))) {
+        const metaKey = `C:${name}`
+        cols[getAspectHeader(name, strictestUsage[metaKey] || categoryMeta?.[metaKey])] = val
+      }
+    }
+  }
+  if (row.brand && (!allowedAspects || allowedAspects.has('Brand'))) {
+    const brandHeader = getAspectHeader('Brand', strictestUsage['C:Brand'] || categoryMeta?.['C:Brand'])
+    if (!cols[brandHeader]) cols[brandHeader] = row.brand
   }
   return cols
 }
@@ -824,8 +920,15 @@ const handleExport = async (force = false) => {
 
   const ws = xlsx.utils.json_to_sheet(exportRows, { header: allColumns.value })
   const csv = xlsx.utils.sheet_to_csv(ws)
+  const metadataCells = [
+    'Info',
+    'Version=1.0.0',
+    'Template=fx_category_template_EBAY_US',
+    ...Array(Math.max(allColumns.value.length - 3, 0)).fill('')
+  ]
+  const metadataLine = xlsx.utils.sheet_to_csv(xlsx.utils.aoa_to_sheet([metadataCells])).trimEnd()
   // eBay requires UTF-8 BOM for correct Unicode parsing
-  const csvWithBom = '\uFEFF' + csv
+  const csvWithBom = '\uFEFF' + metadataLine + '\n' + csv
   await window.api.file.write(exportPath, csvWithBom)
   toast.success('Export thành công!', {
     description: `${readyProducts.value.length} sản phẩm (${exportRows.length} dòng CSV).`,
@@ -975,11 +1078,15 @@ watch(readyProducts, buildPreview, { deep: true })
 .chip-req { background: hsl(0 80% 95%); border-color: hsl(0 75% 80%); color: hsl(0 75% 50%); }
 .chip-req .chip-icon { color: hsl(0 75% 50%); }
 
+.chip-cond { background: hsl(38 92% 95%); border-color: hsl(38 92% 75%); color: hsl(35 92% 35%); }
+
 .chip-rec { background: hsl(142 70% 95%); border-color: hsl(142 70% 80%); color: hsl(142 70% 35%); }
 .chip-rec .chip-icon { color: hsl(142 70% 45%); }
 
 .chip-opt { background: hsl(270 50% 95%); border-color: hsl(270 50% 80%); color: hsl(270 60% 40%); }
 .chip-opt .chip-icon { color: hsl(270 60% 40%); }
+
+.chip-mix { background: hsl(210 80% 96%); border-color: hsl(210 80% 75%); color: hsl(210 80% 35%); }
 
 /* ─── Column header usage badges ─────────────────────────────────────────── */
 .col-usage-badge {
@@ -994,8 +1101,10 @@ watch(readyProducts, buildPreview, { deep: true })
 }
 
 .badge-required { background: hsl(0 75% 55%); color: white; }
+.badge-conditional { background: hsl(38 92% 50%); color: white; }
 .badge-recommended { background: hsl(142 70% 45%); color: white; }
 .badge-optional { background: hsl(270 60% 50%); color: white; }
+.badge-mixed { background: hsl(210 80% 50%); color: white; }
 
 .col-multi-marker {
   font-size: 9px;

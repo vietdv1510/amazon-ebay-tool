@@ -20,7 +20,7 @@ export async function initBrowser(headless = true) {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-blink-features=AutomationControlled',
+        '--disable-blink-features=AutomationControlled'
       ]
     })
   }
@@ -54,10 +54,11 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
   const context = await b.newContext({
     viewport: { width: 1280, height: 900 },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     locale: 'en-US',
     extraHTTPHeaders: {
-      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Language': 'en-US,en;q=0.9'
     }
   })
 
@@ -65,7 +66,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
   await context.addCookies([
     { name: 'i18n-prefs', value: 'USD', domain: '.amazon.com', path: '/' },
     { name: 'lc-main', value: 'en_US', domain: '.amazon.com', path: '/' },
-    { name: 'sp-cdn', value: '"L5Z9:US"', domain: '.amazon.com', path: '/' },
+    { name: 'sp-cdn', value: '"L5Z9:US"', domain: '.amazon.com', path: '/' }
   ])
 
   const page = await context.newPage()
@@ -77,7 +78,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     progressCb(`[PROGRESS] Opening Amazon page...`)
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 35000 })
 
-    const waitMs = (delay * 1000) + Math.random() * 1000
+    const waitMs = delay * 1000 + Math.random() * 1000
     progressCb('[PROGRESS] Waiting for page to load...')
     await page.waitForTimeout(waitMs)
 
@@ -93,12 +94,17 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     const titleSelectorStr = titleSelectors.join(', ')
 
     // Increase timeout to 30s and log details
-    await page.waitForSelector(titleSelectorStr, {
-      state: 'attached',
-      timeout: 30000
-    }).catch((err) => {
-      console.log('[Crawler] ⚠️ Initial title selector not found within 30s. DOM might differ or page is loading slowly.', err.message)
-    })
+    await page
+      .waitForSelector(titleSelectorStr, {
+        state: 'attached',
+        timeout: 30000
+      })
+      .catch((err) => {
+        console.log(
+          '[Crawler] ⚠️ Initial title selector not found within 30s. DOM might differ or page is loading slowly.',
+          err.message
+        )
+      })
 
     // Wait 3-5s for JS to finish rendering
     await page.waitForTimeout(3000 + Math.random() * 2000)
@@ -107,21 +113,27 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     if (options.forceUSLocation !== false) {
       await trySetUSDelivery(page)
     }
-    
+
     progressCb('[PROGRESS] Extracting product data...')
 
     // ── Title ────────────────────────────────────────────────────────────
-    let html = await page.content()
+    let html = await getStablePageContent(page)
     let $ = cheerio.load(html)
 
     let title = ''
-    // Log: check each selector
+    // Log: check each selector sequentially to avoid excessive parallel calls
     console.log('[Crawler] 🔍 Searching for title using selectors:')
     for (const sel of titleSelectors) {
-      const count = await page.$$(sel).then(els => els.length).catch(() => 0)
-      if (count > 0) {
-        const t = $(sel).first().text().trim()
-        console.log(`  [DEBUG] selector "${sel}" has ${count} element(s), text="${t.substring(0, 50)}..."`)
+      try {
+        const count = await page.$$(sel)
+        if (count.length > 0) {
+          const t = $(sel).first().text().trim()
+          console.log(
+            `  [DEBUG] selector "${sel}" has ${count.length} element(s), text="${t.substring(0, 50)}..."`
+          )
+        }
+      } catch {
+        // Selector might be invalid, skip silently
       }
     }
 
@@ -138,7 +150,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     if (!title) {
       console.log('[Crawler] ⚠️ Cheerio failed to find title, trying Playwright $eval...')
       // Playwright evaluation fallback (sometimes cheerio misses dynamically inserted nodes)
-      title = await page.$eval(titleSelectorStr, el => el.textContent.trim()).catch(() => '')
+      title = await page.$eval(titleSelectorStr, (el) => el.textContent.trim()).catch(() => '')
       if (title) {
         console.log(`✅ [Crawler] Found title using Playwright $eval fallback`)
       }
@@ -154,7 +166,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
         let cleanTitle = pageTitle.replace(/^Amazon\.com\s*:\s*/i, '')
         // If it starts with "Amazon.com: ", it will be removed. If not, maybe it still has other colons.
         if (cleanTitle === pageTitle && pageTitle.includes(':')) {
-           cleanTitle = pageTitle.split(':').slice(1).join(':').trim()
+          cleanTitle = pageTitle.split(':').slice(1).join(':').trim()
         }
         title = cleanTitle.trim()
         if (title) {
@@ -175,23 +187,33 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       console.error(`  - titleSelectors tried: ${titleSelectors.join(', ')}`)
     }
 
-    if (!title && (html.toLowerCase().includes('captcha') || html.toLowerCase().includes('type the characters'))) {
+    if (
+      !title &&
+      (html.toLowerCase().includes('captcha') || html.toLowerCase().includes('type the characters'))
+    ) {
       throw new Error('Amazon Anti-Bot Captcha — please try again later or disable Headless Mode.')
     }
     if (!title) {
-      throw new Error('Product title not found. Page might be loading too slowly, blocked, or Amazon DOM has changed. Check logs for debug info.')
+      throw new Error(
+        'Product title not found. Page might be loading too slowly, blocked, or Amazon DOM has changed. Check logs for debug info.'
+      )
     }
 
     // Wait for other lazy-loaded sections before scraping them
+    // Include #twister for variation data
     await Promise.allSettled([
       page.waitForSelector('#feature-bullets', { timeout: 8000 }),
       page.waitForSelector('#availability', { timeout: 8000 }),
-      page.waitForSelector('#wayfinding-breadcrumbs_feature_div, #wayfinding-breadcrumbs_container', { timeout: 8000 }),
+      page.waitForSelector(
+        '#wayfinding-breadcrumbs_feature_div, #wayfinding-breadcrumbs_container',
+        { timeout: 8000 }
+      ),
       page.waitForSelector('.a-price .a-offscreen', { timeout: 8000 }),
+      page.waitForSelector('#twister, #variation_color_name, #variation_size_name', { timeout: 8000 })
     ])
 
     // Re-fetch HTML AFTER lazy sections loaded (captures JS-injected prices, variations)
-    html = await page.content()
+    html = await getStablePageContent(page)
     $ = cheerio.load(html)
 
     // ── Price ────────────────────────────────────────────────────────────
@@ -209,14 +231,17 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       '#centerCol #corePriceDisplay_desktop_feature_div .a-price .a-offscreen',
       '#priceblock_ourprice',
       '#priceblock_dealprice',
-      '#priceblock_saleprice',
+      '#priceblock_saleprice'
     ]
     for (const sel of priceSelectors) {
       const el = $(sel).first()
       const text = el.text().trim()
-      
+
       // Check if this element is inside a carousel/related section
-      const isRelated = el.closest('#HLCXComparisonWidget_feature_div, #sims-consolidated-2_feature_div, #sp_detail, #reco-similar-items, .as-title-block').length > 0
+      const isRelated =
+        el.closest(
+          '#HLCXComparisonWidget_feature_div, #sims-consolidated-2_feature_div, #sp_detail, #reco-similar-items, .as-title-block'
+        ).length > 0
       if (isRelated) {
         console.log(`[Crawler] Skipping price from related/sponsored section: ${sel}`)
         continue
@@ -237,7 +262,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       try {
         price = await page.evaluate(() => {
           // Scoped: only look inside the core price display area
-          const corePrice = document.querySelector('#corePrice_feature_div, #corePriceDisplay_desktop_feature_div, #apex_desktop')
+          const corePrice = document.querySelector(
+            '#corePrice_feature_div, #corePriceDisplay_desktop_feature_div, #apex_desktop'
+          )
           if (corePrice) {
             const offscreen = corePrice.querySelector('.a-price .a-offscreen')
             if (offscreen) {
@@ -246,7 +273,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
             }
           }
           // Fallback: apexPriceToPay (still scoped)
-          const apexEl = document.querySelector('.a-price.apexPriceToPay .a-offscreen, .a-price.priceToPay .a-offscreen')
+          const apexEl = document.querySelector(
+            '.a-price.apexPriceToPay .a-offscreen, .a-price.priceToPay .a-offscreen'
+          )
           if (apexEl) {
             const m = apexEl.textContent.trim().match(/\$([\d,]+\.?\d*)/)
             if (m) return parseFloat(m[1].replace(',', ''))
@@ -262,7 +291,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     // ⚠️ This can pick up prices from "Related Products" carousel, so only use as fallback
     if (!price || price === 0) {
       // Try to find priceAmount near the product's own ASIN to reduce false matches
-      const asinPriceMatch = html.match(new RegExp(`"${asin}"[\\s\\S]{0,500}"priceAmount"\\s*:\\s*([\\d.]+)`))
+      const asinPriceMatch = html.match(
+        new RegExp(`"${asin}"[\\s\\S]{0,500}"priceAmount"\\s*:\\s*([\\d.]+)`)
+      )
       if (asinPriceMatch) {
         const p = parseFloat(asinPriceMatch[1])
         if (p > 0) {
@@ -274,12 +305,16 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     if (!price || price === 0) {
       // Final fallback: look for priceAmount in core price display area only
       // Search in core price containers to avoid related product prices
-      const corePriceAreaMatch = html.match(/(corePrice|corePriceDisplay|apex_desktop|buybox)[\s\S]{0,300}"priceAmount"\s*:\s*([\d.]+)/)
+      const corePriceAreaMatch = html.match(
+        /(corePrice|corePriceDisplay|apex_desktop|buybox)[\s\S]{0,300}"priceAmount"\s*:\s*([\d.]+)/
+      )
       if (corePriceAreaMatch) {
         const p = parseFloat(corePriceAreaMatch[2])
         if (p > 0) {
           price = p
-          console.log(`[Crawler] Found price ${price} via core price area priceAmount (Strategy C fallback)`)
+          console.log(
+            `[Crawler] Found price ${price} via core price area priceAmount (Strategy C fallback)`
+          )
         }
       }
     }
@@ -301,7 +336,10 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     let priceRange = ''
     const rangeEl = $('#corePrice_feature_div .a-price-range')
     if (rangeEl.length) {
-      const prices = rangeEl.find('.a-offscreen').map((_, el) => $(el).text().trim()).get()
+      const prices = rangeEl
+        .find('.a-offscreen')
+        .map((_, el) => $(el).text().trim())
+        .get()
       if (prices.length >= 2) priceRange = `${prices[0]} - ${prices[1]}`
     }
 
@@ -312,7 +350,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     // Method 1: Parse from imageGalleryData or colorImages in JS
     const imgDataPatterns = [
       /"colorImages"\s*:\s*\{\s*"initial"\s*:\s*(\[[\s\S]*?\])\s*\}/,
-      /"imageGalleryData"\s*:\s*(\[[\s\S]*?\])\s*[,}]/,
+      /"imageGalleryData"\s*:\s*(\[[\s\S]*?\])\s*[,}]/
     ]
     for (const pat of imgDataPatterns) {
       if (images.length > 0) break
@@ -320,11 +358,14 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       if (m?.[1]) {
         try {
           const parsed = JSON.parse(m[1])
-          images = parsed
-            .map(i => i.hiRes || i.large || i.mainUrl || '')
-            .filter(Boolean)
+          images = parsed.map((i) => i.hiRes || i.large || i.mainUrl || '').filter(Boolean)
         } catch (err) {
-          console.debug('[Crawler] Image data parse failed for pattern:', pat, 'Error:', err.message)
+          console.debug(
+            '[Crawler] Image data parse failed for pattern:',
+            pat,
+            'Error:',
+            err.message
+          )
         }
       }
     }
@@ -333,7 +374,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     if (images.length === 0) {
       const allHiRes = [...html.matchAll(/"hiRes"\s*:\s*"(https:\/\/[^"]+)"/g)]
       if (allHiRes.length > 0) {
-        images = [...new Set(allHiRes.map(m => m[1]))]
+        images = [...new Set(allHiRes.map((m) => m[1]))]
       }
     }
 
@@ -342,13 +383,18 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       try {
         images = await page.$$eval(
           '#altImages .a-spacing-small img, #imageBlock img, .imageThumbnail img',
-          els => {
+          (els) => {
             const urls = []
             for (const el of els) {
               let src = el.src || el.getAttribute('data-old-hires') || ''
               // Convert thumbnail to full-size
               src = src.replace(/\._.*_\./, '.')
-              if (src && !src.includes('sprite') && !src.includes('grey-pixel') && !src.includes('play-icon')) {
+              if (
+                src &&
+                !src.includes('sprite') &&
+                !src.includes('grey-pixel') &&
+                !src.includes('play-icon')
+              ) {
                 urls.push(src)
               }
             }
@@ -362,14 +408,16 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
     // Method 4: Fallback to landing image
     if (images.length === 0) {
-      const mainImg = await page.$eval('#landingImage', el => {
-        return el.getAttribute('data-old-hires') || el.src || ''
-      }).catch(() => '')
+      const mainImg = await page
+        .$eval('#landingImage', (el) => {
+          return el.getAttribute('data-old-hires') || el.src || ''
+        })
+        .catch(() => '')
       if (mainImg) images.push(mainImg.replace(/\._.*_\./, '.'))
     }
 
     // Deduplicate & clean
-    images = [...new Set(images)].filter(url => url && url.startsWith('http'))
+    images = [...new Set(images)].filter((url) => url && url.startsWith('http'))
 
     // ── Brand ───────────────────────────────────────────────────────────
     let brand = ''
@@ -433,7 +481,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     }
 
     // ── Bullet Points ───────────────────────────────────────────────────
-    const bulletPoints = []
+    let bulletPoints = []
     $('#feature-bullets li span.a-list-item').each((_, el) => {
       const txt = $(el).text().trim()
       if (txt && txt.length > 5) bulletPoints.push(txt)
@@ -442,7 +490,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     // ── Description ─────────────────────────────────────────────────────
     let description = ''
     let descriptionHtml = ''
-    const descriptionImages = []
+    let descriptionImages = []
 
     const descEl = $('#productDescription')
     if (descEl.length) {
@@ -464,25 +512,34 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
         // Expanded selectors for A+ content and description images
         const aplusImgs = await page.$$eval(
           '#aplus-content img, #aplus img, #aplusProductDescription img, ' +
-          '.aplus-module img, [data-aplus-component] img, ' +
-          '#descriptionAndDetails img, #productDetails_table img, ' +
-          '.a-spacing-medium img, .a-section img',
-          els => els
-            .filter(img => {
-              const w = img.naturalWidth || img.width || 0
-              const h = img.naturalHeight || img.height || 0
-              // Filter out 1x1 placeholders and tiny icons
-              return (w > 10 && h > 10) || (!w && !h)
-            })
-            .map(img => {
-              let src = img.getAttribute('data-src') ||
-                        img.getAttribute('data-a-dynamic-image') ||
-                        img.getAttribute('src') || ''
-              // Convert to full resolution
-              src = src.replace(/\._.*_\./, '.')
-              return src
-            })
-            .filter(src => src && src.startsWith('http') && !src.includes('sprite') && !src.includes('grey-pixel'))
+            '.aplus-module img, [data-aplus-component] img, ' +
+            '#descriptionAndDetails img, #productDetails_table img, ' +
+            '.a-spacing-medium img, .a-section img',
+          (els) =>
+            els
+              .filter((img) => {
+                const w = img.naturalWidth || img.width || 0
+                const h = img.naturalHeight || img.height || 0
+                // Filter out 1x1 placeholders and tiny icons
+                return (w > 10 && h > 10) || (!w && !h)
+              })
+              .map((img) => {
+                let src =
+                  img.getAttribute('data-src') ||
+                  img.getAttribute('data-a-dynamic-image') ||
+                  img.getAttribute('src') ||
+                  ''
+                // Convert to full resolution
+                src = src.replace(/\._.*_\./, '.')
+                return src
+              })
+              .filter(
+                (src) =>
+                  src &&
+                  src.startsWith('http') &&
+                  !src.includes('sprite') &&
+                  !src.includes('grey-pixel')
+              )
         )
         for (const src of aplusImgs) {
           if (!descriptionImages.includes(src)) descriptionImages.push(src)
@@ -496,18 +553,32 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     progressCb('[PROGRESS] Fetching technical specifications...')
     const specs = {}
 
-    $('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr').each((_, el) => {
-      const key = $(el).find('th').text().trim()
-      const val = $(el).find('td').text().replace(/\s+/g, ' ').trim()
-      if (key && val) specs[key] = val
-    })
+    $('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr').each(
+      (_, el) => {
+        const key = $(el).find('th').text().trim()
+        const val = $(el).find('td').text().replace(/\s+/g, ' ').trim()
+        if (key && val) specs[key] = val
+      }
+    )
 
     $('#detailBullets_feature_div li, #detailBulletsWrapper_feature_div li').each((_, el) => {
       const spans = $(el).find('span span')
       if (spans.length >= 2) {
-        const key = $(spans[0]).text().replace(/[:\u200F\u200E\s]+/g, ' ').trim()
-        const val = $(spans[1]).text().replace(/[:\u200F\u200E\s]+/g, ' ').trim()
-        if (key && val && key.length < 60 && !key.includes('Customer Reviews') && !val.includes('P.when')) {
+        const key = $(spans[0])
+          .text()
+          .replace(/[:\u200F\u200E\s]+/g, ' ')
+          .trim()
+        const val = $(spans[1])
+          .text()
+          .replace(/[:\u200F\u200E\s]+/g, ' ')
+          .trim()
+        if (
+          key &&
+          val &&
+          key.length < 60 &&
+          !key.includes('Customer Reviews') &&
+          !val.includes('P.when')
+        ) {
           specs[key] = val
         }
       }
@@ -551,24 +622,28 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     const inStock = availabilityText.toLowerCase().includes('in stock')
 
     // ── Categories ──────────────────────────────────────────────────────
-    const categories = []
-    $('#wayfinding-breadcrumbs_feature_div li a, #wayfinding-breadcrumbs_container li a').each((_, el) => {
-      const cat = $(el).text().trim()
-      if (cat) categories.push(cat)
-    })
+    let categories = []
+    $('#wayfinding-breadcrumbs_feature_div li a, #wayfinding-breadcrumbs_container li a').each(
+      (_, el) => {
+        const cat = $(el).text().trim()
+        if (cat) categories.push(cat)
+      }
+    )
 
     // ── BSR ──────────────────────────────────────────────────────────────
     let bsr = ''
-    $('#productDetails_detailBullets_sections1 tr, #detailBulletsWrapper_feature_div li').each((_, el) => {
-      const text = $(el).text()
-      if (text.includes('Best Sellers Rank') || text.includes('Amazon Best Sellers Rank')) {
-        bsr = text.replace(/\s+/g, ' ').trim()
+    $('#productDetails_detailBullets_sections1 tr, #detailBulletsWrapper_feature_div li').each(
+      (_, el) => {
+        const text = $(el).text()
+        if (text.includes('Best Sellers Rank') || text.includes('Amazon Best Sellers Rank')) {
+          bsr = text.replace(/\s+/g, ' ').trim()
+        }
       }
-    })
+    )
 
     // ── Variations — FIXED: comprehensive parsing ───────────────────────
     progressCb('[PROGRESS] Analyzing product variations...')
-    const variations = await extractVariations($, html, page, price, progressCb, defaultQuantity)
+    let variations = await extractVariations($, html, page, price, progressCb, defaultQuantity)
 
     progressCb('[PROGRESS] ✓ Crawl completed!')
 
@@ -596,7 +671,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       images = []
     } else {
       // Filter out any invalid URLs that slipped through
-      images = images.filter(url => url && typeof url === 'string' && url.startsWith('http'))
+      images = images.filter((url) => url && typeof url === 'string' && url.startsWith('http'))
     }
 
     // ASIN format validation
@@ -631,14 +706,44 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       categories,
       bsr,
       inStock,
-      availability: availabilityText,
+      availability: availabilityText
     }
-
   } finally {
     await page.close().catch(() => {})
     await context.close().catch(() => {})
     activeCrawls.delete(asin)
   }
+}
+
+async function getStablePageContent(page, options = {}) {
+  const { attempts = 3, waitAfterNavigationMs = 750 } = options
+  let lastError = null
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
+      return await page.content()
+    } catch (err) {
+      lastError = err
+      const message = String(err?.message || err)
+      const isNavigating =
+        message.includes('page is navigating') ||
+        message.includes('changing the content') ||
+        message.includes('Execution context was destroyed')
+
+      if (!isNavigating || attempt === attempts) {
+        throw err
+      }
+
+      console.debug(
+        `[Crawler] page.content() hit navigation race; retrying ${attempt}/${attempts}...`
+      )
+      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
+      await page.waitForTimeout(waitAfterNavigationMs * attempt)
+    }
+  }
+
+  throw lastError
 }
 
 /**
@@ -648,12 +753,14 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 async function trySetUSDelivery(page) {
   try {
     console.log('[trySetUSDelivery] Hardening location to US (10001)...')
-    
+
     const result = await page.evaluate(async () => {
-      const wait = (ms) => new Promise(res => setTimeout(res, ms))
-      
+      const wait = (ms) => new Promise((res) => setTimeout(res, ms))
+
       // 1. Check current location
-      const locText = document.querySelector('#glow-ingress-block, #nav-global-location-popover-link')?.textContent || ''
+      const locText =
+        document.querySelector('#glow-ingress-block, #nav-global-location-popover-link')
+          ?.textContent || ''
       if (locText.includes('10001') || locText.includes('New York')) return 'ALREADY_US'
 
       // 2. Open popover
@@ -672,18 +779,22 @@ async function trySetUSDelivery(page) {
       await wait(500)
 
       // 4. Click Apply
-      const applyBtn = document.querySelector('#GLUXZipUpdate input[type="submit"], #GLUXZipUpdate .a-button-input')
+      const applyBtn = document.querySelector(
+        '#GLUXZipUpdate input[type="submit"], #GLUXZipUpdate .a-button-input'
+      )
       if (!applyBtn) return 'NO_APPLY'
       applyBtn.click()
       await wait(2000)
 
       // 5. Click Continue/Done
-      const continueBtn = document.querySelector('.a-popover-footer .a-button-primary .a-button-input, #GLUXConfirmClose .a-button-input, button[name="glowDoneButton"]')
+      const continueBtn = document.querySelector(
+        '.a-popover-footer .a-button-primary .a-button-input, #GLUXConfirmClose .a-button-input, button[name="glowDoneButton"]'
+      )
       if (continueBtn) {
         continueBtn.click()
         return 'SUCCESS_CONTINUE'
       }
-      
+
       return 'SUCCESS_ZIP_ONLY'
     })
 
@@ -691,12 +802,25 @@ async function trySetUSDelivery(page) {
 
     // Warning if location not properly set
     if (!result.startsWith('SUCCESS') && result !== 'ALREADY_US') {
-      console.warn(`[trySetUSDelivery] ⚠️ Location setting incomplete (${result}). Prices may be in local currency.`)
+      console.warn(
+        `[trySetUSDelivery] ⚠️ Location setting incomplete (${result}). Prices may be in local currency.`
+      )
     }
 
     if (result.startsWith('SUCCESS')) {
       await page.waitForTimeout(1000)
-      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
+      await page
+        .reload({ waitUntil: 'domcontentloaded' })
+        .catch((err) => {
+          const message = String(err?.message || err)
+          if (!message.includes('ERR_ABORTED') && !message.includes('frame was detached')) {
+            throw err
+          }
+          console.debug('[trySetUSDelivery] Reload skipped because Amazon was already navigating.')
+        })
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+      await page.waitForTimeout(500)
       console.log('[trySetUSDelivery] Reloaded page to apply location.')
     }
   } catch (err) {
@@ -716,7 +840,9 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
     const dimNamesMatch = html.match(/"dimensions"\s*:\s*(\[.*?\])/)
     let dimNames = []
     if (dimNamesMatch) {
-      try { dimNames = JSON.parse(dimNamesMatch[1]) } catch (err) {
+      try {
+        dimNames = JSON.parse(dimNamesMatch[1])
+      } catch (err) {
         console.debug('[extractVariations] Failed to parse dimensions:', err.message)
       }
     }
@@ -724,18 +850,27 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
     // ── Parse dimensionValuesDisplayData ────────────────────────────────
     // This maps ASIN → display values array
     let displayMap = {}
-    const dimDisplayMatch = html.match(/"dimensionValuesDisplayData"\s*:\s*(\{[\s\S]*?\})\s*,\s*"/)
+    // More flexible pattern - match until closing brace followed by optional whitespace and comma/end
+    const dimDisplayMatch = html.match(/"dimensionValuesDisplayData"\s*:\s*(\{[^}]*\})\s*(?:,|;|$)/)
     if (dimDisplayMatch) {
-      try { displayMap = JSON.parse(dimDisplayMatch[1]) } catch (err) {
-        console.debug('[extractVariations] Failed to parse dimensionValuesDisplayData:', err.message)
+      try {
+        displayMap = JSON.parse(dimDisplayMatch[1])
+      } catch (err) {
+        console.debug(
+          '[extractVariations] Failed to parse dimensionValuesDisplayData:',
+          err.message
+        )
       }
     }
 
     // ── Parse asinVariationValues ──────────────────────────────────────
     let asinMap = {}
-    const asinVarMatch = html.match(/"asin_variation_values"\s*:\s*(\{[\s\S]*?\})\s*,\s*"/)
+    // More flexible pattern
+    const asinVarMatch = html.match(/"asin_variation_values"\s*:\s*(\{[^}]*\})\s*(?:,|;|$)/)
     if (asinVarMatch) {
-      try { asinMap = JSON.parse(asinVarMatch[1]) } catch (err) {
+      try {
+        asinMap = JSON.parse(asinVarMatch[1])
+      } catch (err) {
         console.debug('[extractVariations] Failed to parse asin_variation_values:', err.message)
       }
     }
@@ -749,11 +884,13 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
       try {
         // Extract price data per ASIN from twister model
         const twisterContent = twisterMatch[1]
-        const allPrices = [...twisterContent.matchAll(/"([A-Z0-9]{10})"\s*:\s*\{[^}]*"priceAmount"\s*:\s*([\d.]+)/g)]
+        const allPrices = [
+          ...twisterContent.matchAll(/"([A-Z0-9]{10})"\s*:\s*\{[^}]*"priceAmount"\s*:\s*([\d.]+)/g)
+        ]
         for (const m of allPrices) {
           priceMap[m[1]] = parseFloat(m[2])
         }
-      } catch (_) {
+      } catch {
         console.log('[extractVariations] Twister price extraction failed')
       }
     }
@@ -761,13 +898,16 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
     // ── Parse variation image data ──────────────────────────────────────
     let imageMap = {}
     // colorImages maps dimension value → image array
-    const colorImgsMatch = html.match(/"colorImages"\s*:\s*(\{[\s\S]*?\})\s*,\s*"(?:colorToAsin|alwaysIncludeTwister|initial|heroImage|imageGalleryData|twisterModel)/)
+    // More flexible pattern - look for colorImages followed by any key
+    const colorImgsMatch = html.match(
+      /"colorImages"\s*:\s*(\{[^}]*\})\s*(?:,|;|$)/
+    )
     if (colorImgsMatch) {
       try {
         const colorData = JSON.parse(colorImgsMatch[1])
         for (const [key, imgs] of Object.entries(colorData)) {
           if (Array.isArray(imgs) && imgs.length > 0) {
-            imageMap[key] = (imgs[0].hiRes || imgs[0].large || '')
+            imageMap[key] = imgs[0].hiRes || imgs[0].large || ''
           }
         }
       } catch (err) {
@@ -777,9 +917,12 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
 
     // ── colorToAsin mapping ────────────────────────────────────────────
     let colorToAsin = {}
-    const c2aMatch = html.match(/"colorToAsin"\s*:\s*(\{[\s\S]*?\})\s*[,}]\s*"/)
+    // More flexible pattern
+    const c2aMatch = html.match(/"colorToAsin"\s*:\s*(\{[^}]*\})\s*(?:,|;|$)/)
     if (c2aMatch) {
-      try { colorToAsin = JSON.parse(c2aMatch[1]) } catch (err) {
+      try {
+        colorToAsin = JSON.parse(c2aMatch[1])
+      } catch (err) {
         console.debug('[extractVariations] colorToAsin parse failed:', err.message)
       }
     }
@@ -816,7 +959,7 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
         const attributes = {}
         dimNames.forEach((dimName, i) => {
           // Convert snake_case to readable: "flavor_name" → "Flavor Name"
-          const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
           attributes[readableName] = displayValues[i] || ''
         })
 
@@ -837,7 +980,7 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
           attributes,
           price: varPrice,
           quantity: defaultQuantity,
-          image: varImage,
+          image: varImage
         })
       }
     }
@@ -847,7 +990,7 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
       for (const [childAsin, dimValues] of Object.entries(asinMap)) {
         const attributes = {}
         dimNames.forEach((dimName, i) => {
-          const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
           const rawVal = Array.isArray(dimValues) ? dimValues[i] : ''
           attributes[readableName] = rawVal || ''
         })
@@ -857,7 +1000,7 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
           attributes,
           price: priceMap[childAsin] || basePrice,
           quantity: defaultQuantity,
-          image: '',
+          image: ''
         })
       }
     }
@@ -888,7 +1031,10 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
           await varPage.waitForTimeout(1500)
           // Wait for price to render
           await varPage.waitForSelector('.a-price .a-offscreen', { timeout: 5000 }).catch(() => {})
-          const vHtml = await varPage.content()
+          const vHtml = await getStablePageContent(varPage, {
+            attempts: 4,
+            waitAfterNavigationMs: 500
+          })
           const v$ = cheerio.load(vHtml)
 
           // Parse price — DOM selectors FIRST (scoped to core price area)
@@ -903,7 +1049,7 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
             '#priceblock_ourprice',
             '#priceblock_dealprice',
             '#corePrice_desktop .a-offscreen',
-            '#apex_offerDisplay_desktop .a-price .a-offscreen',
+            '#apex_offerDisplay_desktop .a-price .a-offscreen'
           ]
           for (const sel of varPriceSelectors) {
             const txt = v$(sel).first().text().trim()
@@ -918,7 +1064,9 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
           if (!variantPrice) {
             try {
               variantPrice = await varPage.evaluate(() => {
-                const core = document.querySelector('#corePrice_feature_div, #corePriceDisplay_desktop_feature_div')
+                const core = document.querySelector(
+                  '#corePrice_feature_div, #corePriceDisplay_desktop_feature_div'
+                )
                 if (core) {
                   const el = core.querySelector('.a-price .a-offscreen')
                   if (el) {
@@ -935,10 +1083,17 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
 
           // JSON regex last resort - strictly look for the current ASIN's price amount
           if (!variantPrice) {
-            const jsPriceMatches = [...vHtml.matchAll(new RegExp(`"${v.asin}"\\s*:\\s*\\{[^}]*"priceAmount"\\s*:\\s*([\\d.]+)`, 'g'))]
+            const jsPriceMatches = [
+              ...vHtml.matchAll(
+                new RegExp(`"${v.asin}"\\s*:\\s*\\{[^}]*"priceAmount"\\s*:\\s*([\\d.]+)`, 'g')
+              )
+            ]
             for (const m of jsPriceMatches) {
               const p = parseFloat(m[1])
-              if (p > 0) { variantPrice = p; break }
+              if (p > 0) {
+                variantPrice = p
+                break
+              }
             }
           }
 
@@ -948,34 +1103,45 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
 
           // Also grab the main image for this variant if missing
           if (!v.image) {
-            v.image = await varPage.$eval('#landingImage, #imgBlkFront, #main-image, .a-dynamic-image, #imgTagWrapperId img', el =>
-              (el.getAttribute('data-old-hires') || el.getAttribute('data-a-dynamic-image') || el.src || '').replace(/\._.*_\./, '.')
-            ).catch(() => '')
+            v.image = await varPage
+              .$eval(
+                '#landingImage, #imgBlkFront, #main-image, .a-dynamic-image, #imgTagWrapperId img',
+                (el) =>
+                  (
+                    el.getAttribute('data-old-hires') ||
+                    el.getAttribute('data-a-dynamic-image') ||
+                    el.src ||
+                    ''
+                  ).replace(/\._.*_\./, '.')
+              )
+              .catch(() => '')
 
             // Handle data-a-dynamic-image which is a JSON string of URLs
             if (v.image && v.image.startsWith('{')) {
-                try {
-                    const imgObj = JSON.parse(v.image)
-                    v.image = Object.keys(imgObj).sort((a,b) => imgObj[b][0] - imgObj[a][0])[0] // Get largest
-                } catch (err) {
-                  console.debug(`[variation ${v.asin}] data-a-dynamic-image parse failed:`, err.message)
-                }
+              try {
+                const imgObj = JSON.parse(v.image)
+                v.image = Object.keys(imgObj).sort((a, b) => imgObj[b][0] - imgObj[a][0])[0] // Get largest
+              } catch (err) {
+                console.debug(
+                  `[variation ${v.asin}] data-a-dynamic-image parse failed:`,
+                  err.message
+                )
+              }
             }
 
             if (!v.image) {
               const pat = /"colorImages"\s*:\s*\{\s*"initial"\s*:\s*(\[[\s\S]*?\])\s*\}/
               const m = vHtml.match(pat)
               if (m?.[1]) {
-                  try {
-                      const parsed = JSON.parse(m[1])
-                      v.image = parsed[0]?.hiRes || parsed[0]?.large || parsed[0]?.main || ''
-                  } catch (err) {
-                    console.debug(`[variation ${v.asin}] colorImages parse failed:`, err.message)
-                  }
+                try {
+                  const parsed = JSON.parse(m[1])
+                  v.image = parsed[0]?.hiRes || parsed[0]?.large || parsed[0]?.main || ''
+                } catch (err) {
+                  console.debug(`[variation ${v.asin}] colorImages parse failed:`, err.message)
+                }
               }
             }
           }
-
         } catch (err) {
           // Non-critical: keep basePrice
           console.log(`[variation ${v.asin}] price fetch failed:`, err.message?.substring(0, 60))
@@ -985,13 +1151,15 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
             try {
               await varPage.close()
             } catch (closeErr) {
-              console.log(`[variation ${v.asin}] error closing page:`, closeErr.message?.substring(0, 40))
+              console.log(
+                `[variation ${v.asin}] error closing page:`,
+                closeErr.message?.substring(0, 40)
+              )
             }
           }
         }
       }
     }
-
   } catch (err) {
     console.error('extractVariations error:', err)
   }
@@ -1008,24 +1176,24 @@ async function parseDOMVariations(page, dimNames, basePrice, defaultQuantity = 1
   const selects = await page.$$('#twister select')
   if (selects.length > 0) {
     for (const select of selects) {
-      const options = await select.$$eval('option', opts =>
+      const options = await select.$$eval('option', (opts) =>
         opts
-          .filter(o => o.value && o.value !== '-1' && o.value !== '0')
-          .map(o => ({
+          .filter((o) => o.value && o.value !== '-1' && o.value !== '0')
+          .map((o) => ({
             value: o.value,
             text: o.textContent.trim(),
-            asin: o.getAttribute('data-a-html-content') || '',
+            asin: o.getAttribute('data-a-html-content') || ''
           }))
       )
       const dimName = dimNames[0] || 'Option'
-      const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
       for (const opt of options) {
         variations.push({
           asin: opt.value.length === 10 ? opt.value : `opt_${variations.length}`,
           attributes: { [readableName]: opt.text },
           price: basePrice,
           quantity: defaultQuantity,
-          image: '',
+          image: ''
         })
       }
     }
@@ -1038,7 +1206,7 @@ async function parseDOMVariations(page, dimNames, basePrice, defaultQuantity = 1
     '#variation_size_name ul li[data-defaultasin]',
     '#variation_style_name ul li[data-defaultasin]',
     '#variation_flavor_name ul li[data-defaultasin]',
-    '#variation_pattern_name ul li[data-defaultasin]',
+    '#variation_pattern_name ul li[data-defaultasin]'
   ]
 
   for (let si = 0; si < swatchSelectors.length; si++) {
@@ -1047,16 +1215,19 @@ async function parseDOMVariations(page, dimNames, basePrice, defaultQuantity = 1
     if (items.length === 0) continue
 
     const dimName = dimNames[si] || `option_${si}`
-    const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    const readableName = dimName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
     for (const item of items) {
-      const data = await item.evaluate(el => ({
+      const data = await item.evaluate((el) => ({
         asin: el.getAttribute('data-defaultasin') || '',
-        title: el.getAttribute('title')?.replace(/^Click to select\s*/i, '') || el.querySelector('.a-size-base')?.textContent?.trim() || '',
+        title:
+          el.getAttribute('title')?.replace(/^Click to select\s*/i, '') ||
+          el.querySelector('.a-size-base')?.textContent?.trim() ||
+          '',
         img: (() => {
           const img = el.querySelector('img')
           return img ? (img.src || '').replace(/\._.*_\./, '.') : ''
-        })(),
+        })()
       }))
 
       if (data.asin || data.title) {
@@ -1065,7 +1236,7 @@ async function parseDOMVariations(page, dimNames, basePrice, defaultQuantity = 1
           attributes: { [readableName]: data.title },
           price: basePrice,
           quantity: defaultQuantity,
-          image: data.img,
+          image: data.img
         })
       }
     }
@@ -1097,17 +1268,44 @@ export function sanitizeHtmlForEbay(rawHtml) {
   if (!rawHtml) return ''
 
   const ALLOWED_TAGS = new Set([
-    'b', 'strong', 'i', 'em', 'u', 'br', 'p', 'span', 'div',
-    'ul', 'ol', 'li',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
-    'img', 'a',
+    'b',
+    'strong',
+    'i',
+    'em',
+    'u',
+    'br',
+    'p',
+    'span',
+    'div',
+    'ul',
+    'ol',
+    'li',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'table',
+    'thead',
+    'tbody',
+    'tfoot',
+    'tr',
+    'td',
+    'th',
+    'caption',
+    'colgroup',
+    'col',
+    'img',
+    'a'
   ])
 
   const $ = cheerio.load(rawHtml, { decodeEntities: false })
 
   // Remove entirely: script, style, iframe, form, input, button, svg, noscript
-  $('script, style, iframe, form, input, button, select, textarea, svg, noscript, object, embed').remove()
+  $(
+    'script, style, iframe, form, input, button, select, textarea, svg, noscript, object, embed'
+  ).remove()
 
   // Walk every element
   $('*').each((_, el) => {

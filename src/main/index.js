@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, webContents } from 'electron'
 app.name = 'eBay Engine'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -15,7 +15,6 @@ import {
 } from './ebay-api'
 import { fullSync } from './ebay-sync'
 import { getSyncStatus, closeDb, searchCategoriesOffline } from './ebay-db'
-import path from 'path'
 
 // ─── Settings store (JSON file) ───────────────────────────────────────────────
 const settingsPath = join(app.getPath('userData'), 'settings.json')
@@ -91,9 +90,20 @@ function saveSettings(settings) {
 
 // ─── Playwright Crawl Manager ────────────────────────────────────────────────
 
+function sendToWebContents(senderId, channel, payload) {
+  try {
+    const sender = webContents.fromId(senderId)
+    if (sender && !sender.isDestroyed()) {
+      sender.send(channel, payload)
+    }
+  } catch (err) {
+    console.warn(`[IPC] Failed to send ${channel}:`, err.message)
+  }
+}
+
 // ─── Window ───────────────────────────────────────────────────────────────────
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1000,
@@ -112,22 +122,22 @@ function createWindow() {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  win.on('ready-to-show', () => {
+    win.show()
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  win.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  return mainWindow
+  return win
 }
 
 // ─── App ready ────────────────────────────────────────────────────────────────
@@ -147,7 +157,9 @@ app.whenReady().then(() => {
   mainWindow = createWindow()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      mainWindow = createWindow()
+    }
   })
 })
 
@@ -168,7 +180,8 @@ ipcMain.handle('settings:save', (_, settings) => {
 
 // File dialog - open CSV/Excel
 ipcMain.handle('dialog:openFile', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow
+  const result = await dialog.showOpenDialog(win && !win.isDestroyed() ? win : undefined, {
     properties: ['openFile'],
     filters: [
       { name: 'Spreadsheet', extensions: ['csv', 'xlsx', 'xls'] },
@@ -181,7 +194,8 @@ ipcMain.handle('dialog:openFile', async () => {
 
 // File dialog - save
 ipcMain.handle('dialog:saveFile', async (_, opts = {}) => {
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow
+  const result = await dialog.showSaveDialog(win && !win.isDestroyed() ? win : undefined, {
     defaultPath: opts.defaultPath || 'ebay_export.csv',
     filters: [
       { name: 'CSV', extensions: ['csv'] },
@@ -204,16 +218,16 @@ ipcMain.handle('file:write', (_, filePath, content) => {
 })
 
 // Crawl single ASIN
-ipcMain.handle('crawl:asin', async (_, asin) => {
+ipcMain.handle('crawl:asin', async (event, asin) => {
   try {
     const settings = loadSettings()
+    const senderId = event.sender.id
     const progressCb = (msg) => {
-      if (msg && mainWindow) {
-        mainWindow.webContents.send('crawl-progress', {
-          asin,
-          message: msg.replace('[PROGRESS]', '').trim()
-        })
-      }
+      if (!msg) return
+      sendToWebContents(senderId, 'crawl-progress', {
+        asin,
+        message: String(msg).replace('[PROGRESS]', '').trim()
+      })
     }
     const data = await crawlAmazon(
       asin,
@@ -225,6 +239,10 @@ ipcMain.handle('crawl:asin', async (_, asin) => {
         forceUSLocation: settings.forceUSLocation !== false
       }
     )
+
+    if (!data) {
+      return { ok: false, error: 'Không lấy được dữ liệu từ Amazon' }
+    }
 
     // R2 CDN: always upload images after crawl if enabled
     if (settings.useR2Cdn && data.images?.length > 0) {
@@ -342,14 +360,14 @@ ipcMain.handle('ebay:clearCache', () => {
 // ─── eBay Data Sync ───────────────────────────────────────────────────────────
 
 // Sync all categories + aspects to SQLite
-ipcMain.handle('ebay:syncData', async () => {
+ipcMain.handle('ebay:syncData', async (event) => {
   try {
+    const senderId = event.sender.id
+    const progressCb = (progress) => {
+      sendToWebContents(senderId, 'ebay-sync-progress', progress)
+    }
     const settings = loadSettings()
-    const result = await fullSync(settings, (progress) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('ebay-sync-progress', progress)
-      }
-    })
+    const result = await fullSync(settings, progressCb)
     return result
   } catch (e) {
     return { ok: false, error: e.message }
@@ -367,47 +385,47 @@ ipcMain.handle('ebay:getSyncStatus', () => {
 
 // ─── AI Content Generation ────────────────────────────────────────────────────
 
-ipcMain.handle('ai:batchGenerate', async (_, products) => {
+ipcMain.handle('ai:batchGenerate', async (event, products) => {
   try {
+    const senderId = event.sender.id
     const settings = loadSettings()
     if (!settings.useGemini || !settings.geminiApiKey) {
       return { ok: false, error: 'Gemini AI chưa được bật hoặc thiếu API Key' }
     }
-    const results = await batchGenerate(products, settings, (asin, message, total, current) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('ai-gen-progress', { asin, message, total, current })
-      }
-    })
+    const progressCb = (asin, message, total, current) => {
+      sendToWebContents(senderId, 'ai-gen-progress', { asin, message, total, current })
+    }
+    const results = await batchGenerate(products, settings, progressCb)
     // Ensure results are plain serializable objects
     const safeResults = results.map(r => ({
       asin: r.asin,
       ok: !!r.ok,
-      title: r.title || null,
-      description: r.description || null,
-      error: r.error ? String(r.error) : null
+      title: r.title,
+      description: r.description,
+      features: r.features,
+      error: r.error
     }))
     return { ok: true, data: safeResults }
   } catch (e) {
-    return { ok: false, error: String(e?.message || e) }
+    return { ok: false, error: e.message }
   }
 })
 
 // ─── Cloudflare R2 CDN ────────────────────────────────────────────────────────
 
-ipcMain.handle('r2:uploadImages', async (_, { images, asin }) => {
+ipcMain.handle('r2:uploadImages', async (event, { images, asin }) => {
   try {
+    const senderId = event.sender.id
     const settings = loadSettings()
     if (!settings.useR2Cdn) {
       return { ok: false, error: 'R2 CDN chưa được bật' }
     }
     const cdnUrls = await uploadToR2(images, asin, settings, (msg) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('r2-upload-progress', { asin, message: msg })
-      }
+      sendToWebContents(senderId, 'r2-upload-progress', { asin, message: msg })
     })
     return { ok: true, data: cdnUrls }
   } catch (e) {
-    return { ok: false, error: String(e?.message || e) }
+    return { ok: false, error: e.message }
   }
 })
 

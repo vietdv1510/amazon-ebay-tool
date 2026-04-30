@@ -227,6 +227,9 @@ const hasDoneRows = computed(() => rowData.value.some(r => r.status === 'DONE'))
 const isAiGenerating = ref(false)
 const aiGenProgress = ref('✨ AI Gen')
 
+const isAiResultOk = (result) =>
+  result?.ok === true || result?.success === true || !!result?.title || !!result?.description
+
 const handleAiGen = async () => {
   const doneRows = rowData.value.filter(r => r.status === 'DONE')
   if (doneRows.length === 0) return
@@ -254,7 +257,7 @@ const handleAiGen = async () => {
       // Apply results to store
       for (const result of res.data) {
         const row = rowData.value.find(r => r.asin === result.asin)
-        if (row && result.ok) {
+        if (row && isAiResultOk(result)) {
           // Save originals for re-gen
           if (!row._originalTitle) row._originalTitle = row.title
           if (!row._originalDescription) row._originalDescription = row.description || row.descriptionHtml || ''
@@ -266,8 +269,14 @@ const handleAiGen = async () => {
           row._aiGenerated = true
         }
       }
-      const successCount = res.data.filter(r => r.ok).length
-      alert(`✨ AI Gen hoàn tất: ${successCount}/${doneRows.length} sản phẩm`)
+      const successCount = res.data.filter(isAiResultOk).length
+      const failed = res.data.filter(r => !isAiResultOk(r))
+      if (failed.length > 0) {
+        const firstError = failed[0]?.error ? `\n${failed[0].error}` : ''
+        alert(`Lỗi AI Gen ${failed.length}/${doneRows.length} sản phẩm${firstError}`)
+      } else {
+        alert(`✨ AI Gen hoàn tất: ${successCount}/${doneRows.length} sản phẩm`)
+      }
     } else {
       alert('Lỗi AI Gen: ' + res.error)
     }

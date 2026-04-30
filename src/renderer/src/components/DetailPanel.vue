@@ -429,6 +429,7 @@ const loadCategoryAspects = async (categoryId) => {
 const selectCategory = async (cat) => {
   form.ebayCategory = cat.categoryId
   form.ebayCategoryName = cat.categoryName
+  form.aspectValues = {}
   showCategorySearch.value = false
   await loadCategoryAspects(cat.categoryId)
 }
