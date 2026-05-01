@@ -233,7 +233,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import * as xlsx from 'xlsx'
+
 import { toast } from 'vue-sonner'
 import { globalRowData as rowData } from '../store'
 import { Button } from '@/components/ui/button'
@@ -347,6 +347,18 @@ const validationErrors = computed(() => {
     if (row['*Title'] && row['*Title'].length > 80) {
       errors[`${idx}-*Title`] = `*Title quá dài (${row['*Title'].length}/80)`
     }
+    // 2. Check business policies on parent/single rows
+    if (row._rowType === 'parent' || row._rowType === 'single') {
+      if (isValEmpty(row['ShippingProfileName'])) {
+        errors[`${idx}-ShippingProfileName`] = 'Thiếu Shipping Policy'
+      }
+      if (isValEmpty(row['ReturnProfileName'])) {
+        errors[`${idx}-ReturnProfileName`] = 'Thiếu Return Policy'
+      }
+      if (isValEmpty(row['PaymentProfileName'])) {
+        errors[`${idx}-PaymentProfileName`] = 'Thiếu Payment Policy'
+      }
+    }
   })
   return errors
 })
@@ -375,17 +387,17 @@ const colHeaderUsage = computed(() => {
 })
 
 const isAspectCol = (col) => col.startsWith('C:') || col.startsWith('*C:')
-const aspectMetaKey = (col) => col.replace(/^\*?C:/, 'C:')
+const aspectMetaKey = (col) => col.replace(/^\*C:/, 'C:')  // normalize *C:Brand → C:Brand for lookups
 const aspectNameFromCol = (col) => col.replace(/^\*?C:/, '')
-const getAspectHeader = (aspectName, usage) => `${usage === 'REQUIRED' ? '*C:' : 'C:'}${aspectName}`
+const getAspectHeader = (aspectName, usage) => usage === 'REQUIRED' ? `*C:${aspectName}` : `C:${aspectName}`
 
 // Header helpers
 const isRequiredCol = (col) => {
-  if (col.startsWith('*') && !isAspectCol(col)) return getColumnRequiredState(col) === 'REQUIRED'
-  return isAspectCol(col) && colHeaderUsage.value[aspectMetaKey(col)] === 'REQUIRED'
+  if (!isAspectCol(col)) return getColumnRequiredState(col) === 'REQUIRED'
+  return colHeaderUsage.value[aspectMetaKey(col)] === 'REQUIRED'
 }
 const isConditionalRequiredCol = (col) => {
-  if (col.startsWith('*') && !isAspectCol(col)) return getColumnRequiredState(col) === 'CONDITIONAL'
+  if (!isAspectCol(col)) return getColumnRequiredState(col) === 'CONDITIONAL'
   return false
 }
 const isRecommendedCol = (col) => {
@@ -478,13 +490,13 @@ const getCellUsageLabel = (row, col) => {
 }
 
 const isStandardCellRequired = (row, col) => {
-  if ((!col.startsWith('*') || isAspectCol(col)) && col !== 'Relationship' && col !== 'RelationshipDetails') return false
+  if (isAspectCol(col)) return false
   const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType] || []
   return requiredCols.includes(col)
 }
 
 const getColumnRequiredState = (col) => {
-  if ((!col.startsWith('*') || isAspectCol(col)) && col !== 'Relationship' && col !== 'RelationshipDetails') return 'OPTIONAL'
+  if (isAspectCol(col)) return 'OPTIONAL'
   const relevantRows = previewRows.value.filter((row) => col in row)
   if (relevantRows.length === 0) return 'OPTIONAL'
 
@@ -530,7 +542,7 @@ const cancelEdit = () => {
 }
 
 // Required columns in eBay File Exchange for item/listing rows.
-const ACTION_HEADER = '*Action(SiteID=US|Country=Thailand|Currency=USD|Version=1193|CC=UTF-8)'
+const ACTION_HEADER = '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)'
 const ALWAYS_REQUIRED_COLUMNS = [
   ACTION_HEADER,
   '*Category',
@@ -546,7 +558,7 @@ const ALWAYS_REQUIRED_COLUMNS = [
 
 const ROW_REQUIRED_COLUMNS = {
   parent: [...ALWAYS_REQUIRED_COLUMNS, 'RelationshipDetails'],
-  child: ['Relationship', 'RelationshipDetails', '*Quantity', '*StartPrice'],
+  child: ['Relationship', 'RelationshipDetails', '*Quantity', '*StartPrice', 'CustomLabel'],
   single: [...ALWAYS_REQUIRED_COLUMNS, '*StartPrice', '*Quantity']
 }
 
@@ -558,9 +570,10 @@ const isValEmpty = (val) => val == null || String(val).trim() === ''
 
 const isCellMissingRequired = (row, col) => {
   const empty = isValEmpty(row[col])
-  // Standard fixed required columns
-  if ((col.startsWith('*') && !isAspectCol(col)) || col === 'Relationship' || col === 'RelationshipDetails') {
-    return isStandardCellRequired(row, col) && empty
+  // Standard fixed required columns (includes *, Relationship*, CustomLabel, etc.)
+  const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType] || []
+  if (requiredCols.includes(col)) {
+    return empty
   }
   // C: aspects — required only if THIS row's category marks it REQUIRED
   if (isAspectCol(col)) {
@@ -649,25 +662,36 @@ const buildPreview = async () => {
           _rowType: 'parent',
           _ebayCategory: r.ebayCategory || '',
           [ACTION_HEADER]: 'Add',
+          'CustomLabel': r.asin,
           '*Category': r.ebayCategory || '',
+          'StoreCategory': '',
           '*Title': cleanTitle(r.title),
-          '*Description': description,
+          'Subtitle': '',
+          'Relationship': '',
+          'RelationshipDetails': parentRelDetails,
+          'ScheduleTime': '',
           '*ConditionID': props.settings.defaultCondition || '1000',
+          ...aspectCols,
           'PicURL': (r.images || []).slice(0, 12).join('|'),
-          '*Quantity': '',
+          'GalleryType': '',
+          'VideoID': '',
+          '*Description': description,
           '*Format': props.settings.defaultFormat || 'FixedPrice',
-          '*StartPrice': '',
           '*Duration': props.settings.defaultDuration || 'GTC',
+          '*StartPrice': '',
+          'BuyItNowPrice': '',
+          'BestOfferEnabled': '',
+          '*Quantity': '',
+          'ImmediatePayRequired': '',
           '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
           '*DispatchTimeMax': props.settings.dispatchTimeMax || '2',
           '*ReturnsAcceptedOption': 'ReturnsAccepted',
-          'CustomLabel': r.asin,
-          'Relationship': '',
-          'RelationshipDetails': parentRelDetails,
+          'ReturnsWithinOption': props.settings.returnsWithinOption || 'Days_30',
+          'RefundOption': props.settings.refundOption || 'MoneyBack',
+          'ShippingCostPaidByOption': props.settings.shippingCostPaidBy || 'Buyer',
           'ShippingProfileName': props.settings.shippingProfileName || '',
           'ReturnProfileName': props.settings.returnProfileName || '',
           'PaymentProfileName': props.settings.paymentProfileName || '',
-          ...aspectCols,
         })
 
         // Child rows
@@ -679,21 +703,32 @@ const buildPreview = async () => {
             _rowType: 'child',
             _ebayCategory: r.ebayCategory || '',
             [ACTION_HEADER]: '',
+            'CustomLabel': v.asin || '',
             '*Category': '',
+            'StoreCategory': '',
             '*Title': '',
-            '*Description': '',
+            'Subtitle': '',
+            'Relationship': 'Variation',
+            'RelationshipDetails': childRelDetails,
+            'ScheduleTime': '',
             '*ConditionID': '',
             'PicURL': v.image || '',
-            '*Quantity': props.settings.defaultQuantity || v.quantity || 10,
+            'GalleryType': '',
+            'VideoID': '',
+            '*Description': '',
             '*Format': '',
-            '*StartPrice': v.price || r.sellPrice,
             '*Duration': '',
+            '*StartPrice': v.price != null && v.price > 0 ? v.price : r.sellPrice,
+            'BuyItNowPrice': '',
+            'BestOfferEnabled': '',
+            '*Quantity': props.settings.defaultQuantity || v.quantity || 10,
+            'ImmediatePayRequired': '',
             '*Location': '',
             '*DispatchTimeMax': '',
             '*ReturnsAcceptedOption': '',
-            'CustomLabel': v.asin || '',
-            'Relationship': 'Variation',
-            'RelationshipDetails': childRelDetails,
+            'ReturnsWithinOption': '',
+            'RefundOption': '',
+            'ShippingCostPaidByOption': '',
             'ShippingProfileName': '',
             'ReturnProfileName': '',
             'PaymentProfileName': '',
@@ -705,25 +740,36 @@ const buildPreview = async () => {
           _rowType: 'single',
           _ebayCategory: r.ebayCategory || '',
           [ACTION_HEADER]: 'Add',
+          'CustomLabel': r.asin,
           '*Category': r.ebayCategory || '',
+          'StoreCategory': '',
           '*Title': cleanTitle(r.title),
-          '*Description': description,
+          'Subtitle': '',
+          'Relationship': '',
+          'RelationshipDetails': '',
+          'ScheduleTime': '',
           '*ConditionID': props.settings.defaultCondition || '1000',
+          ...aspectCols,
           'PicURL': (r.images || []).slice(0, 12).join('|'),
-          '*Quantity': props.settings.defaultQuantity || 10,
+          'GalleryType': '',
+          'VideoID': '',
+          '*Description': description,
           '*Format': props.settings.defaultFormat || 'FixedPrice',
-          '*StartPrice': r.sellPrice,
           '*Duration': props.settings.defaultDuration || 'GTC',
+          '*StartPrice': r.sellPrice,
+          'BuyItNowPrice': '',
+          'BestOfferEnabled': '',
+          '*Quantity': props.settings.defaultQuantity || 10,
+          'ImmediatePayRequired': '',
           '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
           '*DispatchTimeMax': props.settings.dispatchTimeMax || '2',
           '*ReturnsAcceptedOption': 'ReturnsAccepted',
-          'CustomLabel': r.asin,
-          'Relationship': '',
-          'RelationshipDetails': '',
+          'ReturnsWithinOption': props.settings.returnsWithinOption || 'Days_30',
+          'RefundOption': props.settings.refundOption || 'MoneyBack',
+          'ShippingCostPaidByOption': props.settings.shippingCostPaidBy || 'Buyer',
           'ShippingProfileName': props.settings.shippingProfileName || '',
           'ReturnProfileName': props.settings.returnProfileName || '',
           'PaymentProfileName': props.settings.paymentProfileName || '',
-          ...aspectCols,
         })
       }
     }
@@ -778,35 +824,35 @@ const refreshPreview = async () => {
 
 const buildDescription = (row) => {
   const parts = []
-  parts.push('<div style="max-width:800px;margin:0 auto;font-family:Arial,sans-serif">')
+  parts.push('<div style=\'max-width:800px;margin:0 auto;font-family:Arial,sans-serif\'>')
 
   if (row.bulletPoints?.length > 0) {
-    parts.push('<h3 style="margin-bottom:8px">Product Features</h3>')
-    parts.push('<ul style="padding-left:18px">')
+    parts.push('<h3 style=\'margin-bottom:8px\'>Product Features</h3>')
+    parts.push('<ul style=\'padding-left:18px\'>')
     row.bulletPoints.forEach(bp => {
-      parts.push(`<li style="margin-bottom:4px">${escapeHtml(bp)}</li>`)
+      parts.push(`<li style='margin-bottom:4px'>${escapeHtml(bp)}</li>`)
     })
     parts.push('</ul>')
   }
 
   if (row.images?.length > 0) {
-    parts.push('<div style="margin:16px 0">')
+    parts.push('<div style=\'margin:16px 0\'>')
     row.images.slice(0, 5).forEach(img => {
-      parts.push(`<img src="${img}" style="max-width:700px;width:100%;display:block;margin:8px 0" />`)
+      parts.push(`<img src='${img}' style='max-width:700px;width:100%;display:block;margin:8px 0' />`)
     })
     parts.push('</div>')
   }
 
   if (row.description) {
-    parts.push(`<p style="margin-top:12px">${escapeHtml(row.description.substring(0, 2000))}</p>`)
+    parts.push(`<p style='margin-top:12px'>${escapeHtml(row.description.substring(0, 2000))}</p>`)
   }
 
   if (row.specs && Object.keys(row.specs).length > 0) {
-    parts.push('<h3 style="margin-top:16px;margin-bottom:8px">Specifications</h3>')
-    parts.push('<table style="border-collapse:collapse;width:100%">')
+    parts.push('<h3 style=\'margin-top:16px;margin-bottom:8px\'>Specifications</h3>')
+    parts.push('<table style=\'border-collapse:collapse;width:100%\'>')
     for (const [key, val] of Object.entries(row.specs)) {
-      parts.push(`<tr><td style="border:1px solid #ddd;padding:6px 10px;font-weight:bold;width:35%">${escapeHtml(key)}</td>`)
-      parts.push(`<td style="border:1px solid #ddd;padding:6px 10px">${escapeHtml(val)}</td></tr>`)
+      parts.push(`<tr><td style='border:1px solid #ddd;padding:6px 10px;font-weight:bold;width:35%'>${escapeHtml(key)}</td>`)
+      parts.push(`<td style='border:1px solid #ddd;padding:6px 10px'>${escapeHtml(val)}</td></tr>`)
     }
     parts.push('</table>')
   }
@@ -835,7 +881,7 @@ const getStrictestAspectUsage = (categoryMetaById) => {
 
 const buildAspectColumns = (row, categoryMeta = null, strictestUsage = {}) => {
   const cols = {}
-  const allowedAspects = categoryMeta ? new Set(Object.keys(categoryMeta).map((col) => col.replace(/^C:/, ''))) : null
+  const allowedAspects = categoryMeta ? new Set(Object.keys(categoryMeta).map((col) => col.replace(/^\*?C:/, ''))) : null
 
   if (row.aspectValues) {
     for (const [name, val] of Object.entries(row.aspectValues)) {
@@ -861,7 +907,7 @@ const buildParentRelationshipDetails = (variations) => {
     }
   }
   return Object.entries(dimValues)
-    .map(([key, vals]) => `${key}=${[...vals].join(';')}`)
+    .map(([key, vals]) => `${key}=${[...vals].join(',')}`)
     .join('|')
 }
 
@@ -870,11 +916,14 @@ const buildParentRelationshipDetails = (variations) => {
  */
 const cleanTitle = (title) => {
   if (!title) return ''
-  return title
+  let cleaned = title
     .replace(/[\u{1F600}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // strip emoji
     .replace(/[【】「」『』]/g, ' ')  // CJK brackets → space
     .replace(/\s+/g, ' ')
     .trim()
+  // eBay enforces 80-char title limit
+  if (cleaned.length > 80) cleaned = cleaned.substring(0, 80).trim()
+  return cleaned
 }
 
 // ─── Export (reuses preview data) ─────────────────────────────────────────────
@@ -918,18 +967,35 @@ const handleExport = async (force = false) => {
     return clean
   })
 
-  const ws = xlsx.utils.json_to_sheet(exportRows, { header: allColumns.value })
-  const csv = xlsx.utils.sheet_to_csv(ws)
-  const metadataCells = [
-    'Info',
-    'Version=1.0.0',
-    'Template=fx_category_template_EBAY_US',
-    ...Array(Math.max(allColumns.value.length - 3, 0)).fill('')
-  ]
-  const metadataLine = xlsx.utils.sheet_to_csv(xlsx.utils.aoa_to_sheet([metadataCells])).trimEnd()
-  // eBay requires UTF-8 BOM for correct Unicode parsing
-  const csvWithBom = '\uFEFF' + metadataLine + '\n' + csv
-  await window.api.file.write(exportPath, csvWithBom)
+  // Build CSV manually — eBay's parser struggles with RFC 4180 "" escaping
+  const headers = allColumns.value
+  const csvEscape = (val) => {
+    if (val == null) return ''
+    let s = String(val)
+    // Replace any remaining double quotes with single quotes (safety net)
+    s = s.replace(/"/g, "'")
+    // Quote the field if it contains comma, newline, or single quote
+    if (s.includes(',') || s.includes('\n') || s.includes('\r')) {
+      return `"${s}"`
+    }
+    return s
+  }
+
+  const csvLines = []
+  // Metadata line (eBay requires this as first row)
+  const metaCells = ['Info', 'Version=1.0.0', 'Template=fx_category_template_EBAY_US']
+  while (metaCells.length < headers.length) metaCells.push('')
+  csvLines.push(metaCells.join(','))
+  // Header line
+  csvLines.push(headers.join(','))
+  // Data rows
+  for (const row of exportRows) {
+    const cells = headers.map(h => csvEscape(row[h]))
+    csvLines.push(cells.join(','))
+  }
+
+  const csvContent = '\uFEFF' + csvLines.join('\r\n') + '\r\n'
+  await window.api.file.write(exportPath, csvContent)
   toast.success('Export thành công!', {
     description: `${readyProducts.value.length} sản phẩm (${exportRows.length} dòng CSV).`,
     duration: 3000
