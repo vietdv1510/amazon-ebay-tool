@@ -40,10 +40,10 @@
           <ListOrdered class="w-4 h-4 flex-shrink-0" :class="{ 'mr-2': !sidebarCollapsed }" />
           <span v-if="!sidebarCollapsed">Amazon Crawler</span>
           <Badge
-            v-if="stats.pending > 0 && !sidebarCollapsed"
+            v-if="crawlerBadge > 0 && !sidebarCollapsed"
             variant="outline"
             class="ml-auto bg-background/50 border-border/50 text-[10px] px-1.5 h-4"
-            >{{ stats.pending }}</Badge
+            >{{ crawlerBadge }}</Badge
           >
         </Button>
 
@@ -57,10 +57,10 @@
           <LayoutDashboard class="w-4 h-4 flex-shrink-0" :class="{ 'mr-2': !sidebarCollapsed }" />
           <span v-if="!sidebarCollapsed">Data Processing</span>
           <Badge
-            v-if="stats.total > 0 && !sidebarCollapsed"
+            v-if="workspaceBadge > 0 && !sidebarCollapsed"
             variant="outline"
             class="ml-auto bg-background/50 border-border/50 text-[10px] px-1.5 h-4"
-            >{{ stats.total }}</Badge
+            >{{ workspaceBadge }}</Badge
           >
         </Button>
 
@@ -144,7 +144,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Workspace from './components/Workspace.vue'
 import ExportPreview from './components/ExportPreview.vue'
 import Queue from './components/Queue.vue'
@@ -160,12 +160,23 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-vue-next'
+import { globalRowData as rowData } from './store'
 
 const currentPage = ref('queue')
 const sidebarCollapsed = ref(false)
 const platform = ref(window.electron?.process?.platform || 'win32')
 
 const stats = ref({ total: 0, pending: 0, done: 0, error: 0 })
+
+// ── Badges computed trực tiếp từ store (không phụ thuộc vào tab đang active) ──
+// Amazon Crawler: số item chưa xử lý xong (PENDING + ERROR)
+const crawlerBadge = computed(() =>
+  rowData.value.filter(r => r.status === 'PENDING' || r.status === 'ERROR').length
+)
+// Data Processing: tổng sản phẩm đã crawl xong
+const workspaceBadge = computed(() =>
+  rowData.value.filter(r => r.status === 'DONE').length
+)
 
 const settings = ref({
   priceMultiplier: 1.5,

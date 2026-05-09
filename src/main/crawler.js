@@ -8,6 +8,41 @@ let browser = null
 let currentHeadless = true
 const activeCrawls = new Map()
 
+// ── Retry helpers ────────────────────────────────────────────────────────────
+
+const delay = (ms) => new Promise((res) => setTimeout(res, ms))
+
+/**
+ * Classify whether a crawl error is worth retrying.
+ * CAPTCHA, invalid ASIN, DOM structural changes → not retryable.
+ * Network timeouts, Amazon throttle, page crash → retryable.
+ */
+function isRetryableError(err) {
+  const msg = String(err?.message || err).toLowerCase()
+  // Non-retryable signals
+  if (
+    msg.includes('captcha') ||
+    msg.includes('type the characters') ||
+    msg.includes('invalid asin') ||
+    msg.includes('amazon dom has changed')
+  ) {
+    return false
+  }
+  // Retryable signals
+  return (
+    msg.includes('timeout') ||
+    msg.includes('net::err') ||
+    msg.includes('navigation failed') ||
+    msg.includes('target closed') ||
+    msg.includes('socket') ||
+    msg.includes('loading too slowly') ||
+    msg.includes('blocked') ||
+    msg.includes('http 503') ||
+    msg.includes('http 429') ||
+    msg.includes('http 403')
+  )
+}
+
 export async function initBrowser(headless = true) {
   if (browser && currentHeadless !== headless) {
     await closeBrowser()
@@ -48,8 +83,41 @@ export async function closeBrowser() {
   }
 }
 
+/**
+ * Retry wrapper for crawlAmazon.
+ * Retries up to MAX_RETRIES times with exponential backoff on transient errors.
+ * Backoff: attempt 1→5s, attempt 2→15s, attempt 3→45s (+ up to 2s jitter).
+ */
+export async function crawlAmazonWithRetry(asin, progressCb, options = {}) {
+  const MAX_RETRIES = options.maxRetries ?? 3
+  const BASE_DELAY_MS = options.baseRetryDelayMs ?? 5000
+
+  let lastError
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await crawlAmazon(asin, progressCb, options)
+    } catch (err) {
+      lastError = err
+      const retryable = isRetryableError(err)
+      if (!retryable || attempt === MAX_RETRIES) {
+        console.error(`[Crawler] ❌ crawlAmazon failed (attempt ${attempt}/${MAX_RETRIES}, not retrying):`, err.message)
+        throw err
+      }
+      const waitMs = BASE_DELAY_MS * Math.pow(3, attempt - 1) + Math.random() * 2000
+      console.warn(
+        `[Crawler] ⚠️ crawlAmazon attempt ${attempt}/${MAX_RETRIES} failed: ${err.message?.substring(0, 80)}. Retrying in ${(waitMs / 1000).toFixed(1)}s...`
+      )
+      progressCb(
+        `[RETRY] Lần thử ${attempt}/${MAX_RETRIES} thất bại. Thử lại sau ${(waitMs / 1000).toFixed(1)}s...`
+      )
+      await delay(waitMs)
+    }
+  }
+  throw lastError
+}
+
 export async function crawlAmazon(asin, progressCb, options = {}) {
-  const { headless = true, delay = 2, defaultQuantity = 10 } = options
+  const { headless = true, delay: crawlDelay = 2, defaultQuantity = 10 } = options
   const b = await initBrowser(headless)
 
   const context = await b.newContext({
@@ -75,10 +143,29 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
   try {
     const url = `https://www.amazon.com/dp/${asin}`
-    progressCb(`[PROGRESS] Opening Amazon page...`)
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 35000 })
 
-    const waitMs = delay * 1000 + Math.random() * 1000
+    // ── HTTP response guard: detect Amazon blocks before parsing ─────────
+    let httpBlockError = null
+    page.on('response', (res) => {
+      try {
+        const resUrl = res.url()
+        const status = res.status()
+        if (
+          resUrl.includes('amazon.com/dp/') &&
+          [503, 429, 403].includes(status)
+        ) {
+          httpBlockError = new Error(`Amazon blocked request: HTTP ${status}`)
+          console.error(`[Crawler] 🚫 HTTP ${status} detected on ${resUrl}`)
+        }
+      } catch { /* ignore listener errors */ }
+    })
+
+    progressCb(`[PROGRESS] Opening Amazon page...`)
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 40000 })
+
+    if (httpBlockError) throw httpBlockError
+
+    const waitMs = crawlDelay * 1000 + Math.random() * 1000
     progressCb('[PROGRESS] Waiting for page to load...')
     await page.waitForTimeout(waitMs)
 

@@ -111,7 +111,7 @@
 
         <Separator />
 
-        <!-- Section: eBay -->
+        <!-- [HIDDEN] Section: eBay API + Đồng bộ dữ liệu — tạm ẩn
         <div class="space-y-4">
           <div
             class="flex items-center gap-2 text-sm font-semibold tracking-tight uppercase text-muted-foreground"
@@ -159,7 +159,6 @@
             </SwitchRoot>
           </div>
 
-          <!-- eBay Data Sync -->
           <div class="pt-4 space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex flex-col space-y-1">
@@ -183,7 +182,6 @@
               </Button>
             </div>
 
-            <!-- Progress bar -->
             <div v-if="syncing" class="space-y-1">
               <div class="h-2 rounded-full bg-muted overflow-hidden">
                 <div
@@ -194,7 +192,6 @@
               <p class="text-xs text-muted-foreground">{{ syncProgress.message }}</p>
             </div>
 
-            <!-- Sync status -->
             <div
               v-if="syncStatus"
               class="text-xs text-muted-foreground space-y-0.5 p-3 rounded-md bg-muted/50"
@@ -221,6 +218,9 @@
             </div>
           </div>
         </div>
+
+        <Separator />
+        -->
 
         <Separator />
 

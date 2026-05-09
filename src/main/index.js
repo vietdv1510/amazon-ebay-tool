@@ -4,7 +4,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs'
-import { crawlAmazon, cancelCrawl, closeBrowser } from './crawler'
+import { crawlAmazon, crawlAmazonWithRetry, cancelCrawl, closeBrowser } from './crawler'
 import { batchGenerate } from './ai-gen'
 import { uploadToR2, testR2Connection, resetR2Client } from './r2-uploader'
 import {
@@ -118,7 +118,8 @@ function createWindow() {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webSecurity: false
     }
   })
 
@@ -229,14 +230,16 @@ ipcMain.handle('crawl:asin', async (event, asin) => {
         message: String(msg).replace('[PROGRESS]', '').trim()
       })
     }
-    const data = await crawlAmazon(
+    const data = await crawlAmazonWithRetry(
       asin,
       progressCb,
       {
         headless: settings.headlessMode === true,
         delay: settings.crawlDelay ?? 2,
         defaultQuantity: settings.defaultQuantity || 10,
-        forceUSLocation: settings.forceUSLocation !== false
+        forceUSLocation: settings.forceUSLocation !== false,
+        maxRetries: settings.crawlRetry ?? 3,
+        baseRetryDelayMs: 5000
       }
     )
 
