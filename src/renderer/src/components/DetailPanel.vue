@@ -434,9 +434,29 @@ const selectCategory = async (cat) => {
   await loadCategoryAspects(cat.categoryId)
 }
 
+const autoSelectCategory = async () => {
+  if (form.ebayCategory) return // Already has category
+  if (!props.row.title?.trim()) return // No title to search with
+  try {
+    catSearching.value = true
+    const res = await window.api.ebay.categorySuggestions(
+      (props.row.title || '').substring(0, 150)
+    )
+    if (res.ok && res.data?.length > 0) {
+      await selectCategory(res.data[0]) // Auto-select first (highest relevancy)
+    }
+  } catch (err) {
+    console.warn('[AutoCategory] Failed:', err.message)
+  } finally {
+    catSearching.value = false
+  }
+}
+
 onMounted(async () => {
   if (form.ebayCategory) {
     await loadCategoryAspects(form.ebayCategory)
+  } else {
+    await autoSelectCategory()
   }
 })
 

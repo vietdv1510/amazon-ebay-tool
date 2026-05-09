@@ -451,12 +451,79 @@ const crawlItem = async (row) => {
         log: `✓ Hoàn tất — ${(p.images || []).length} ảnh, ${(p.variations || []).length} biến thể`,
       }
       updateRow(doneRow)
+      // Auto-select eBay category sau khi crawl xong (fire & forget)
+      autoSelectCategory(doneRow)
     } else {
       throw new Error(response.error)
     }
   } catch (err) {
     updateRow({ ...row, status: 'ERROR', log: err.message || 'Lỗi crawler' })
   }
+}
+
+// Tự động gợi ý và chọn category đầu tiên sau khi crawl DONE
+const autoSelectCategory = async (doneRow) => {
+  if (!doneRow.title?.trim()) return
+  try {
+    // Offline SQLite dùng LIKE match theo từng term → cần rút gọn query
+    // thay vì gửi full title (dễ bị AND-miss với 8+ terms)
+    const query = buildCategoryQuery(doneRow)
+    const res = await window.api.ebay.categorySuggestions(query)
+    if (res.ok && res.data?.length > 0) {
+      const cat = res.data[0]
+      const current = rowData.value.find(r => r.id === doneRow.id)
+      if (current && !current.ebayCategory) {
+        updateRow({
+          ...current,
+          ebayCategory: cat.categoryId,
+          ebayCategoryName: cat.categoryName,
+          log: `✓ Hoàn tất — ${cat.categoryName} (ID: ${cat.categoryId})`,
+        })
+      }
+    }
+  } catch (err) {
+    console.warn('[AutoCategory]', doneRow.asin, err.message)
+  }
+}
+
+// Trích xuất keyword từ title để search offline SQLite
+// Offline DB chỉ match theo categoryName → cần dùng noun phổ thông, KHÔNG dùng brand
+// Ví dụ: "REACH Ultraclean Flosser Refill..." → "Flosser Refill" (bỏ brand REACH)
+const buildCategoryQuery = (row) => {
+  // Ưu tiên 1: Amazon breadcrumb — chính xác nhất, map thẳng vào category tree eBay
+  // categories = ['Health', 'Oral Care', 'Dental Floss']
+  if (row.categories?.length > 0) {
+    const tail = row.categories.slice(-2).join(' ')
+    if (tail.length > 3) return tail
+  }
+
+  // Ưu tiên 2: Lấy noun chính từ title, BỎ brand (brand hiếm khi có trong categoryName eBay)
+  const stopWords = new Set([
+    'for','with','and','the','a','an','of','in','to','by','set','pack',
+    'pcs','piece','pieces','lot','new','best','top','pro','max','plus',
+    'mini','ultra','ultraclean','inch','mm','cm','ft','oz','lb','kg','x','vs',
+    'black','white','gray','grey','blue','red','green','silver','gold',
+    'free','resistant','remover','shred','hard','areas','adults','kids','count',
+    'care','oral','mint','plaque','refill','heads','access',
+  ])
+
+  const brand = (row.brand || '').toLowerCase()
+  const brandWords = new Set(brand.split(/\s+/).filter(Boolean))
+
+  const title = row.title || ''
+  const words = title
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w =>
+      w.length > 2 &&
+      !/^\d+$/.test(w) &&
+      !stopWords.has(w.toLowerCase()) &&
+      !brandWords.has(w.toLowerCase())   // bỏ brand words
+    )
+
+  // Lấy 2-3 noun đầu tiên còn lại (thường là loại sản phẩm)
+  const query = words.slice(0, 3).join(' ')
+  return query.substring(0, 80) || title.substring(0, 80)
 }
 
 const updateRow = (row) => {

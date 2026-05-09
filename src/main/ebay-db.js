@@ -160,32 +160,50 @@ export function searchCategoriesOffline(query) {
   const terms = query.trim().split(/\s+/).filter(t => t.length > 0)
   if (terms.length === 0) return []
 
-  // Build WHERE: each term must appear in either categoryName or categoryPath
-  const conditions = terms.map(() => '(categoryName LIKE ? OR COALESCE(categoryPath, categoryName) LIKE ?)').join(' AND ')
-  const params = []
-  terms.forEach(t => {
-    params.push(`%${t}%`)
-    params.push(`%${t}%`)
-  })
+  // Helper: check if categoryPath column exists
+  const hasCategoryPath = (() => {
+    try {
+      const cols = database.pragma('table_info(categories)')
+      return cols.some(c => c.name === 'categoryPath')
+    } catch { return false }
+  })()
+  const nameExpr = hasCategoryPath
+    ? '(categoryName LIKE ? OR COALESCE(categoryPath, categoryName) LIKE ?)'
+    : 'categoryName LIKE ?'
 
+  const makeParams = (t) => hasCategoryPath ? [`%${t}%`, `%${t}%`] : [`%${t}%`]
+
+  // Step 1: AND — tất cả terms phải match
+  const andConditions = terms.map(() => nameExpr).join(' AND ')
+  const andParams = terms.flatMap(makeParams)
   let rows = database.prepare(`
-    SELECT categoryId, categoryName, categoryPath, parentId, level, isLeaf
-    FROM categories
-    WHERE ${conditions}
-    ORDER BY level ASC, isLeaf DESC
-    LIMIT 20
-  `).all(...params)
+    SELECT categoryId, categoryName, level, isLeaf
+    FROM categories WHERE ${andConditions}
+    ORDER BY level ASC, isLeaf DESC LIMIT 20
+  `).all(...andParams)
 
-  // If strict AND returned nothing, try OR (any term matches)
+  // Step 2: OR — bất kỳ term nào match
   if (rows.length === 0 && terms.length > 1) {
-    const orConditions = terms.map(() => '(categoryName LIKE ? OR COALESCE(categoryPath, categoryName) LIKE ?)').join(' OR ')
+    const orConditions = terms.map(() => nameExpr).join(' OR ')
     rows = database.prepare(`
-      SELECT categoryId, categoryName, categoryPath, parentId, level, isLeaf
-      FROM categories
-      WHERE ${orConditions}
-      ORDER BY level ASC, isLeaf DESC
-      LIMIT 20
-    `).all(...params)
+      SELECT categoryId, categoryName, level, isLeaf
+      FROM categories WHERE ${orConditions}
+      ORDER BY isLeaf DESC, level ASC LIMIT 20
+    `).all(...andParams)
+  }
+
+  // Step 3: Per-term fallback — thử từng term riêng lẻ, lấy term đầu tiên có kết quả
+  // Giải quyết trường hợp "Flosser Teeth" → AND=0, OR noise → chỉ dùng "Flosser"
+  if (rows.length === 0) {
+    for (const t of terms) {
+      const p = makeParams(t)
+      const r = database.prepare(`
+        SELECT categoryId, categoryName, level, isLeaf
+        FROM categories WHERE ${nameExpr}
+        ORDER BY isLeaf DESC, level ASC LIMIT 20
+      `).all(...p)
+      if (r.length > 0) { rows = r; break }
+    }
   }
 
   return rows.map(r => ({
@@ -193,7 +211,7 @@ export function searchCategoriesOffline(query) {
     categoryName: r.categoryName,
     categoryTreeNodeLevel: r.level,
     relevancy: 'Offline Cache',
-    path: r.categoryPath || r.categoryName
+    path: r.categoryName
   }))
 }
 
