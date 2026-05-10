@@ -952,14 +952,12 @@ const buildParentRelationshipDetails = (variations) => {
  */
 const cleanTitle = (title) => {
   if (!title) return ''
-  let cleaned = title
+  return title
     .replace(/[\u{1F600}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // strip emoji
     .replace(/[【】「」『』]/g, ' ')  // CJK brackets → space
     .replace(/\s+/g, ' ')
     .trim()
-  // eBay enforces 80-char title limit
-  if (cleaned.length > 80) cleaned = cleaned.substring(0, 80).trim()
-  return cleaned
+  // Note: 80-char limit NOT enforced here — validation in Preview will flag it for manual fix
 }
 
 // ─── Export (reuses preview data) ─────────────────────────────────────────────
