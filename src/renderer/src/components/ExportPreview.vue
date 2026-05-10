@@ -301,11 +301,12 @@ const handleAiGen = async () => {
     const scrollState = getTableScrollState()
 
     if (res.ok) {
-      // Apply results to globalRowData (shared store)
+      // Apply results to globalRowData (shared reactive store).
+      // DetailPanel reads from the same ref → will see updated values on reopen.
       for (const result of res.data) {
         const row = rowData.value.find(r => r.asin === result.asin)
         if (row && isAiResultOk(result)) {
-          // Save originals for re-gen
+          // Preserve original for re-gen (only saved once)
           if (!row._originalTitle) row._originalTitle = row.title
           if (!row._originalDescription) row._originalDescription = row.description || row.descriptionHtml || ''
           if (result.title) row.title = result.title
