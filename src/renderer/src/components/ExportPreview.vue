@@ -784,25 +784,27 @@ const buildPreview = async () => {
     // Sort columns in logical order for eBay File Exchange:
     // 0: Action header
     // 1: Core identity (CustomLabel, Category, Title, Subtitle)
-    // 2: Variation (Relationship, RelationshipDetails)
-    // 3: Listing type (ConditionID, Format, Duration)
+    // 2: Variation + Price & Quantity (Relationship, RelationshipDetails, StartPrice, Quantity)
+    // 3: Listing type (ConditionID, Format, Duration, ScheduleTime)
     // 4: Required item specifics (C: REQUIRED)
     // 5: Recommended item specifics (C: RECOMMENDED)
     // 6: Optional item specifics (C: OPTIONAL)
     // 7: Media (PicURL, GalleryType, VideoID)
     // 8: Description
-    // 9: Pricing & Quantity
-    // 10: Shipping & Policy
+    // 9: Location & Shipping
+    // 10: Policies
     // 11: Everything else
     const COLUMN_ORDER = [
       ACTION_HEADER,
       'CustomLabel', '*Category', 'StoreCategory', '*Title', 'Subtitle',
-      'Relationship', 'RelationshipDetails', 'ScheduleTime',
-      '*ConditionID', '*Format', '*Duration',
+      // Variation + pricing grouped together so parent/child price is visible side-by-side
+      'Relationship', 'RelationshipDetails',
+      '*StartPrice', 'BuyItNowPrice', 'BestOfferEnabled', '*Quantity', 'ImmediatePayRequired',
+      // Listing config
+      'ScheduleTime', '*ConditionID', '*Format', '*Duration',
       // aspect cols go here (ranks 4-6)
       'PicURL', 'GalleryType', 'VideoID',
       '*Description',
-      '*StartPrice', 'BuyItNowPrice', 'BestOfferEnabled', '*Quantity', 'ImmediatePayRequired',
       '*Location', '*DispatchTimeMax',
       'ShippingProfileName', 'ReturnProfileName', 'PaymentProfileName',
     ]
@@ -810,14 +812,14 @@ const buildPreview = async () => {
       const rank = (c) => {
         const fixedIdx = COLUMN_ORDER.indexOf(c)
         if (fixedIdx !== -1) {
-          // Aspect cols slot in between ConditionID block and PicURL
-          // fixed index < PicURL index means before aspects
-          return fixedIdx < COLUMN_ORDER.indexOf('PicURL') ? fixedIdx * 10 : fixedIdx * 10 + 30
+          // Aspect cols slot between *Duration and PicURL
+          const durationIdx = COLUMN_ORDER.indexOf('*Duration')
+          return fixedIdx <= durationIdx ? fixedIdx * 10 : fixedIdx * 10 + 30
         }
         const u = strictestUsage[aspectMetaKey(c)]
-        if (isAspectCol(c) && u === 'REQUIRED') return COLUMN_ORDER.indexOf('*ConditionID') * 10 + 5
-        if (isAspectCol(c) && u === 'RECOMMENDED') return COLUMN_ORDER.indexOf('*ConditionID') * 10 + 6
-        if (isAspectCol(c)) return COLUMN_ORDER.indexOf('*ConditionID') * 10 + 7
+        if (isAspectCol(c) && u === 'REQUIRED') return COLUMN_ORDER.indexOf('*Duration') * 10 + 5
+        if (isAspectCol(c) && u === 'RECOMMENDED') return COLUMN_ORDER.indexOf('*Duration') * 10 + 6
+        if (isAspectCol(c)) return COLUMN_ORDER.indexOf('*Duration') * 10 + 7
         return 999
       }
       const diff = rank(a) - rank(b)
