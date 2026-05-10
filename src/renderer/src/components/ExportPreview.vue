@@ -623,16 +623,21 @@ const buildPreview = async () => {
     const rows = []
     // Per-category aspect meta: { [catId]: { 'C:Name': usage } }
     const newCatMeta = {}
+    // Per-category aspect valid values: { [catId]: { aspectName: string[] } }
+    const catAspectValues = {}
     const categoryIds = [...new Set(readyProducts.value.map((r) => r.ebayCategory).filter(Boolean))]
 
     for (const categoryId of categoryIds) {
       newCatMeta[categoryId] = {}
+      catAspectValues[categoryId] = {}
       try {
         const res = await window.api.ebay.categoryAspects(categoryId)
         if (res.ok) {
           const catMap = {}
           for (const asp of res.data) {
-            catMap[`C:${asp.name}`] = asp.usage // REQUIRED | RECOMMENDED | OPTIONAL
+            catMap[`C:${asp.name}`] = asp.usage
+            // Store valid values for "Does Not Apply" detection
+            if (asp.values?.length) catAspectValues[categoryId][asp.name] = asp.values
           }
           newCatMeta[categoryId] = catMap
         }
@@ -644,12 +649,16 @@ const buildPreview = async () => {
     for (const r of readyProducts.value) {
       const description = buildDescription(r)
       const aspectCols = buildAspectColumns(r, newCatMeta[r.ebayCategory], strictestUsage)
+      const aspValues = catAspectValues[r.ebayCategory] || {}
 
-      // Ensure REQUIRED aspects are included in aspectCols even if empty.
+      // Ensure REQUIRED aspects are included; auto-fill "Does Not Apply" if it's a valid value.
       if (newCatMeta[r.ebayCategory]) {
         for (const [colName, usage] of Object.entries(newCatMeta[r.ebayCategory])) {
           if (usage === 'REQUIRED' && !(colName in aspectCols)) {
-            aspectCols[getAspectHeader(aspectNameFromCol(colName), strictestUsage[colName])] = ''
+            const aspName = aspectNameFromCol(colName)
+            const validVals = aspValues[aspName] || []
+            const fallback = validVals.includes('Does Not Apply') ? 'Does Not Apply' : ''
+            aspectCols[getAspectHeader(aspName, strictestUsage[colName])] = fallback
           }
         }
       }
