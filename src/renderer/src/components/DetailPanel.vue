@@ -262,47 +262,92 @@
 
       <div class="divider"></div>
 
-      <!-- Bullet Points -->
-      <div v-if="form.bulletPoints?.length > 0" class="mt-3">
-        <div class="section-title flex items-center">
-          <List class="w-4 h-4 mr-2" /> Đặc điểm sản phẩm ({{ form.bulletPoints.length }})
+      <!-- Bullet Points (editable) -->
+      <div class="mt-3">
+        <div class="section-title flex items-center justify-between">
+          <span class="flex items-center"><List class="w-4 h-4 mr-2" /> Đặc điểm sản phẩm ({{ form.bulletPoints?.length || 0 }})</span>
+          <button
+            @click="form.bulletPoints = [...(form.bulletPoints || []), '']"
+            class="flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-400"
+          >
+            <PlusCircle class="w-3 h-3" /> Thêm
+          </button>
         </div>
-        <ul class="mt-2 space-y-1">
-          <li v-for="(bp, i) in form.bulletPoints" :key="i" class="text-xs text-muted-foreground leading-snug pl-3 relative">
-            <span class="absolute left-0">•</span>
-            {{ bp }}
-          </li>
-        </ul>
+        <div class="mt-2 space-y-1.5">
+          <div
+            v-for="(bp, i) in (form.bulletPoints || [])"
+            :key="i"
+            class="flex items-start gap-1.5"
+          >
+            <span class="text-muted-foreground text-xs mt-1.5 flex-shrink-0">•</span>
+            <Textarea
+              :value="bp"
+              @input="form.bulletPoints[i] = $event.target.value"
+              rows="2"
+              class="flex-1 text-xs min-h-0 resize-none py-1 px-2"
+              :placeholder="`Đặc điểm ${i + 1}`"
+            />
+            <button
+              @click="form.bulletPoints.splice(i, 1)"
+              class="mt-1 text-muted-foreground hover:text-red-500 flex-shrink-0"
+            >
+              <Trash2 class="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div v-if="!form.bulletPoints?.length" class="text-xs text-muted-foreground italic">Chưa có đặc điểm nào</div>
+        </div>
       </div>
 
-      <!-- Description Preview -->
-      <div v-if="form.description" class="mt-3">
+      <!-- Description (editable) -->
+      <div class="mt-3">
         <div class="section-title flex items-center">
           <FileText class="w-4 h-4 mr-2" /> Mô tả sản phẩm
         </div>
-        <Collapsible>
-          <CollapsibleTrigger class="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-400 cursor-pointer mt-1 [&[data-state=open]>svg]:rotate-90">
-            <ChevronRight class="w-3 h-3 transition-transform duration-200" />
-            Xem / Ẩn mô tả
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div class="mt-2 text-xs text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-md border max-h-[200px] overflow-auto">
-              {{ form.description?.substring(0, 1500) }}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+        <Textarea
+          v-model="form.description"
+          rows="6"
+          class="mt-2 text-xs resize-y"
+          placeholder="Nhập mô tả sản phẩm..."
+        />
       </div>
 
-      <!-- Specs -->
-      <div v-if="Object.keys(form.specs || {}).length > 0" class="mt-3">
-        <div class="section-title flex items-center">
-          <ClipboardList class="w-4 h-4 mr-2" /> Thông số kỹ thuật ({{ Object.keys(form.specs).length }})
+      <!-- Specs (editable) -->
+      <div class="mt-3">
+        <div class="section-title flex items-center justify-between">
+          <span class="flex items-center"><ClipboardList class="w-4 h-4 mr-2" /> Thông số kỹ thuật ({{ Object.keys(form.specs || {}).length }})</span>
+          <button
+            @click="addSpecRow"
+            class="flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-400"
+          >
+            <PlusCircle class="w-3 h-3" /> Thêm dòng
+          </button>
         </div>
-        <div class="specs-table mt-2">
-          <div v-for="(val, key) in form.specs" :key="key" class="spec-row">
-            <span class="spec-key">{{ key }}</span>
-            <span class="spec-val">{{ val }}</span>
+        <div class="mt-2 space-y-1.5">
+          <div
+            v-for="(val, key) in (form.specs || {})"
+            :key="key"
+            class="flex items-center gap-1.5"
+          >
+            <Input
+              :value="key"
+              @change="renameSpecKey(key, $event.target.value)"
+              class="h-7 text-xs w-[38%] flex-shrink-0 text-blue-400"
+              placeholder="Tên thông số"
+            />
+            <Input
+              :value="val"
+              @input="form.specs[key] = $event.target.value"
+              class="h-7 text-xs flex-1"
+              placeholder="Giá trị"
+            />
+            <button
+              @click="deleteSpec(key)"
+              class="text-muted-foreground hover:text-red-500 flex-shrink-0"
+            >
+              <Trash2 class="w-3.5 h-3.5" />
+            </button>
           </div>
+          <div v-if="!Object.keys(form.specs || {}).length" class="text-xs text-muted-foreground italic">Chưa có thông số nào</div>
         </div>
       </div>
 
@@ -340,7 +385,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import {
   X, Image as ImageIcon, Palette, Plus, ClipboardList, Save,
-  Search, Tag, Star, ClipboardCheck, ChevronRight, List, FileText, FolderOpen
+  Search, Tag, Star, ClipboardCheck, ChevronRight, List, FileText, FolderOpen,
+  Trash2, PlusCircle
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -532,6 +578,26 @@ const variationDimNames = computed(() => {
 
 const removeVariation = (i) => {
   form.variations.splice(i, 1)
+}
+
+// ─── Spec helpers ──────────────────────────────────────────────────────────────
+const addSpecRow = () => {
+  if (!form.specs) form.specs = {}
+  const key = `Thông số ${Object.keys(form.specs).length + 1}`
+  form.specs[key] = ''
+}
+
+const renameSpecKey = (oldKey, newKey) => {
+  if (!newKey || newKey === oldKey) return
+  const entries = Object.entries(form.specs)
+  form.specs = Object.fromEntries(
+    entries.map(([k, v]) => (k === oldKey ? [newKey, v] : [k, v]))
+  )
+}
+
+const deleteSpec = (key) => {
+  const { [key]: _, ...rest } = form.specs
+  form.specs = rest
 }
 
 // ─── Save ──────────────────────────────────────────────────────────────────────
