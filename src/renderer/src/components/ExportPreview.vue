@@ -653,11 +653,13 @@ const buildPreview = async () => {
       // Ensure REQUIRED aspects are included; auto-fill "Does Not Apply" if it's a valid value.
       if (newCatMeta[r.ebayCategory]) {
         for (const [colName, usage] of Object.entries(newCatMeta[r.ebayCategory])) {
-          if (usage === 'REQUIRED' && !(colName in aspectCols)) {
+          if (usage === 'REQUIRED') {
             const aspName = aspectNameFromCol(colName)
+            const headerKey = getAspectHeader(aspName, strictestUsage[colName])
+            // Skip if already filled by buildAspectColumns (check by actual header key)
+            if (headerKey in aspectCols) continue
             const validVals = aspValues[aspName] || []
-            const fallback = validVals.includes('Does Not Apply') ? 'Does Not Apply' : ''
-            aspectCols[getAspectHeader(aspName, strictestUsage[colName])] = fallback
+            aspectCols[headerKey] = validVals.includes('Does Not Apply') ? 'Does Not Apply' : ''
           }
         }
       }
