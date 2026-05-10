@@ -16,6 +16,16 @@ import {
 import { fullSync } from './ebay-sync'
 import { getSyncStatus, closeDb, searchCategoriesOffline } from './ebay-db'
 
+// ─── Playwright: point to bundled Chromium ────────────────────────────────────
+// Must be set before any chromium.launch() call (happens on first crawl).
+if (app.isPackaged) {
+  // Production: Chromium is bundled in app's extraResources
+  process.env.PLAYWRIGHT_BROWSERS_PATH = join(process.resourcesPath, 'playwright-browsers')
+} else {
+  // Dev mode: use project-local playwright-browsers/ directory
+  process.env.PLAYWRIGHT_BROWSERS_PATH = join(__dirname, '../../playwright-browsers')
+}
+
 // ─── Settings store (JSON file) ───────────────────────────────────────────────
 const settingsPath = join(app.getPath('userData'), 'settings.json')
 

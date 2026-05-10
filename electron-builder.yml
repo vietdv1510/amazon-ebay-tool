@@ -10,6 +10,11 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
 asarUnpack:
   - resources/**
+extraResources:
+  - from: playwright-browsers
+    to: playwright-browsers
+    filter:
+      - '**/*'
 win:
   executableName: ebay-engine
 nsis:
