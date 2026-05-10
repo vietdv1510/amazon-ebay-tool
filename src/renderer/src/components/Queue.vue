@@ -547,8 +547,8 @@ const updateRow = (row) => {
 }
 
 const deleteRow = (row) => {
-  // Không cho xóa khi đang crawl
   if (row.status === 'CRAWLING') return
+  if (!confirm(`Xóa sản phẩm "${row.title || row.asin}"?`)) return
   rowData.value = rowData.value.filter(r => r.id !== row.id)
 }
 

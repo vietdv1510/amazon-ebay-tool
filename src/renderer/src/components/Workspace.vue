@@ -173,8 +173,8 @@ const onDetailUpdate = (updatedRow) => {
 }
 
 const deleteRow = (row) => {
+  if (!confirm(`Xóa sản phẩm "${row.title || row.asin}"?`)) return
   rowData.value = rowData.value.filter(r => r.id !== row.id)
-  // Đóng detail panel nếu đang mở sản phẩm bị xóa
   if (selectedRow.value?.id === row.id) {
     selectedRow.value = null
   }
