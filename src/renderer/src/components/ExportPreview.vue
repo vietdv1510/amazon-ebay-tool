@@ -683,7 +683,7 @@ const buildPreview = async () => {
           '*Quantity': '',
           'ImmediatePayRequired': '',
           '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
-          '*DispatchTimeMax': props.settings.dispatchTimeMax || '2',
+          '*DispatchTimeMax': props.settings.dispatchTimeMax || '7',
           // Business Policies — sử dụng profile đã tạo trong Seller Hub (loại bỏ legacy fields)
           'ShippingProfileName': props.settings.shippingProfileName || '',
           'ReturnProfileName': props.settings.returnProfileName || '',
@@ -754,7 +754,7 @@ const buildPreview = async () => {
           '*Quantity': props.settings.defaultQuantity || 10,
           'ImmediatePayRequired': '',
           '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
-          '*DispatchTimeMax': props.settings.dispatchTimeMax || '2',
+          '*DispatchTimeMax': props.settings.dispatchTimeMax || '7',
           // Business Policies — sử dụng profile đã tạo trong Seller Hub (loại bỏ legacy fields)
           'ShippingProfileName': props.settings.shippingProfileName || '',
           'ReturnProfileName': props.settings.returnProfileName || '',

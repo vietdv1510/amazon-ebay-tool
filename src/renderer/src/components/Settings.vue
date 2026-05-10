@@ -514,6 +514,23 @@
             </div>
           </div>
 
+          <div class="grid grid-cols-3 gap-6 mt-4">
+            <div class="space-y-2">
+              <Label>Handling Time (*DispatchTimeMax)</Label>
+              <Input
+                type="number"
+                min="1"
+                max="30"
+                v-model.number="form.dispatchTimeMax"
+                @input="saveNow"
+                @change="save"
+              />
+              <p class="text-[0.8rem] text-muted-foreground">
+                Số ngày xử lý đơn trước khi ship (bắt buộc). Mặc định: 7 ngày.
+              </p>
+            </div>
+          </div>
+
           <div class="grid grid-cols-2 gap-6 mt-4">
             <div class="space-y-2">
               <Label>Location (*Location)</Label>
@@ -618,6 +635,8 @@ const coerceSettings = (raw) => {
   if (result.r2AutoUpload === undefined) result.r2AutoUpload = true
   if (result.r2ConvertWebp === undefined) result.r2ConvertWebp = true
   if (!result.r2WebpQuality) result.r2WebpQuality = 80
+  // eBay listing defaults
+  if (!result.dispatchTimeMax) result.dispatchTimeMax = 7
   return result
 }
 
