@@ -480,18 +480,18 @@
           <div class="grid grid-cols-3 gap-6">
             <div class="space-y-2">
               <Label>Condition</Label>
-              <Input type="text" value="New (1000)" disabled class="bg-muted/50 text-muted-foreground cursor-not-allowed" />
-              <p class="text-[0.8rem] text-muted-foreground">Cố định: <code class="font-mono">1000</code></p>
+              <Input type="text" v-model="form.defaultCondition" @change="saveNow" placeholder="Ví dụ: 1000" />
+              <p class="text-[0.8rem] text-muted-foreground">Mặc định: <code class="font-mono">1000</code> (New)</p>
             </div>
             <div class="space-y-2">
               <Label>Format</Label>
-              <Input type="text" value="Fixed Price" disabled class="bg-muted/50 text-muted-foreground cursor-not-allowed" />
-              <p class="text-[0.8rem] text-muted-foreground">Cố định: <code class="font-mono">FixedPrice</code></p>
+              <Input type="text" v-model="form.defaultFormat" @change="saveNow" placeholder="Ví dụ: FixedPrice" />
+              <p class="text-[0.8rem] text-muted-foreground">Mặc định: <code class="font-mono">FixedPrice</code></p>
             </div>
             <div class="space-y-2">
               <Label>Duration</Label>
-              <Input type="text" value="Good Till Cancelled" disabled class="bg-muted/50 text-muted-foreground cursor-not-allowed" />
-              <p class="text-[0.8rem] text-muted-foreground">Cố định: <code class="font-mono">GTC</code></p>
+              <Input type="text" v-model="form.defaultDuration" @change="saveNow" placeholder="Ví dụ: GTC" />
+              <p class="text-[0.8rem] text-muted-foreground">Mặc định: <code class="font-mono">GTC</code> (Good Till Cancelled)</p>
             </div>
           </div>
 
@@ -618,6 +618,9 @@ const coerceSettings = (raw) => {
   if (!result.r2WebpQuality) result.r2WebpQuality = 80
   // eBay listing defaults
   if (!result.dispatchTimeMax) result.dispatchTimeMax = 7
+  if (!result.defaultCondition) result.defaultCondition = '1000'
+  if (!result.defaultFormat) result.defaultFormat = 'FixedPrice'
+  if (!result.defaultDuration) result.defaultDuration = 'GTC'
   return result
 }
 
