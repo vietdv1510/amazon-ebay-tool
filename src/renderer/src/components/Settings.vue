@@ -480,37 +480,18 @@
           <div class="grid grid-cols-3 gap-6">
             <div class="space-y-2">
               <Label>Condition</Label>
-              <Select v-model="form.defaultCondition">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1000">New (1000)</SelectItem>
-                  <SelectItem value="1500">New other (1500)</SelectItem>
-                  <SelectItem value="2000">Manufacturer refurbished (2000)</SelectItem>
-                  <SelectItem value="2500">Seller refurbished (2500)</SelectItem>
-                  <SelectItem value="3000">Used (3000)</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input type="text" value="New (1000)" disabled class="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+              <p class="text-[0.8rem] text-muted-foreground">Cố định: <code class="font-mono">1000</code></p>
             </div>
             <div class="space-y-2">
               <Label>Format</Label>
-              <Select v-model="form.defaultFormat">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FixedPrice">Fixed Price</SelectItem>
-                  <SelectItem value="Auction">Auction</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input type="text" value="Fixed Price" disabled class="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+              <p class="text-[0.8rem] text-muted-foreground">Cố định: <code class="font-mono">FixedPrice</code></p>
             </div>
             <div class="space-y-2">
               <Label>Duration</Label>
-              <Select v-model="form.defaultDuration">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GTC">Good Till Cancelled</SelectItem>
-                  <SelectItem value="Days_7">7 ngày</SelectItem>
-                  <SelectItem value="Days_30">30 ngày</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input type="text" value="Good Till Cancelled" disabled class="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+              <p class="text-[0.8rem] text-muted-foreground">Cố định: <code class="font-mono">GTC</code></p>
             </div>
           </div>
 
