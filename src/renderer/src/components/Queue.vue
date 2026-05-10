@@ -154,7 +154,20 @@
                     {{ row.log }}
                   </div>
                 </TableCell>
-                <TableCell></TableCell>
+                <!-- Actions -->
+                <TableCell class="text-center pr-3">
+                  <button
+                    @click.stop="deleteRow(row)"
+                    :disabled="row.status === 'CRAWLING'"
+                    :title="row.status === 'CRAWLING' ? 'Đang crawl, chờ hoàn tất mới xóa được' : 'Xóa sản phẩm này'"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors"
+                    :class="row.status === 'CRAWLING'
+                      ? 'text-muted-foreground/30 cursor-not-allowed'
+                      : 'text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -531,6 +544,12 @@ const updateRow = (row) => {
   if (idx !== -1) {
     rowData.value[idx] = row
   }
+}
+
+const deleteRow = (row) => {
+  // Không cho xóa khi đang crawl
+  if (row.status === 'CRAWLING') return
+  rowData.value = rowData.value.filter(r => r.id !== row.id)
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────

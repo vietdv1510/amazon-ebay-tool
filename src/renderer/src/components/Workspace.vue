@@ -98,7 +98,16 @@
                     {{ isRowReady(row) ? 'Sẵn sàng' : 'Thiếu dữ liệu' }}
                   </Badge>
                 </TableCell>
-                <TableCell></TableCell>
+                <!-- Actions -->
+                <TableCell class="text-center pr-3" @click.stop>
+                  <button
+                    @click.stop="deleteRow(row)"
+                    title="Xóa sản phẩm này"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -130,7 +139,7 @@ import DetailPanel from './DetailPanel.vue'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Search, Filter, RefreshCw, FileSpreadsheet, ListTree, Play, Square, Download, ChevronRight, CheckCircle2, CircleDashed, LayoutDashboard, FolderOpen, AlertTriangle } from 'lucide-vue-next'
+import { Search, Filter, RefreshCw, FileSpreadsheet, ListTree, Play, Square, Download, ChevronRight, CheckCircle2, CircleDashed, LayoutDashboard, FolderOpen, AlertTriangle, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps({
   settings: { type: Object, required: true }
@@ -161,6 +170,14 @@ const onDetailUpdate = (updatedRow) => {
     rowData.value[idx] = updatedRow
   }
   selectedRow.value = { ...updatedRow }
+}
+
+const deleteRow = (row) => {
+  rowData.value = rowData.value.filter(r => r.id !== row.id)
+  // Đóng detail panel nếu đang mở sản phẩm bị xóa
+  if (selectedRow.value?.id === row.id) {
+    selectedRow.value = null
+  }
 }
 
 // Removed local export logic as it is now strictly handled in ExportPreview.vue
