@@ -15,8 +15,7 @@
             @click="handleAiGen"
             :disabled="readyProducts.length === 0 || isAiGenerating"
           >
-            <Sparkles class="w-4 h-4 mr-2" :class="{ 'animate-pulse text-amber-500': isAiGenerating }" />
-            {{ isAiGenerating ? aiGenProgress : 'AI Gen' }}
+            {{ isAiGenerating ? aiGenProgress : 'Tạo mô tả bằng AI' }}
           </Button>
 
           <Button size="sm" variant="destructive" @click="handleExport(true)" :disabled="previewRows.length === 0" title="Ép xuất không cần kiểm tra lỗi">
