@@ -553,7 +553,6 @@ const ALWAYS_REQUIRED_COLUMNS = [
   '*Duration',
   '*Location',
   '*DispatchTimeMax',
-  '*ReturnsAcceptedOption'
 ]
 
 const ROW_REQUIRED_COLUMNS = {
@@ -685,10 +684,7 @@ const buildPreview = async () => {
           'ImmediatePayRequired': '',
           '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
           '*DispatchTimeMax': props.settings.dispatchTimeMax || '2',
-          '*ReturnsAcceptedOption': 'ReturnsAccepted',
-          'ReturnsWithinOption': props.settings.returnsWithinOption || 'Days_30',
-          'RefundOption': props.settings.refundOption || 'MoneyBack',
-          'ShippingCostPaidByOption': props.settings.shippingCostPaidBy || 'Buyer',
+          // Business Policies — sử dụng profile đã tạo trong Seller Hub (loại bỏ legacy fields)
           'ShippingProfileName': props.settings.shippingProfileName || '',
           'ReturnProfileName': props.settings.returnProfileName || '',
           'PaymentProfileName': props.settings.paymentProfileName || '',
@@ -725,10 +721,6 @@ const buildPreview = async () => {
             'ImmediatePayRequired': '',
             '*Location': '',
             '*DispatchTimeMax': '',
-            '*ReturnsAcceptedOption': '',
-            'ReturnsWithinOption': '',
-            'RefundOption': '',
-            'ShippingCostPaidByOption': '',
             'ShippingProfileName': '',
             'ReturnProfileName': '',
             'PaymentProfileName': '',
@@ -763,10 +755,7 @@ const buildPreview = async () => {
           'ImmediatePayRequired': '',
           '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
           '*DispatchTimeMax': props.settings.dispatchTimeMax || '2',
-          '*ReturnsAcceptedOption': 'ReturnsAccepted',
-          'ReturnsWithinOption': props.settings.returnsWithinOption || 'Days_30',
-          'RefundOption': props.settings.refundOption || 'MoneyBack',
-          'ShippingCostPaidByOption': props.settings.shippingCostPaidBy || 'Buyer',
+          // Business Policies — sử dụng profile đã tạo trong Seller Hub (loại bỏ legacy fields)
           'ShippingProfileName': props.settings.shippingProfileName || '',
           'ReturnProfileName': props.settings.returnProfileName || '',
           'PaymentProfileName': props.settings.paymentProfileName || '',
@@ -784,15 +773,44 @@ const buildPreview = async () => {
       }
     }
 
-    // Sort: std required -> *C: required -> C: recommended -> C: optional -> others
+    // Sort columns in logical order for eBay File Exchange:
+    // 0: Action header
+    // 1: Core identity (CustomLabel, Category, Title, Subtitle)
+    // 2: Variation (Relationship, RelationshipDetails)
+    // 3: Listing type (ConditionID, Format, Duration)
+    // 4: Required item specifics (C: REQUIRED)
+    // 5: Recommended item specifics (C: RECOMMENDED)
+    // 6: Optional item specifics (C: OPTIONAL)
+    // 7: Media (PicURL, GalleryType, VideoID)
+    // 8: Description
+    // 9: Pricing & Quantity
+    // 10: Shipping & Policy
+    // 11: Everything else
+    const COLUMN_ORDER = [
+      ACTION_HEADER,
+      'CustomLabel', '*Category', 'StoreCategory', '*Title', 'Subtitle',
+      'Relationship', 'RelationshipDetails', 'ScheduleTime',
+      '*ConditionID', '*Format', '*Duration',
+      // aspect cols go here (ranks 4-6)
+      'PicURL', 'GalleryType', 'VideoID',
+      '*Description',
+      '*StartPrice', 'BuyItNowPrice', 'BestOfferEnabled', '*Quantity', 'ImmediatePayRequired',
+      '*Location', '*DispatchTimeMax',
+      'ShippingProfileName', 'ReturnProfileName', 'PaymentProfileName',
+    ]
     const sorted = [...colSet].sort((a, b) => {
       const rank = (c) => {
-        if (c.startsWith('*') && !isAspectCol(c)) return 0
+        const fixedIdx = COLUMN_ORDER.indexOf(c)
+        if (fixedIdx !== -1) {
+          // Aspect cols slot in between ConditionID block and PicURL
+          // fixed index < PicURL index means before aspects
+          return fixedIdx < COLUMN_ORDER.indexOf('PicURL') ? fixedIdx * 10 : fixedIdx * 10 + 30
+        }
         const u = strictestUsage[aspectMetaKey(c)]
-        if (isAspectCol(c) && u === 'REQUIRED') return 1
-        if (isAspectCol(c) && u === 'RECOMMENDED') return 2
-        if (isAspectCol(c)) return 3
-        return 1.5
+        if (isAspectCol(c) && u === 'REQUIRED') return COLUMN_ORDER.indexOf('*ConditionID') * 10 + 5
+        if (isAspectCol(c) && u === 'RECOMMENDED') return COLUMN_ORDER.indexOf('*ConditionID') * 10 + 6
+        if (isAspectCol(c)) return COLUMN_ORDER.indexOf('*ConditionID') * 10 + 7
+        return 999
       }
       const diff = rank(a) - rank(b)
       if (diff !== 0) return diff
@@ -899,15 +917,21 @@ const buildAspectColumns = (row, categoryMeta = null, strictestUsage = {}) => {
 }
 
 const buildParentRelationshipDetails = (variations) => {
-  const dimValues = {}
+  const dimValues = {}       // key → Map<lowerVal, originalVal> (giữ giá trị gốc, dedup theo lowercase)
   for (const v of variations) {
     for (const [key, val] of Object.entries(v.attributes || {})) {
-      if (!dimValues[key]) dimValues[key] = new Set()
-      if (val) dimValues[key].add(val)
+      if (!dimValues[key]) dimValues[key] = new Map()
+      if (val) {
+        const lk = String(val).toLowerCase()
+        // Chỉ thêm nếu chưa có giá trị tương đương (case-insensitive)
+        if (!dimValues[key].has(lk)) {
+          dimValues[key].set(lk, val)
+        }
+      }
     }
   }
   return Object.entries(dimValues)
-    .map(([key, vals]) => `${key}=${[...vals].join(',')}`)
+    .map(([key, valMap]) => `${key}=${[...valMap.values()].join(',')}`)
     .join('|')
 }
 
