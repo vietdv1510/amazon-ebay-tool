@@ -5,8 +5,39 @@
 import Database from 'better-sqlite3'
 import { join } from 'path'
 import { app } from 'electron'
+import fs from 'fs'
 
 let db = null
+
+/**
+ * Seed user DB from bundled seed file on first install (empty DB).
+ * The bundled seed contains 17k categories + 197k aspects (~16MB).
+ */
+function seedIfEmpty(dbPath) {
+  // Determine seed DB path (bundled in resources/)
+  const seedPath = app.isPackaged
+    ? join(process.resourcesPath, 'ebay_seed.db')
+    : join(app.getAppPath(), '..', 'resources', 'ebay_seed.db')
+
+  if (!fs.existsSync(seedPath)) return // No seed file, skip
+
+  // Check if user DB already has data
+  if (fs.existsSync(dbPath)) {
+    try {
+      const check = new Database(dbPath, { readonly: true })
+      const count = check.prepare('SELECT COUNT(*) as cnt FROM categories').get()
+      check.close()
+      if (count && count.cnt > 0) return // Already has data, skip seed
+    } catch (_) {
+      // Table doesn't exist yet → proceed with seed copy
+    }
+  }
+
+  // Copy seed DB to userData
+  console.log('[DB] First run: seeding category DB from bundled seed...')
+  fs.copyFileSync(seedPath, dbPath)
+  console.log('[DB] Seed complete.')
+}
 
 /**
  * Initialize / open database
@@ -15,6 +46,10 @@ export function getDb() {
   if (db) return db
 
   const dbPath = join(app.getPath('userData'), 'ebay_cache.db')
+
+  // Auto-seed on first install
+  seedIfEmpty(dbPath)
+
   db = new Database(dbPath)
 
   // Optimize performance
@@ -22,7 +57,7 @@ export function getDb() {
   db.pragma('synchronous = NORMAL')
   db.pragma('cache_size = -64000') // 64MB cache
 
-  // Create tables
+  // Create tables (idempotent — safe to run even after seed)
   db.exec(`
     CREATE TABLE IF NOT EXISTS categories (
       categoryId   TEXT PRIMARY KEY,
@@ -72,6 +107,7 @@ export function getDb() {
 
   return db
 }
+
 
 // ─── Category Queries ──────────────────────────────────────────────────────────
 

@@ -1,8 +1,38 @@
 import { chromium } from 'playwright-extra'
 import stealth from 'puppeteer-extra-plugin-stealth'
 import * as cheerio from 'cheerio'
+import { join } from 'path'
+import { app } from 'electron'
 
 chromium.use(stealth())
+
+/**
+ * Resolve the bundled Chromium executable path at runtime.
+ * Bypasses PLAYWRIGHT_BROWSERS_PATH which can be cached before env var is set.
+ */
+function getChromiumExecutable() {
+  const browsersPath = app.isPackaged
+    ? join(process.resourcesPath, 'playwright-browsers')
+    : join(app.getAppPath(), '..', 'playwright-browsers')
+
+  const revision = 'chromium_headless_shell-1217'
+  let platformDir
+  if (process.platform === 'win32') {
+    platformDir = 'chrome-headless-shell-win64'
+  } else if (process.platform === 'darwin') {
+    platformDir = process.arch === 'arm64'
+      ? 'chrome-headless-shell-mac-arm64'
+      : 'chrome-headless-shell-mac-x64'
+  } else {
+    platformDir = 'chrome-headless-shell-linux-x64'
+  }
+
+  const exeName = process.platform === 'win32'
+    ? 'chrome-headless-shell.exe'
+    : 'chrome-headless-shell'
+
+  return join(browsersPath, revision, platformDir, exeName)
+}
 
 let browser = null
 let currentHeadless = true
@@ -51,6 +81,7 @@ export async function initBrowser(headless = true) {
     currentHeadless = headless
     browser = await chromium.launch({
       headless,
+      executablePath: getChromiumExecutable(),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
