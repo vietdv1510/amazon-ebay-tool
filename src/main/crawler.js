@@ -86,7 +86,18 @@ export async function initBrowser(headless = true) {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-blink-features=AutomationControlled'
+        '--disable-blink-features=AutomationControlled',
+        // ── Memory optimization ──
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-translate',
+        '--no-first-run',
+        '--disable-background-timer-throttling',
+        '--js-flags=--max-old-space-size=128',
       ]
     })
   }
@@ -169,6 +180,16 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
   ])
 
   const page = await context.newPage()
+
+  // ── Block heavy resources to save RAM/CPU (~40% reduction) ──────────────
+  await page.route('**/*', (route) => {
+    const type = route.request().resourceType()
+    if (['image', 'font', 'media', 'stylesheet'].includes(type)) {
+      return route.abort()
+    }
+    return route.continue()
+  })
+
   activeCrawls.set(asin, page)
   progressCb('[PROGRESS] Starting browser...')
 
@@ -1142,6 +1163,14 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
         try {
           progressCb(`[PROGRESS] Variation price ${i + 1}/${variations.length}: ${v.asin}...`)
           varPage = await context.newPage()
+          // Block heavy resources for variant pages too
+          await varPage.route('**/*', (route) => {
+            const type = route.request().resourceType()
+            if (['image', 'font', 'media', 'stylesheet'].includes(type)) {
+              return route.abort()
+            }
+            return route.continue()
+          })
           await varPage.goto(`https://www.amazon.com/dp/${v.asin}`, {
             waitUntil: 'domcontentloaded',
             timeout: 12000

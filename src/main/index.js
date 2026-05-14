@@ -35,7 +35,7 @@ const DEFAULT_SETTINGS = {
   defaultFormat: 'FixedPrice',
   defaultDuration: 'GTC',
   defaultQuantity: 10,
-  crawlThreads: 3,
+  crawlThreads: 1,
   crawlDelay: 2,
   crawlRetry: 3,
   headlessMode: true,
