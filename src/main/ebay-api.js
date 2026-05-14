@@ -7,6 +7,13 @@ import { getAspectsFromCache, getCategoryTreeFromCache } from './ebay-db'
 
 const EBAY_CATEGORY_TREE_ID = '0' // US marketplace
 
+// Default credentials — injected at build time via .env (not stored in source)
+const DEFAULT_EBAY = {
+  ebayClientId: process.env.EBAY_CLIENT_ID,
+  ebayClientSecret: process.env.EBAY_CLIENT_SECRET,
+  ebayEnv: process.env.EBAY_ENV || 'sandbox',
+}
+
 let tokenCache = {
   sandbox: null,
   production: null,
@@ -55,12 +62,12 @@ async function getAppToken(clientId, clientSecret, env = 'sandbox') {
 
 /**
  * Helper: call eBay API with token
+ * Always uses bundled credentials (Settings UI is hidden)
  */
-async function ebayGet(path, settings) {
-  const { ebayClientId, ebayClientSecret, ebayEnv = 'sandbox' } = settings
-  if (!ebayClientId || !ebayClientSecret) {
-    throw new Error('eBay Client ID / Client Secret not configured in Settings.')
-  }
+async function ebayGet(path) {
+  const ebayClientId = DEFAULT_EBAY.ebayClientId
+  const ebayClientSecret = DEFAULT_EBAY.ebayClientSecret
+  const ebayEnv = DEFAULT_EBAY.ebayEnv
 
   const token = await getAppToken(ebayClientId, ebayClientSecret, ebayEnv)
   const base = getBaseUrl(ebayEnv)
@@ -86,11 +93,10 @@ async function ebayGet(path, settings) {
  * Always call API (eBay's AI search algorithm)
  * @returns Array of { categoryId, categoryName, categoryTreeNodeLevel, relevancy }
  */
-export async function getCategorySuggestions(query, settings) {
+export async function getCategorySuggestions(query) {
   const encoded = encodeURIComponent(query.slice(0, 150)) // eBay limits query length
   const data = await ebayGet(
-    `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_category_suggestions?q=${encoded}`,
-    settings
+    `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_category_suggestions?q=${encoded}`
   )
 
   return (data.categorySuggestions || []).slice(0, 8).map(s => ({
@@ -121,8 +127,7 @@ export async function getCategoryAspects(categoryId, settings) {
 
   // 2. Fallback: call API
   const data = await ebayGet(
-    `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_item_aspects_for_category?category_id=${categoryId}`,
-    settings
+    `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_item_aspects_for_category?category_id=${categoryId}`
   )
 
   return (data.aspects || []).map(aspect => {
@@ -167,8 +172,7 @@ export async function getCategoryTree(settings) {
 
   // 2. Fallback: call API
   const data = await ebayGet(
-    `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}`,
-    settings
+    `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}`
   )
 
   const rootNodes = data.rootCategoryNode?.childCategoryTreeNodes || []

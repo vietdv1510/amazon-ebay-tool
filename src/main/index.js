@@ -315,26 +315,23 @@ ipcMain.handle('app:paths', () => ({
 // Category suggestions from title/keyword
 ipcMain.handle('ebay:categorySuggestions', async (_, query) => {
   try {
-    const settings = loadSettings()
-    console.log(`[CategorySearch] query="${query}" useEbayAI=${settings.useEbayAI}`)
+    console.log(`[CategorySearch] query="${query}"`)
 
-    // Try AI mode first (if enabled)
-    if (settings.useEbayAI) {
-      try {
-        const results = await getCategorySuggestions(query, settings)
-        console.log(`[CategorySearch] AI results: ${results.length}`)
-        if (results.length > 0) return { ok: true, data: results }
-      } catch (aiErr) {
-        console.warn(`[CategorySearch] AI failed, falling back to offline:`, aiErr.message)
-      }
+    // Always try eBay API first — credentials are bundled, no user config needed
+    // Fallback to offline SQLite only if API fails (rate-limit / network error)
+    try {
+      const results = await getCategorySuggestions(query)
+      console.log(`[CategorySearch] eBay API results: ${results.length}`)
+      if (results.length > 0) return { ok: true, data: results }
+    } catch (apiErr) {
+      console.warn(`[CategorySearch] eBay API failed, using offline DB:`, apiErr.message)
     }
 
-    // Offline search (always available as fallback)
+    // Offline fallback (always available)
     const offlineResults = searchCategoriesOffline(query)
     console.log(`[CategorySearch] Offline results: ${offlineResults.length}`)
     if (offlineResults.length > 0) return { ok: true, data: offlineResults }
 
-    // Both modes returned empty
     return { ok: true, data: [] }
   } catch (e) {
     console.error(`[CategorySearch] ERROR:`, e.message)
