@@ -133,7 +133,7 @@ function createWindow() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0f0f13',
-    title: 'eBay Engine',
+    title: '',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     icon,
     webPreferences: {
