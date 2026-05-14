@@ -188,7 +188,7 @@ const settings = ref({
   shippingProfileName: 'Shipping',
   returnProfileName: 'Return',
   paymentProfileName: 'Payment',
-  crawlThreads: 3,
+  crawlThreads: 2,
   crawlDelay: 2,
   crawlRetry: 3,
   headlessMode: true,

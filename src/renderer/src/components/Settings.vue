@@ -75,6 +75,7 @@
             </div>
           </div>
 
+          <!-- [HIDDEN] Headless Mode - Enforced permanently in backend
           <div class="flex items-center justify-between space-x-2 pt-2">
             <div class="flex flex-col space-y-1">
               <Label>Ẩn trình duyệt (Headless Mode)</Label>
@@ -90,6 +91,7 @@
               <SwitchThumb :class="switchThumbClass" />
             </SwitchRoot>
           </div>
+          -->
 
           <div class="flex items-center justify-between space-x-2 pt-2">
             <div class="flex flex-col space-y-1">

@@ -35,7 +35,7 @@ const DEFAULT_SETTINGS = {
   defaultFormat: 'FixedPrice',
   defaultDuration: 'GTC',
   defaultQuantity: 10,
-  crawlThreads: 1,
+  crawlThreads: 2,
   crawlDelay: 2,
   crawlRetry: 3,
   headlessMode: true,
@@ -77,6 +77,18 @@ function loadSettings() {
           merged[key] = saved[key]
         }
       }
+      // Migration V3: force crawlThreads to 2 (1 was too slow, 3 was too heavy)
+      if (!merged._migratedV3) {
+        merged.crawlThreads = 2
+        merged._migratedV3 = true
+        // Persist the migration so it doesn't run again
+        fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2), 'utf-8')
+        console.log('[Settings] Migration V3: crawlThreads forced to 2')
+      }
+
+      // Always enforce headless mode for stability/performance since we hid it in UI
+      merged.headlessMode = true
+
       console.log('[Settings] Merged settings:', JSON.stringify(merged))
       return merged
     }
@@ -121,8 +133,13 @@ function createWindow() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0f0f13',
-    title: 'eBay Engine',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    title: '',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+    titleBarOverlay: process.platform === 'win32' ? {
+      color: '#0f0f13',
+      symbolColor: '#ffffff',
+      height: 38
+    } : false,
     icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
