@@ -1,6 +1,6 @@
 {
   "name": "ebay-engine",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "eBay Engine application",
   "main": "./out/main/index.js",
   "author": "Nexs",

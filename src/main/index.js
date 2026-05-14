@@ -133,13 +133,8 @@ function createWindow() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0f0f13',
-    title: '',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
-    titleBarOverlay: process.platform === 'win32' ? {
-      color: '#0f0f13',
-      symbolColor: '#ffffff',
-      height: 38
-    } : false,
+    title: 'eBay Engine',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
