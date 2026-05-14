@@ -12,6 +12,9 @@ asarUnpack:
   - resources/**
   - node_modules/sharp/**
   - node_modules/@img/**
+  - node_modules/playwright-core/**
+  - node_modules/playwright/**
+  - node_modules/puppeteer-extra-plugin-stealth/**
 extraResources:
   - from: playwright-browsers
     to: playwright-browsers
