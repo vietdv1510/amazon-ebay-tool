@@ -218,14 +218,15 @@ export function searchCategoriesOffline(query) {
     ORDER BY level ASC, isLeaf DESC LIMIT 20
   `).all(...andParams)
 
-  // Step 2: OR — bất kỳ term nào match
+  // Step 2: OR — bất kỳ term nào match (dùng orParams riêng, không dùng andParams)
   if (rows.length === 0 && terms.length > 1) {
     const orConditions = terms.map(() => nameExpr).join(' OR ')
+    const orParams = terms.flatMap(makeParams)  // fix: dùng orParams đúng số lượng
     rows = database.prepare(`
       SELECT categoryId, categoryName, level, isLeaf
       FROM categories WHERE ${orConditions}
       ORDER BY isLeaf DESC, level ASC LIMIT 20
-    `).all(...andParams)
+    `).all(...orParams)
   }
 
   // Step 3: Per-term fallback — thử từng term riêng lẻ, lấy term đầu tiên có kết quả
