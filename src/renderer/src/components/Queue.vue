@@ -503,11 +503,15 @@ const autoSelectCategory = async (doneRow) => {
 // Offline DB chỉ match theo categoryName → cần dùng noun phổ thông, KHÔNG dùng brand
 // Ví dụ: "REACH Ultraclean Flosser Refill..." → "Flosser Refill" (bỏ brand REACH)
 const buildCategoryQuery = (row) => {
-  // Ưu tiên 1: Amazon breadcrumb — chính xác nhất, map thẳng vào category tree eBay
-  // categories = ['Health', 'Oral Care', 'Dental Floss']
+  // Ưu tiên 1: Amazon breadcrumb — thử từng term từ cuối (specific nhất) lên
+  // categories = ['Health', 'Oral Care', 'Dental Floss'] → thử 'Dental Floss', rồi 'Oral Care', rồi 'Health'
+  // Tránh ghép multi-term AND "Oral Care Dental Floss" gây AND-miss → OR noise
   if (row.categories?.length > 0) {
-    const tail = row.categories.slice(-2).join(' ')
-    if (tail.length > 3) return tail
+    const reversed = [...row.categories].reverse()
+    for (const cat of reversed) {
+      const term = cat.trim()
+      if (term.length > 3) return term  // dùng single term cụ thể nhất còn lại
+    }
   }
 
   // Ưu tiên 2: Lấy noun chính từ title, BỎ brand (brand hiếm khi có trong categoryName eBay)
