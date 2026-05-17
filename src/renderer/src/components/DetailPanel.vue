@@ -309,6 +309,27 @@
           class="mt-2 text-xs resize-y"
           placeholder="Nhập mô tả sản phẩm..."
         />
+        <div v-if="form.descriptionImages?.length > 0" class="description-images mt-2">
+          <div class="description-images-header">
+            <span>Ảnh mô tả</span>
+            <Badge variant="secondary" class="text-[10px] h-5 px-1.5">
+              {{ form.descriptionImages.length }}
+            </Badge>
+          </div>
+          <div class="description-images-grid">
+            <a
+              v-for="(img, i) in form.descriptionImages"
+              :key="`${img}-${i}`"
+              :href="img"
+              target="_blank"
+              class="description-image-item"
+              :title="img"
+            >
+              <img :src="img" :alt="`Ảnh mô tả ${i + 1}`" loading="lazy" />
+              <span>{{ i + 1 }}</span>
+            </a>
+          </div>
+        </div>
       </div>
 
       <!-- Specs (editable) -->
@@ -677,6 +698,63 @@ const save = () => {
 .form-hint { font-size: 10px; color: var(--text-muted); }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .section-title { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.description-images {
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--muted) / 0.35);
+  padding: 8px;
+}
+
+.description-images-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.description-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.description-image-item {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  background: var(--bg-card);
+}
+
+.description-image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.description-image-item span {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.68);
+  color: white;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
 
 /* Category */
 .cat-selected {
