@@ -4,9 +4,9 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs'
-import { crawlAmazon, crawlAmazonWithRetry, cancelCrawl, closeBrowser } from './crawler'
+import { crawlAmazonWithRetry, cancelCrawl, closeBrowser } from './crawler'
 import { batchGenerate } from './ai-gen'
-import { uploadToR2, testR2Connection, resetR2Client } from './r2-uploader'
+import { uploadToR2, uploadProductAssetsToR2, testR2Connection, resetR2Client } from './r2-uploader'
 import {
   getCategorySuggestions,
   getCategoryAspects,
@@ -252,50 +252,41 @@ ipcMain.handle('crawl:asin', async (event, asin) => {
         message: String(msg).replace('[PROGRESS]', '').trim()
       })
     }
-    const data = await crawlAmazonWithRetry(
-      asin,
-      progressCb,
-      {
-        headless: settings.headlessMode === true,
-        delay: settings.crawlDelay ?? 2,
-        defaultQuantity: settings.defaultQuantity || 10,
-        forceUSLocation: settings.forceUSLocation !== false,
-        maxRetries: settings.crawlRetry ?? 3,
-        baseRetryDelayMs: 5000
-      }
-    )
+    const data = await crawlAmazonWithRetry(asin, progressCb, {
+      headless: settings.headlessMode === true,
+      delay: settings.crawlDelay ?? 2,
+      defaultQuantity: settings.defaultQuantity || 10,
+      forceUSLocation: settings.forceUSLocation !== false,
+      maxRetries: settings.crawlRetry ?? 3,
+      baseRetryDelayMs: 5000
+    })
 
     if (!data) {
       return { ok: false, error: 'Không lấy được dữ liệu từ Amazon' }
     }
 
-    // R2 CDN: always upload images after crawl if enabled
-    if (settings.useR2Cdn && data.images?.length > 0) {
+    // R2 CDN: always upload crawled images after crawl if enabled
+    const hasCrawledImages =
+      data.images?.length > 0 ||
+      data.variations?.some((v) => v.image) ||
+      data.descriptionImages?.length > 0
+    if (settings.useR2Cdn && hasCrawledImages) {
       // Validate R2 credentials
-      if (!settings.r2AccountId || !settings.r2AccessKeyId || !settings.r2SecretAccessKey || !settings.r2BucketName) {
-        progressCb('[PROGRESS] ⚠ CDN bật nhưng chưa cấu hình đầy đủ — vào Settings để nhập thông tin R2')
+      if (
+        !settings.r2AccountId ||
+        !settings.r2AccessKeyId ||
+        !settings.r2SecretAccessKey ||
+        !settings.r2BucketName
+      ) {
+        progressCb(
+          '[PROGRESS] ⚠ CDN bật nhưng chưa cấu hình đầy đủ — vào Settings để nhập thông tin R2'
+        )
       } else {
         try {
           progressCb('[PROGRESS] Uploading images to CDN...')
-          data.images = await uploadToR2(data.images, asin, settings, (msg) => {
+          await uploadProductAssetsToR2(data, asin, settings, (msg) => {
             progressCb(`[PROGRESS] ${msg}`)
           })
-          // Also upload variation images
-          if (data.variations?.length > 0) {
-            for (let vi = 0; vi < data.variations.length; vi++) {
-              const v = data.variations[vi]
-              if (v.image) {
-                const [cdnUrl] = await uploadToR2([v.image], `${asin}/var`, settings, () => {})
-                data.variations[vi].image = cdnUrl
-              }
-            }
-          }
-          // Upload description images too
-          if (data.descriptionImages?.length > 0) {
-            data.descriptionImages = await uploadToR2(
-              data.descriptionImages, `${asin}/desc`, settings, () => {}
-            )
-          }
           progressCb('[PROGRESS] ✓ Images uploaded to CDN')
         } catch (r2Err) {
           console.warn('[R2] Auto-upload failed, keeping original URLs:', r2Err.message)

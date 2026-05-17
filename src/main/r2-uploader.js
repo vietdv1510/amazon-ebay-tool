@@ -11,8 +11,21 @@ import { NodeHttpHandler } from '@aws-sdk/node-http-handler'
 import https from 'node:https'
 import sharp from 'sharp'
 
+sharp.concurrency(1)
+
 let s3Client = null
 let cachedSettings = null
+let uploadQueue = Promise.resolve()
+
+function enqueueUpload(task) {
+  const queued = uploadQueue.then(task, task)
+  uploadQueue = queued.catch(() => {})
+  return queued
+}
+
+function isHttpUrl(url) {
+  return typeof url === 'string' && /^https?:\/\//i.test(url)
+}
 
 /**
  * Get or create S3 client (cached, recreated if settings change)
@@ -144,39 +157,128 @@ export async function uploadToR2(imageUrls, asin, settings, progressCb = () => {
   if (!imageUrls || imageUrls.length === 0) return []
 
   const client = getClient(settings)
-  const cdnUrls = []
+  const cdnUrls = Array(imageUrls.length)
+  const uniqueUrls = []
+  const urlToUniqueIndex = new Map()
 
   for (let i = 0; i < imageUrls.length; i++) {
     const url = imageUrls[i]
-    progressCb(`☁️ Upload ảnh ${i + 1}/${imageUrls.length}...`)
+    if (!isHttpUrl(url)) {
+      cdnUrls[i] = url
+      continue
+    }
+    if (!urlToUniqueIndex.has(url)) {
+      urlToUniqueIndex.set(url, uniqueUrls.length)
+      uniqueUrls.push(url)
+    }
+  }
+
+  const uploadedByUniqueIndex = new Map()
+
+  for (let i = 0; i < uniqueUrls.length; i++) {
+    const url = uniqueUrls[i]
+    progressCb(`☁️ Upload ảnh ${i + 1}/${uniqueUrls.length}...`)
 
     try {
-      // Download
-      const buffer = await downloadImage(url)
+      const cdnUrl = await enqueueUpload(async () => {
+        // Download
+        const buffer = await downloadImage(url)
 
-      // Process (WebP conversion)
-      const processed = await processImage(buffer, settings)
+        // Process (WebP conversion)
+        const processed = await processImage(buffer, settings)
 
-      // Upload
-      const key = `products/${asin}/${i + 1}.${processed.ext}`
-      const cdnUrl = await uploadSingle(
-        client,
-        processed.buffer,
-        key,
-        processed.contentType,
-        settings
-      )
+        // Upload
+        const key = `products/${asin}/${i + 1}.${processed.ext}`
+        const uploadedUrl = await uploadSingle(
+          client,
+          processed.buffer,
+          key,
+          processed.contentType,
+          settings
+        )
 
-      cdnUrls.push(cdnUrl)
-      console.log(`[R2] ✓ Uploaded ${key} (${(processed.buffer.length / 1024).toFixed(0)}KB)`)
+        console.log(`[R2] ✓ Uploaded ${key} (${(processed.buffer.length / 1024).toFixed(0)}KB)`)
+        return uploadedUrl
+      })
+
+      uploadedByUniqueIndex.set(i, cdnUrl)
     } catch (err) {
       console.error(`[R2] ✗ Failed to upload image ${i + 1} for ${asin}:`, err.message)
-      // Keep original URL on failure
-      cdnUrls.push(url)
+      uploadedByUniqueIndex.set(i, url)
+    }
+  }
+
+  for (let i = 0; i < imageUrls.length; i++) {
+    if (cdnUrls[i] !== undefined) continue
+    const uniqueIndex = urlToUniqueIndex.get(imageUrls[i])
+    if (uniqueIndex === undefined) {
+      cdnUrls[i] = imageUrls[i]
+    } else {
+      cdnUrls[i] = uploadedByUniqueIndex.get(uniqueIndex) || imageUrls[i]
     }
   }
 
   return cdnUrls
+}
+
+/**
+ * Upload all crawled product assets in one deduped pass, then map CDN URLs
+ * back to their original product / variation / description positions.
+ */
+export async function uploadProductAssetsToR2(data, asin, settings, progressCb = () => {}) {
+  if (!settings.useR2Cdn || !data) return data
+
+  const locationsByUrl = new Map()
+  const uniqueUrls = []
+
+  const addLocation = (url, apply) => {
+    if (!isHttpUrl(url)) return
+    if (!locationsByUrl.has(url)) {
+      locationsByUrl.set(url, [])
+      uniqueUrls.push(url)
+    }
+    locationsByUrl.get(url).push(apply)
+  }
+
+  if (Array.isArray(data.images)) {
+    data.images.forEach((url, index) => {
+      addLocation(url, (cdnUrl) => {
+        data.images[index] = cdnUrl
+      })
+    })
+  }
+
+  if (Array.isArray(data.variations)) {
+    data.variations.forEach((variation) => {
+      if (!variation) return
+      addLocation(variation?.image, (cdnUrl) => {
+        variation.image = cdnUrl
+      })
+    })
+  }
+
+  if (Array.isArray(data.descriptionImages)) {
+    data.descriptionImages.forEach((url, index) => {
+      addLocation(url, (cdnUrl) => {
+        data.descriptionImages[index] = cdnUrl
+      })
+    })
+  }
+
+  if (uniqueUrls.length === 0) return data
+
+  progressCb(`Uploading ${uniqueUrls.length} unique image(s) to CDN...`)
+  const cdnUrls = await uploadToR2(uniqueUrls, asin, settings, progressCb)
+
+  for (let i = 0; i < uniqueUrls.length; i++) {
+    const originalUrl = uniqueUrls[i]
+    const cdnUrl = cdnUrls[i] || originalUrl
+    for (const apply of locationsByUrl.get(originalUrl) || []) {
+      apply(cdnUrl)
+    }
+  }
+
+  return data
 }
 
 /**
