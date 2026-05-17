@@ -252,11 +252,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
     // Try to find title selector. If not found within 30s, reload page and try once more.
     // This handles transient network issues / slow Amazon responses.
-    let titleSelectorFound = false
     try {
       await page.waitForSelector(titleSelectorStr, { state: 'attached', timeout: 30000 })
-      titleSelectorFound = true
-    } catch (firstErr) {
+    } catch {
       console.warn(
         '[Crawler] ⚠️ Title selector not found within 30s. Reloading page for retry...'
       )
@@ -278,7 +276,6 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
         }
 
         await page.waitForSelector(titleSelectorStr, { state: 'attached', timeout: 30000 })
-        titleSelectorFound = true
         console.log('[Crawler] ✅ Title found after page reload!')
         progressCb('[PROGRESS] ✅ Page reloaded successfully')
       } catch (reloadErr) {
@@ -720,9 +717,8 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
         // Expanded selectors for A+ content and description images
         const aplusImgs = await page.$$eval(
           '#aplus-content img, #aplus img, #aplusProductDescription img, ' +
-            '.aplus-module img, [data-aplus-component] img, ' +
-            '#descriptionAndDetails img, #productDetails_table img, ' +
-            '.a-spacing-medium img, .a-section img',
+            '#aplus_feature_div img, #aplusBrandStory_feature_div img, #aplus3p_feature_div img, ' +
+            '.aplus-v2 img, .aplus-module img, [data-aplus-component] img',
           (els) =>
             els
               .filter((img) => {

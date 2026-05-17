@@ -866,9 +866,12 @@ const buildDescription = (row) => {
     parts.push('</ul>')
   }
 
-  if (row.images?.length > 0) {
+  const descriptionImages =
+    row.descriptionImages?.length > 0 ? row.descriptionImages : (row.images || []).slice(0, 5)
+
+  if (descriptionImages.length > 0) {
     parts.push('<div style=\'margin:16px 0\'>')
-    row.images.slice(0, 5).forEach(img => {
+    descriptionImages.forEach(img => {
       parts.push(`<img src='${img}' style='max-width:700px;width:100%;display:block;margin:8px 0' />`)
     })
     parts.push('</div>')
@@ -1028,7 +1031,7 @@ const handleExport = async (force = false) => {
 // _version is bumped on every DetailPanel save, guaranteeing rebuild for ANY edit.
 const readyFingerprint = computed(() =>
   readyProducts.value.map(r =>
-    `${r.asin}:${r.title}:${r.ebayCategory || ''}:${r.sellPrice || ''}:${r.brand || ''}:${r.images?.length || 0}:${r.variations?.length || 0}:${r._version || 0}`
+    `${r.asin}:${r.title}:${r.ebayCategory || ''}:${r.sellPrice || ''}:${r.brand || ''}:${r.images?.length || 0}:${r.descriptionImages?.length || 0}:${r.variations?.length || 0}:${r._version || 0}`
   ).join(',')
 )
 onMounted(buildPreview)
