@@ -127,7 +127,10 @@
         :settings="settings"
         @stats-update="handleStatsUpdate"
       />
-      <ExportPreview v-if="currentPage === 'preview'" :settings="settings" />
+      <!-- KeepAlive: ExportPreview stays alive to avoid re-fetching category aspects on tab switch -->
+      <KeepAlive>
+        <ExportPreview v-if="currentPage === 'preview'" :settings="settings" />
+      </KeepAlive>
       <!-- KeepAlive: Queue stays alive to preserve IPC listener + crawl state -->
       <KeepAlive>
         <Queue

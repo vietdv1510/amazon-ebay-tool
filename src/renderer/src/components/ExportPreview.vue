@@ -1024,10 +1024,12 @@ const handleExport = async (force = false) => {
   })
 }
 
-// Auto-build on mount and when the list of ready ASINs changes
-// (fingerprint avoids deep-watching every field mutation during crawling)
+// Auto-build on mount and when ready products' preview-relevant fields change.
+// _version is bumped on every DetailPanel save, guaranteeing rebuild for ANY edit.
 const readyFingerprint = computed(() =>
-  readyProducts.value.map(r => `${r.asin}:${r.title}:${r.ebayCategory || ''}`).join(',')
+  readyProducts.value.map(r =>
+    `${r.asin}:${r.title}:${r.ebayCategory || ''}:${r.sellPrice || ''}:${r.brand || ''}:${r.images?.length || 0}:${r.variations?.length || 0}:${r._version || 0}`
+  ).join(',')
 )
 onMounted(buildPreview)
 watch(readyFingerprint, buildPreview)

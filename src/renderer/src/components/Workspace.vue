@@ -167,6 +167,8 @@ const onRowClick = (row) => {
 const onDetailUpdate = (updatedRow) => {
   const idx = rowData.value.findIndex(r => r.id === updatedRow.id)
   if (idx !== -1) {
+    // Bump _version so ExportPreview fingerprint detects ANY edit
+    updatedRow._version = (updatedRow._version || 0) + 1
     rowData.value[idx] = updatedRow
   }
   selectedRow.value = { ...updatedRow }
