@@ -231,7 +231,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, watch, nextTick } from 'vue'
 
 import { toast } from 'vue-sonner'
 import { globalRowData as rowData } from '../store'
@@ -1035,6 +1035,7 @@ const readyFingerprint = computed(() =>
   ).join(',')
 )
 onMounted(buildPreview)
+onActivated(buildPreview)
 watch(readyFingerprint, buildPreview)
 </script>
 
