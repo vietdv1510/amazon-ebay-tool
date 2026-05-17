@@ -477,10 +477,24 @@ const crawlItem = async (row) => {
 // Tự động gợi ý và chọn category đầu tiên sau khi crawl DONE
 const autoSelectCategory = async (doneRow) => {
   if (!doneRow.title?.trim()) return
+
+  // Skip auto-category for rows with no meaningful crawl data
+  // (no images + no price = likely a failed/empty crawl that somehow passed)
+  const hasNoImages = !doneRow.images || doneRow.images.length === 0
+  const hasNoPrice = !doneRow.originalPrice || doneRow.originalPrice <= 0
+  if (hasNoImages && hasNoPrice) {
+    console.warn('[AutoCategory] Skipping — no images and no price, data likely invalid:', doneRow.asin)
+    return
+  }
+
   try {
     // Offline SQLite dùng LIKE match theo từng term → cần rút gọn query
     // thay vì gửi full title (dễ bị AND-miss với 8+ terms)
     const query = buildCategoryQuery(doneRow)
+    if (!query || query.length < 3) {
+      console.warn('[AutoCategory] Skipping — query too short:', query, doneRow.asin)
+      return
+    }
     const res = await window.api.ebay.categorySuggestions(query)
     if (res.ok && res.data?.length > 0) {
       const cat = res.data[0]
@@ -503,6 +517,17 @@ const autoSelectCategory = async (doneRow) => {
 // Offline DB chỉ match theo categoryName → cần dùng noun phổ thông, KHÔNG dùng brand
 // Ví dụ: "REACH Ultraclean Flosser Refill..." → "Flosser Refill" (bỏ brand REACH)
 const buildCategoryQuery = (row) => {
+  // Reject known non-product titles early
+  const titleLower = (row.title || '').toLowerCase().trim()
+  const NON_PRODUCT_PATTERNS = [
+    'amazon.com', 'amazon', 'page not found', 'robot check',
+    'something went wrong', 'sign in', 'error', '404',
+  ]
+  if (!titleLower || NON_PRODUCT_PATTERNS.includes(titleLower)) {
+    console.warn('[buildCategoryQuery] Rejected non-product title:', row.title)
+    return ''
+  }
+
   // Ưu tiên 1: Amazon breadcrumb — thử từng term từ cuối (specific nhất) lên
   // categories = ['Health', 'Oral Care', 'Dental Floss'] → thử 'Dental Floss', rồi 'Oral Care', rồi 'Health'
   // Tránh ghép multi-term AND "Oral Care Dental Floss" gây AND-miss → OR noise

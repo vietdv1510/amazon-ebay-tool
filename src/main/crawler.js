@@ -69,7 +69,10 @@ function isRetryableError(err) {
     msg.includes('blocked') ||
     msg.includes('http 503') ||
     msg.includes('http 429') ||
-    msg.includes('http 403')
+    msg.includes('http 403') ||
+    msg.includes('no usable data') ||
+    msg.includes('failed to load') ||
+    msg.includes('redirected away')
   )
 }
 
@@ -221,6 +224,21 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     progressCb('[PROGRESS] Waiting for page to load...')
     await page.waitForTimeout(waitMs)
 
+    // ── Early redirect detection ───────────────────────────────────────
+    // Amazon redirects invalid/unavailable products to homepage, search, or error pages.
+    // Detect this immediately to avoid wasting 30+ seconds on empty extraction.
+    const postLoadUrl = page.url()
+    const isStillProductPage =
+      postLoadUrl.includes('/dp/') || postLoadUrl.includes('/gp/product/')
+    if (!isStillProductPage) {
+      console.error(`[Crawler] ❌ Amazon redirected away from product page`)
+      console.error(`  - Expected: ${url}`)
+      console.error(`  - Actual:   ${postLoadUrl}`)
+      throw new Error(
+        `Amazon redirected away from product page (to: ${postLoadUrl.substring(0, 120)}). ASIN may be invalid or region-locked.`
+      )
+    }
+
     // Wait for product title to actually render (JS-driven pages load it late)
     progressCb('[PROGRESS] Waiting for product title...')
     const titleSelectors = [
@@ -232,18 +250,46 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     ]
     const titleSelectorStr = titleSelectors.join(', ')
 
-    // Increase timeout to 30s and log details
-    await page
-      .waitForSelector(titleSelectorStr, {
-        state: 'attached',
-        timeout: 30000
-      })
-      .catch((err) => {
-        console.log(
-          '[Crawler] ⚠️ Initial title selector not found within 30s. DOM might differ or page is loading slowly.',
-          err.message
+    // Try to find title selector. If not found within 30s, reload page and try once more.
+    // This handles transient network issues / slow Amazon responses.
+    let titleSelectorFound = false
+    try {
+      await page.waitForSelector(titleSelectorStr, { state: 'attached', timeout: 30000 })
+      titleSelectorFound = true
+    } catch (firstErr) {
+      console.warn(
+        '[Crawler] ⚠️ Title selector not found within 30s. Reloading page for retry...'
+      )
+      progressCb('[PROGRESS] Page loaded slowly — reloading and retrying...')
+
+      try {
+        httpBlockError = null // Reset before reload
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 40000 })
+        if (httpBlockError) throw httpBlockError
+
+        await page.waitForTimeout(crawlDelay * 1000 + Math.random() * 1000)
+
+        // Re-check redirect after reload
+        const reloadUrl = page.url()
+        if (!reloadUrl.includes('/dp/') && !reloadUrl.includes('/gp/product/')) {
+          throw new Error(
+            `Amazon redirected away after reload (to: ${reloadUrl.substring(0, 120)}). ASIN may be invalid.`
+          )
+        }
+
+        await page.waitForSelector(titleSelectorStr, { state: 'attached', timeout: 30000 })
+        titleSelectorFound = true
+        console.log('[Crawler] ✅ Title found after page reload!')
+        progressCb('[PROGRESS] ✅ Page reloaded successfully')
+      } catch (reloadErr) {
+        console.warn(
+          '[Crawler] ⚠️ Title still not found after reload:',
+          reloadErr.message
         )
-      })
+        // Don't throw here — continue with extraction.
+        // Data Quality Gate at the end will catch truly empty pages.
+      }
+    }
 
     // Wait 3-5s for JS to finish rendering
     await page.waitForTimeout(3000 + Math.random() * 2000)
@@ -307,9 +353,32 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
         if (cleanTitle === pageTitle && pageTitle.includes(':')) {
           cleanTitle = pageTitle.split(':').slice(1).join(':').trim()
         }
-        title = cleanTitle.trim()
-        if (title) {
+        cleanTitle = cleanTitle.trim()
+
+        // Reject non-product page titles (error pages, dog pages, redirects)
+        const NON_PRODUCT_TITLES = [
+          'amazon.com',
+          'amazon',
+          'page not found',
+          'robot check',
+          'sorry',
+          'something went wrong',
+          'error',
+          '404',
+          'sign in',
+          'amazon.com: online shopping',
+        ]
+        const isNonProduct = NON_PRODUCT_TITLES.some(
+          (t) => cleanTitle.toLowerCase() === t || cleanTitle.toLowerCase().startsWith(t + ' ')
+        )
+
+        if (cleanTitle && !isNonProduct) {
+          title = cleanTitle
           console.log(`✅ [Crawler] Extracted title from page <title>: ${title}`)
+        } else {
+          console.warn(
+            `[Crawler] ⚠️ page.title() rejected as non-product: "${pageTitle}" → cleaned: "${cleanTitle}"`
+          )
         }
       }
     }
@@ -813,6 +882,34 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       images = images.filter((url) => url && typeof url === 'string' && url.startsWith('http'))
     }
 
+    // ── Data Quality Gate ─────────────────────────────────────────────────
+    // If we got no meaningful data, the product page didn't load properly
+    // (dog page, redirect to homepage, invalid ASIN, geo-blocked, etc.)
+    const hasNoImages = images.length === 0
+    const hasNoPrice = !price || price <= 0
+    const hasNoSpecs = Object.keys(specs).length === 0
+    const hasNoBullets = bulletPoints.length === 0
+
+    if (hasNoImages && hasNoPrice && hasNoSpecs && hasNoBullets) {
+      const pageUrl = page.url()
+      console.error(`[Crawler] ❌ Data Quality Gate FAILED for ASIN ${asin}:`)
+      console.error(`  - title: "${title?.substring(0, 80)}"`)
+      console.error(`  - images: ${images.length}, price: ${price}, specs: ${Object.keys(specs).length}, bullets: ${bulletPoints.length}`)
+      console.error(`  - final URL: ${pageUrl}`)
+
+      // Check if Amazon redirected away from the product page
+      const isProductPage = pageUrl.includes('/dp/') || pageUrl.includes('/gp/product/')
+      if (!isProductPage) {
+        throw new Error(
+          `Amazon redirected away from product page (to: ${pageUrl.substring(0, 100)}). ASIN may be invalid or region-locked.`
+        )
+      }
+
+      throw new Error(
+        `No usable data extracted for ASIN ${asin} — 0 images, no price, no specs. Page may have failed to load properly.`
+      )
+    }
+
     // ASIN format validation
     if (!asin || !/^[A-Z0-9]{10}$/i.test(asin)) {
       console.warn('[Crawler] ⚠️ Invalid ASIN format:', asin)
@@ -1152,16 +1249,18 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
 
     // ── Fetch real prices per variation (navigate each ASIN) ────────────
     if (variations.length > 0) {
-      progressCb(`[PROGRESS] Fetching prices for ${variations.length} variations...`)
-      const context = page.context()
-      for (let i = 0; i < variations.length; i++) {
-        const v = variations[i]
-        // Skip current ASIN (already have price) or if we already got price from JS
-        if (v.price !== basePrice && v.price > 0) continue
+      const toFetch = variations.filter((v) => !v.price || v.price === basePrice || v.price <= 0)
 
+      if (toFetch.length > 0) {
+        progressCb(`[PROGRESS] Fetching prices for ${toFetch.length} variations...`)
+      }
+      const context = page.context()
+
+      for (let i = 0; i < toFetch.length; i++) {
+        const v = toFetch[i]
         let varPage = null
         try {
-          progressCb(`[PROGRESS] Variation price ${i + 1}/${variations.length}: ${v.asin}...`)
+          progressCb(`[PROGRESS] Variation price ${i + 1}/${toFetch.length}: ${v.asin}...`)
           varPage = await context.newPage()
           // Block heavy resources for variant pages too
           await varPage.route('**/*', (route) => {
@@ -1176,6 +1275,16 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
             timeout: 12000
           })
           await varPage.waitForTimeout(1500)
+
+          // Guard: check if Amazon redirected away from product page
+          const varUrl = varPage.url()
+          if (!varUrl.includes('/dp/') && !varUrl.includes('/gp/product/')) {
+            console.warn(`[variation ${v.asin}] redirected away → skipping price fetch`)
+            await varPage.close().catch(() => {})
+            varPage = null
+            continue
+          }
+
           // Wait for price to render
           await varPage.waitForSelector('.a-price .a-offscreen', { timeout: 5000 }).catch(() => {})
           const vHtml = await getStablePageContent(varPage, {
