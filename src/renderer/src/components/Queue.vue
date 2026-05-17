@@ -221,14 +221,17 @@ const formatNumber = (n) => {
   return String(n)
 }
 
-// ─── Stats ────────────────────────────────────────────────────────────────
+// ─── Stats (single-pass — was 4× .filter()) ─────────────────────────────
 const stats = computed(() => {
-  const total = rowData.value.length
-  const done = rowData.value.filter(r => r.status === 'DONE').length
-  const error = rowData.value.filter(r => r.status === 'ERROR').length
-  const crawling = rowData.value.filter(r => r.status === 'CRAWLING').length
-  const pending = rowData.value.filter(r => r.status === 'PENDING').length
-  return { total, done, error, crawling, pending }
+  const counts = { total: 0, done: 0, error: 0, crawling: 0, pending: 0 }
+  for (const r of rowData.value) {
+    counts.total++
+    if (r.status === 'DONE') counts.done++
+    else if (r.status === 'ERROR') counts.error++
+    else if (r.status === 'CRAWLING') counts.crawling++
+    else if (r.status === 'PENDING') counts.pending++
+  }
+  return counts
 })
 
 watch(stats, (s) => emit('stats-update', s))
@@ -432,7 +435,7 @@ const stopCrawl = () => {
 }
 
 const crawlItem = async (row) => {
-  updateRow({ ...row, status: 'CRAWLING', log: 'Khởi động trình duyệt...' })
+  updateRow({ id: row.id, status: 'CRAWLING', log: 'Khởi động trình duyệt...' })
   try {
     const response = await window.api.crawl.asin(row.asin)
     if (response.ok) {
@@ -470,7 +473,7 @@ const crawlItem = async (row) => {
       throw new Error(response.error)
     }
   } catch (err) {
-    updateRow({ ...row, status: 'ERROR', log: err.message || 'Lỗi crawler' })
+    updateRow({ id: row.id, status: 'ERROR', log: err.message || 'Lỗi crawler' })
   }
 }
 
@@ -501,7 +504,7 @@ const autoSelectCategory = async (doneRow) => {
       const current = rowData.value.find(r => r.id === doneRow.id)
       if (current && !current.ebayCategory) {
         updateRow({
-          ...current,
+          id: doneRow.id,
           ebayCategory: cat.categoryId,
           ebayCategoryName: cat.categoryName,
           log: `✓ Hoàn tất — ${cat.categoryName} (ID: ${cat.categoryId})`,
@@ -568,10 +571,10 @@ const buildCategoryQuery = (row) => {
   return query.substring(0, 80) || title.substring(0, 80)
 }
 
-const updateRow = (row) => {
-  const idx = rowData.value.findIndex(r => r.id === row.id)
-  if (idx !== -1) {
-    rowData.value[idx] = row
+const updateRow = (updates) => {
+  const existing = rowData.value.find(r => r.id === updates.id)
+  if (existing) {
+    Object.assign(existing, updates)
   }
 }
 
@@ -587,7 +590,7 @@ onMounted(() => {
   unsubProgress = window.api.crawl.onProgress(({ asin, message }) => {
     const row = rowData.value.find(r => r.asin === asin)
     if (row && row.status === 'CRAWLING') {
-      updateRow({ ...row, log: message })
+      row.log = message  // mutate directly — avoids spread + full object replace
     }
   })
 })

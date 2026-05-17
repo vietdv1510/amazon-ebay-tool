@@ -127,14 +127,17 @@
         :settings="settings"
         @stats-update="handleStatsUpdate"
       />
-      <ExportPreview v-else-if="currentPage === 'preview'" :settings="settings" />
-      <Queue
-        v-else-if="currentPage === 'queue'"
-        :settings="settings"
-        @stats-update="handleStatsUpdate"
-      />
+      <ExportPreview v-if="currentPage === 'preview'" :settings="settings" />
+      <!-- KeepAlive: Queue stays alive to preserve IPC listener + crawl state -->
+      <KeepAlive>
+        <Queue
+          v-if="currentPage === 'queue'"
+          :settings="settings"
+          @stats-update="handleStatsUpdate"
+        />
+      </KeepAlive>
       <Settings
-        v-else-if="currentPage === 'settings'"
+        v-if="currentPage === 'settings'"
         :initial-settings="settings"
         @save="handleSettingsSave"
       />

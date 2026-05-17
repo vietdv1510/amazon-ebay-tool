@@ -491,8 +491,8 @@ const getCellUsageLabel = (row, col) => {
 
 const isStandardCellRequired = (row, col) => {
   if (isAspectCol(col)) return false
-  const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType] || []
-  return requiredCols.includes(col)
+  const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType]
+  return requiredCols?.has(col) || false
 }
 
 const getColumnRequiredState = (col) => {
@@ -556,9 +556,9 @@ const ALWAYS_REQUIRED_COLUMNS = [
 ]
 
 const ROW_REQUIRED_COLUMNS = {
-  parent: [...ALWAYS_REQUIRED_COLUMNS, 'RelationshipDetails'],
-  child: ['Relationship', 'RelationshipDetails', '*Quantity', '*StartPrice', 'CustomLabel'],
-  single: [...ALWAYS_REQUIRED_COLUMNS, '*StartPrice', '*Quantity']
+  parent: new Set([...ALWAYS_REQUIRED_COLUMNS, 'RelationshipDetails']),
+  child: new Set(['Relationship', 'RelationshipDetails', '*Quantity', '*StartPrice', 'CustomLabel']),
+  single: new Set([...ALWAYS_REQUIRED_COLUMNS, '*StartPrice', '*Quantity'])
 }
 
 const readyProducts = computed(() =>
@@ -570,8 +570,8 @@ const isValEmpty = (val) => val == null || String(val).trim() === ''
 const isCellMissingRequired = (row, col) => {
   const empty = isValEmpty(row[col])
   // Standard fixed required columns (includes *, Relationship*, CustomLabel, etc.)
-  const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType] || []
-  if (requiredCols.includes(col)) {
+  const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType]
+  if (requiredCols?.has(col)) {
     return empty
   }
   // C: aspects — required only if THIS row's category marks it REQUIRED
@@ -585,12 +585,12 @@ const isCellMissingRequired = (row, col) => {
 }
 
 const errorCount = computed(() => {
-  let count = 0
-  for (const [idx, row] of previewRows.value.entries()) {
+  // Count validation errors from the pre-computed map (title length, missing policies)
+  let count = Object.keys(validationErrors.value).length
+  // Count missing required cells (separate from validationErrors)
+  for (const row of previewRows.value) {
     for (const col of allColumns.value) {
       if (isCellMissingRequired(row, col)) {
-        count++
-      } else if (validationErrors.value[`${idx}-${col}`]) {
         count++
       }
     }
@@ -964,20 +964,7 @@ const cleanTitle = (title) => {
 // ─── Export (reuses preview data) ─────────────────────────────────────────────
 
 const validatePreview = () => {
-  let hasErrors = Object.keys(validationErrors.value).length > 0
-
-  previewRows.value.forEach((row, idx) => {
-    // Check missing required fields
-    allColumns.value.forEach(col => {
-      if (isCellMissingRequired(row, col)) {
-        hasErrors = true
-        // We do NOT add to validationErrors here because missing fields
-        // already have the empty-placeholder (Required) visual indicator.
-      }
-    })
-  })
-
-  return !hasErrors
+  return errorCount.value === 0
 }
 
 const handleExport = async (force = false) => {
@@ -1037,9 +1024,13 @@ const handleExport = async (force = false) => {
   })
 }
 
-// Auto-build on mount and when data changes
+// Auto-build on mount and when the list of ready ASINs changes
+// (fingerprint avoids deep-watching every field mutation during crawling)
+const readyFingerprint = computed(() =>
+  readyProducts.value.map(r => `${r.asin}:${r.title}:${r.ebayCategory || ''}`).join(',')
+)
 onMounted(buildPreview)
-watch(readyProducts, buildPreview, { deep: true })
+watch(readyFingerprint, buildPreview)
 </script>
 
 <style scoped>
