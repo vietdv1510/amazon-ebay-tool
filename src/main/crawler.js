@@ -704,7 +704,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     }
 
     // A+ content
-    const aplusEl = $('#aplus-content, #aplus, #aplusProductDescription')
+    const aplusEl = $(
+      '#aplus-content, #aplus, #aplusProductDescription, #aplus_feature_div, #aplus3p_feature_div, .aplus-v2'
+    )
     if (aplusEl.length) {
       if (!description) {
         description = aplusEl.text().trim().replace(/\s+/g, ' ').substring(0, 3000)
@@ -714,36 +716,78 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       }
       // Extract A+ images via Playwright (cheerio misses lazy-loaded)
       try {
-        // Expanded selectors for A+ content and description images
+        // A+ product description images only. Brand Story / carousel blocks often
+        // contain cross-sell/category images that should not be exported as description.
         const aplusImgs = await page.$$eval(
           '#aplus-content img, #aplus img, #aplusProductDescription img, ' +
-            '#aplus_feature_div img, #aplusBrandStory_feature_div img, #aplus3p_feature_div img, ' +
+            '#aplus_feature_div img, #aplus3p_feature_div img, ' +
             '.aplus-v2 img, .aplus-module img, [data-aplus-component] img',
-          (els) =>
-            els
+          (els) => {
+            const brandStoryMarker = Array.from(
+              document.querySelectorAll(
+                'h1, h2, h3, h4, span, div, #aplusBrandStory_feature_div, #brandStory_feature_div'
+              )
+            ).find((el) => {
+              const text = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase()
+              return text === 'from the brand'
+            })
+
+            const excludedAncestors = [
+              '#aplusBrandStory_feature_div',
+              '#brandStory_feature_div',
+              '[id*="BrandStory"]',
+              '[id*="brandStory"]',
+              '[id*="brand-story"]',
+              '[class*="brand-story"]',
+              '[cel_widget_id*="brandStory"]',
+              '[data-cel-widget*="brandStory"]'
+            ].join(', ')
+
+            const isBeforeBrandStory = (img) => {
+              if (!brandStoryMarker) return true
+              return Boolean(img.compareDocumentPosition(brandStoryMarker) & Node.DOCUMENT_POSITION_FOLLOWING)
+            }
+
+            const getImageSrc = (img) => {
+              const dynamicImage = img.getAttribute('data-a-dynamic-image')
+              if (dynamicImage) {
+                try {
+                  const parsed = JSON.parse(dynamicImage)
+                  const urls = Object.keys(parsed)
+                  if (urls.length > 0) return urls[0]
+                } catch {
+                  // Fall back to normal attributes below.
+                }
+              }
+
+              return img.getAttribute('data-src') || img.getAttribute('src') || ''
+            }
+
+            return els
+              .filter((img) => !img.closest(excludedAncestors))
+              .filter(isBeforeBrandStory)
               .filter((img) => {
                 const w = img.naturalWidth || img.width || 0
                 const h = img.naturalHeight || img.height || 0
-                // Filter out 1x1 placeholders and tiny icons
+                // Filter out loaded placeholders and tiny icons. If images are blocked
+                // for crawler performance, dimensions may be 0 and source filters below apply.
                 return (w > 10 && h > 10) || (!w && !h)
               })
               .map((img) => {
-                let src =
-                  img.getAttribute('data-src') ||
-                  img.getAttribute('data-a-dynamic-image') ||
-                  img.getAttribute('src') ||
-                  ''
-                // Convert to full resolution
-                src = src.replace(/\._.*_\./, '.')
-                return src
+                const src = getImageSrc(img)
+                return src.replace(/\._.*_\./, '.')
               })
-              .filter(
-                (src) =>
-                  src &&
-                  src.startsWith('http') &&
-                  !src.includes('sprite') &&
-                  !src.includes('grey-pixel')
-              )
+              .filter((src) => {
+                if (!src || !src.startsWith('http')) return false
+                const lower = src.toLowerCase()
+                return (
+                  !lower.includes('sprite') &&
+                  !lower.includes('grey-pixel') &&
+                  !lower.includes('transparent-pixel') &&
+                  !lower.includes('/nav-sprite')
+                )
+              })
+          }
         )
         for (const src of aplusImgs) {
           if (!descriptionImages.includes(src)) descriptionImages.push(src)
