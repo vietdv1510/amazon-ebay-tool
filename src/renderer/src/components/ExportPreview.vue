@@ -18,12 +18,24 @@
             {{ isAiGenerating ? aiGenProgress : 'Tạo mô tả bằng AI' }}
           </Button>
 
+          <!-- Selective export toggle -->
+          <Button
+            size="sm"
+            :variant="selectiveMode ? 'default' : 'outline'"
+            @click="toggleSelectiveMode"
+            :disabled="previewRows.length === 0"
+            title="Bật/tắt chế độ chọn sản phẩm để export"
+          >
+            <ListFilter class="w-4 h-4 mr-1.5" />
+            {{ selectiveMode ? `Đã chọn (${selectedProductCount})` : 'Export tùy chỉnh' }}
+          </Button>
+
           <Button size="sm" variant="destructive" @click="handleExport(true)" :disabled="previewRows.length === 0" title="Ép xuất không cần kiểm tra lỗi">
             Export thô (Bỏ qua lỗi)
           </Button>
-          <Button size="sm" @click="handleExport(false)" :disabled="previewRows.length === 0">
+          <Button size="sm" @click="handleExport(false)" :disabled="selectiveMode && selectedProductCount === 0 || previewRows.length === 0">
             <Download class="w-4 h-4 mr-2" />
-            Export CSV
+            {{ selectiveMode ? `Export (${selectedProductCount})` : 'Export CSV' }}
           </Button>
       </div>
     </div>
@@ -124,6 +136,11 @@
           <table class="preview-table">
             <thead>
               <tr>
+                <th v-if="selectiveMode" class="checkbox-col">
+                  <label class="select-all-wrap" title="Chọn / bỏ chọn tất cả">
+                    <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="product-checkbox" />
+                  </label>
+                </th>
                 <th class="row-num-col">#</th>
                 <th class="row-type-col">Loại</th>
                 <th
@@ -155,6 +172,16 @@
                 :key="idx"
                 :class="getRowClass(row)"
               >
+                <td v-if="selectiveMode" class="checkbox-col">
+                  <label v-if="row._rowType === 'parent' || row._rowType === 'single'" class="checkbox-wrap">
+                    <input
+                      type="checkbox"
+                      :checked="selectedProducts.has(row._productAsin)"
+                      @change="toggleProduct(row._productAsin)"
+                      class="product-checkbox"
+                    />
+                  </label>
+                </td>
                 <td class="row-num-col">{{ idx + 1 }}</td>
                 <td class="row-type-col">
                   <Badge
@@ -240,7 +267,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   FileSpreadsheet, Download, RefreshCw, AlertTriangle,
-  Package, Rows3, Columns3, Check, X, Sparkles
+  Package, Rows3, Columns3, Check, X, Sparkles, ListFilter
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -249,6 +276,52 @@ const props = defineProps({
 
 const previewRows = ref([])
 const allColumns = ref([])
+
+// ─── Selective Export ────────────────────────────────────────────────────
+const selectiveMode = ref(false)
+const selectedProducts = ref(new Set())
+
+const selectedProductCount = computed(() => selectedProducts.value.size)
+
+const isAllSelected = computed(() => {
+  const parentAsins = new Set(
+    previewRows.value
+      .filter(r => r._rowType === 'parent' || r._rowType === 'single')
+      .map(r => r._productAsin)
+  )
+  return parentAsins.size > 0 && parentAsins.size === selectedProducts.value.size
+})
+
+const toggleSelectiveMode = () => {
+  selectiveMode.value = !selectiveMode.value
+  if (!selectiveMode.value) {
+    selectedProducts.value = new Set() // Reset khi tắt
+  } else {
+    // Mặc định chọn tất cả khi bật
+    const allAsins = previewRows.value
+      .filter(r => r._rowType === 'parent' || r._rowType === 'single')
+      .map(r => r._productAsin)
+    selectedProducts.value = new Set(allAsins)
+  }
+}
+
+const toggleProduct = (asin) => {
+  const next = new Set(selectedProducts.value)
+  if (next.has(asin)) next.delete(asin)
+  else next.add(asin)
+  selectedProducts.value = next
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedProducts.value = new Set()
+  } else {
+    const allAsins = previewRows.value
+      .filter(r => r._rowType === 'parent' || r._rowType === 'single')
+      .map(r => r._productAsin)
+    selectedProducts.value = new Set(allAsins)
+  }
+}
 
 // ─── AI Gen ──────────────────────────────────────────────────────────────
 const isAiGenerating = ref(false)
@@ -673,6 +746,7 @@ const buildPreview = async () => {
         const parentRelDetails = buildParentRelationshipDetails(r.variations)
         rows.push({
           _rowType: 'parent',
+          _productAsin: r.asin,
           _ebayCategory: r.ebayCategory || '',
           [ACTION_HEADER.value]: 'Add',
           'CustomLabel': r.asin,
@@ -711,6 +785,7 @@ const buildPreview = async () => {
             .join('|')
           rows.push({
             _rowType: 'child',
+            _productAsin: r.asin,
             _ebayCategory: r.ebayCategory || '',
             [ACTION_HEADER.value]: '',
             'CustomLabel': v.asin || '',
@@ -744,6 +819,7 @@ const buildPreview = async () => {
         // Single product
         rows.push({
           _rowType: 'single',
+          _productAsin: r.asin,
           _ebayCategory: r.ebayCategory || '',
           [ACTION_HEADER.value]: 'Add',
           'CustomLabel': r.asin,
@@ -987,10 +1063,17 @@ const handleExport = async (force = false) => {
   const exportPath = await window.api.dialog.saveFile({ defaultPath: 'ebay-upload-template.csv' })
   if (!exportPath) return
 
+  // Filter by selection if selective mode is on
+  let rowsToExport = previewRows.value
+  if (selectiveMode.value && selectedProducts.value.size > 0) {
+    rowsToExport = previewRows.value.filter(r => selectedProducts.value.has(r._productAsin))
+  }
+
   // Remove internal fields before export
-  const exportRows = previewRows.value.map(r => {
+  const exportRows = rowsToExport.map(r => {
     const clean = { ...r }
     delete clean._rowType
+    delete clean._productAsin
     delete clean._ebayCategory
     return clean
   })
@@ -1025,7 +1108,9 @@ const handleExport = async (force = false) => {
   const csvContent = '\uFEFF' + csvLines.join('\r\n') + '\r\n'
   await window.api.file.write(exportPath, csvContent)
   toast.success('Export thành công!', {
-    description: `${readyProducts.value.length} sản phẩm (${exportRows.length} dòng CSV).`,
+    description: selectiveMode.value
+      ? `${selectedProducts.value.size} sản phẩm được chọn (${exportRows.length} dòng CSV).`
+      : `${readyProducts.value.length} sản phẩm (${exportRows.length} dòng CSV).`,
     duration: 3000
   })
 }
@@ -1366,6 +1451,43 @@ watch(readyFingerprint, buildPreview)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ─── Checkbox column (selective export) ─────────────────────────────── */
+.checkbox-col {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  text-align: center;
+  padding: 0 !important;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: inherit;
+}
+
+thead .checkbox-col {
+  background: hsl(var(--muted));
+  z-index: 4;
+}
+
+.select-all-wrap,
+.checkbox-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.product-checkbox {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: hsl(var(--primary));
+  border-radius: 3px;
 }
 
 .row-num-col {
