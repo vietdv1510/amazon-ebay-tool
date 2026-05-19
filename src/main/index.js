@@ -39,6 +39,7 @@ const DEFAULT_SETTINGS = {
   crawlDelay: 2,
   crawlRetry: 3,
   headlessMode: true,
+  ebayCountry: 'US',
   ebayEnv: 'sandbox',
   ebayClientId: '',
   ebayClientSecret: '',
@@ -86,9 +87,7 @@ function loadSettings() {
         console.log('[Settings] Migration V3: crawlThreads forced to 2')
       }
 
-      // Always enforce headless mode for stability/performance since we hid it in UI
-      merged.headlessMode = true
-
+      // headlessMode is now user-configurable via Settings UI
       console.log('[Settings] Merged settings:', JSON.stringify(merged))
       return merged
     }
@@ -241,7 +240,7 @@ ipcMain.handle('file:write', (_, filePath, content) => {
 })
 
 // Crawl single ASIN
-ipcMain.handle('crawl:asin', async (event, asin) => {
+ipcMain.handle('crawl:asin', async (event, asin, amazonUrl) => {
   try {
     const settings = loadSettings()
     const senderId = event.sender.id
@@ -258,7 +257,8 @@ ipcMain.handle('crawl:asin', async (event, asin) => {
       defaultQuantity: settings.defaultQuantity || 10,
       forceUSLocation: settings.forceUSLocation !== false,
       maxRetries: settings.crawlRetry ?? 3,
-      baseRetryDelayMs: 5000
+      baseRetryDelayMs: 5000,
+      amazonUrl: amazonUrl || ''
     })
 
     if (!data) {

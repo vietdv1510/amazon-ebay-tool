@@ -8,30 +8,48 @@ chromium.use(stealth())
 
 /**
  * Resolve the bundled Chromium executable path at runtime.
- * Bypasses PLAYWRIGHT_BROWSERS_PATH which can be cached before env var is set.
+ * When headless=true → use chrome-headless-shell (lightweight).
+ * When headless=false → use full Chromium (has GUI window).
  */
-function getChromiumExecutable() {
+function getChromiumExecutable(headless = true) {
   const browsersPath = app.isPackaged
     ? join(process.resourcesPath, 'playwright-browsers')
     : join(app.getAppPath(), '..', 'playwright-browsers')
 
-  const revision = 'chromium_headless_shell-1217'
-  let platformDir
-  if (process.platform === 'win32') {
-    platformDir = 'chrome-headless-shell-win64'
-  } else if (process.platform === 'darwin') {
-    platformDir = process.arch === 'arm64'
-      ? 'chrome-headless-shell-mac-arm64'
-      : 'chrome-headless-shell-mac-x64'
+  if (headless) {
+    // Headless-only shell binary (lightweight, no GUI)
+    const revision = 'chromium_headless_shell-1217'
+    let platformDir
+    if (process.platform === 'win32') {
+      platformDir = 'chrome-headless-shell-win64'
+    } else if (process.platform === 'darwin') {
+      platformDir = process.arch === 'arm64'
+        ? 'chrome-headless-shell-mac-arm64'
+        : 'chrome-headless-shell-mac-x64'
+    } else {
+      platformDir = 'chrome-headless-shell-linux-x64'
+    }
+    const exeName = process.platform === 'win32'
+      ? 'chrome-headless-shell.exe'
+      : 'chrome-headless-shell'
+    return join(browsersPath, revision, platformDir, exeName)
   } else {
-    platformDir = 'chrome-headless-shell-linux-x64'
+    // Full Chromium with GUI (needed for non-headless mode)
+    const revision = 'chromium-1217'
+    if (process.platform === 'win32') {
+      return join(browsersPath, revision, 'chrome-win64', 'chrome.exe')
+    } else if (process.platform === 'darwin') {
+      const platformDir = process.arch === 'arm64'
+        ? 'chrome-mac-arm64'
+        : 'chrome-mac-x64'
+      return join(
+        browsersPath, revision, platformDir,
+        'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'
+      )
+    } else {
+      return join(browsersPath, revision, 'chrome-linux64', 'chrome')
+    }
   }
-
-  const exeName = process.platform === 'win32'
-    ? 'chrome-headless-shell.exe'
-    : 'chrome-headless-shell'
-
-  return join(browsersPath, revision, platformDir, exeName)
 }
 
 let browser = null
@@ -84,7 +102,7 @@ export async function initBrowser(headless = true) {
     currentHeadless = headless
     browser = await chromium.launch({
       headless,
-      executablePath: getChromiumExecutable(),
+      executablePath: getChromiumExecutable(headless),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -162,6 +180,7 @@ export async function crawlAmazonWithRetry(asin, progressCb, options = {}) {
 }
 
 export async function crawlAmazon(asin, progressCb, options = {}) {
+  const amazonUrl = options.amazonUrl || ''
   const { headless = true, delay: crawlDelay = 2, defaultQuantity = 10 } = options
   const b = await initBrowser(headless)
 
@@ -184,10 +203,12 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
   const page = await context.newPage()
 
-  // ── Block heavy resources to save RAM/CPU (~40% reduction) ──────────────
+  // ── Block heavy resources to save RAM/CPU ────────────────────────────────
+  // NOTE: Do NOT block 'stylesheet' — Amazon's JS rendering pipeline depends
+  // on CSS being loaded. Blocking it prevents #productTitle from appearing.
   await page.route('**/*', (route) => {
     const type = route.request().resourceType()
-    if (['image', 'font', 'media', 'stylesheet'].includes(type)) {
+    if (['image', 'font', 'media'].includes(type)) {
       return route.abort()
     }
     return route.continue()
@@ -197,7 +218,8 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
   progressCb('[PROGRESS] Starting browser...')
 
   try {
-    const url = `https://www.amazon.com/dp/${asin}`
+    // Prefer original Amazon URL from Excel; fallback to ASIN-constructed URL
+    const url = (amazonUrl && amazonUrl.includes('amazon.com')) ? amazonUrl : `https://www.amazon.com/dp/${asin}`
 
     // ── HTTP response guard: detect Amazon blocks before parsing ─────────
     let httpBlockError = null
@@ -216,9 +238,29 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     })
 
     progressCb(`[PROGRESS] Opening Amazon page...`)
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 40000 })
+    await page.goto(url, { waitUntil: 'load', timeout: 45000 })
 
     if (httpBlockError) throw httpBlockError
+
+    // ── Handle "Continue shopping" interstitial ─────────────────────────
+    // Amazon shows a gateway page with: "Click the button below to continue shopping"
+    // This can appear even when URL contains /dp/ — so always check for the button.
+    try {
+      let continueBtn = await page.$('button.a-button-text[alt="Continue shopping"]')
+      if (!continueBtn) {
+        continueBtn = await page.$('button:has-text("Continue shopping")')
+      }
+      if (continueBtn) {
+        console.log('[Crawler] 🛒 "Continue shopping" interstitial detected — clicking...')
+        progressCb('[PROGRESS] Bypassing Amazon gateway page...')
+        await continueBtn.click()
+        await page.waitForLoadState('load', { timeout: 30000 })
+        await page.waitForTimeout(1500)
+        console.log('[Crawler] ✅ Passed interstitial, now on:', page.url())
+      }
+    } catch (e) {
+      console.warn('[Crawler] ⚠️ Continue-shopping bypass attempt failed:', e.message)
+    }
 
     const waitMs = crawlDelay * 1000 + Math.random() * 1000
     progressCb('[PROGRESS] Waiting for page to load...')
@@ -237,6 +279,20 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       throw new Error(
         `Amazon redirected away from product page (to: ${postLoadUrl.substring(0, 120)}). ASIN may be invalid or region-locked.`
       )
+    }
+
+    // ── Early CAPTCHA / bot-block detection ──────────────────────────────
+    // Fail fast instead of waiting 30s for title selectors that will never appear.
+    const pageText = await page.evaluate(() => document.body?.innerText?.substring(0, 2000) || '')
+    const bodyLower = pageText.toLowerCase()
+    if (
+      bodyLower.includes('type the characters you see') ||
+      bodyLower.includes('enter the characters you see') ||
+      bodyLower.includes('sorry, we just need to make sure') ||
+      bodyLower.includes('captcha')
+    ) {
+      console.error('[Crawler] 🤖 CAPTCHA detected — Amazon is blocking this crawler session')
+      throw new Error('Amazon CAPTCHA detected. Please wait a few minutes and try again, or switch IP/VPN.')
     }
 
     // Wait for product title to actually render (JS-driven pages load it late)
@@ -262,7 +318,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
       try {
         httpBlockError = null // Reset before reload
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: 40000 })
+        await page.reload({ waitUntil: 'load', timeout: 45000 })
         if (httpBlockError) throw httpBlockError
 
         await page.waitForTimeout(crawlDelay * 1000 + Math.random() * 1000)
@@ -988,6 +1044,10 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     await page.close().catch(() => {})
     await context.close().catch(() => {})
     activeCrawls.delete(asin)
+    // Close browser when no more active crawls — prevents zombie Chrome windows
+    if (activeCrawls.size === 0) {
+      await closeBrowser()
+    }
   }
 }
 
@@ -1027,81 +1087,93 @@ async function getStablePageContent(page, options = {}) {
  * Wrapped with a hard timeout to prevent hanging.
  */
 async function trySetUSDelivery(page) {
-  try {
-    console.log('[trySetUSDelivery] Hardening location to US (10001)...')
+  const MAX_ATTEMPTS = 2
 
-    const result = await page.evaluate(async () => {
-      const wait = (ms) => new Promise((res) => setTimeout(res, ms))
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      console.log(`[trySetUSDelivery] Hardening location to US (10001)... (attempt ${attempt}/${MAX_ATTEMPTS})`)
 
-      // 1. Check current location
-      const locText =
-        document.querySelector('#glow-ingress-block, #nav-global-location-popover-link')
-          ?.textContent || ''
-      if (locText.includes('10001') || locText.includes('New York')) return 'ALREADY_US'
+      const result = await page.evaluate(async () => {
+        const wait = (ms) => new Promise((res) => setTimeout(res, ms))
 
-      // 2. Open popover
-      const btn = document.querySelector('#nav-global-location-popover-link, #glow-ingress-block')
-      if (!btn) return 'NO_BUTTON'
-      btn.click()
-      await wait(1500)
+        // 1. Check current location
+        const locText =
+          document.querySelector('#glow-ingress-block, #nav-global-location-popover-link')
+            ?.textContent || ''
+        if (locText.includes('10001') || locText.includes('New York')) return 'ALREADY_US'
 
-      // 3. Enter Zip
-      const input = document.querySelector('#GLUXZipUpdateInput')
-      if (!input) return 'NO_INPUT'
-      input.value = '10001'
-      // Trigger input events so Amazon knows we typed
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-      input.dispatchEvent(new Event('change', { bubbles: true }))
-      await wait(500)
+        // 2. Open popover
+        const btn = document.querySelector('#nav-global-location-popover-link, #glow-ingress-block')
+        if (!btn) return 'NO_BUTTON'
+        btn.click()
+        await wait(2000)
 
-      // 4. Click Apply
-      const applyBtn = document.querySelector(
-        '#GLUXZipUpdate input[type="submit"], #GLUXZipUpdate .a-button-input'
-      )
-      if (!applyBtn) return 'NO_APPLY'
-      applyBtn.click()
-      await wait(2000)
+        // 3. Enter Zip
+        const input = document.querySelector('#GLUXZipUpdateInput')
+        if (!input) return 'NO_INPUT'
+        input.value = '10001'
+        // Trigger input events so Amazon knows we typed
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        input.dispatchEvent(new Event('change', { bubbles: true }))
+        await wait(500)
 
-      // 5. Click Continue/Done
-      const continueBtn = document.querySelector(
-        '.a-popover-footer .a-button-primary .a-button-input, #GLUXConfirmClose .a-button-input, button[name="glowDoneButton"]'
-      )
-      if (continueBtn) {
-        continueBtn.click()
-        return 'SUCCESS_CONTINUE'
+        // 4. Click Apply
+        const applyBtn = document.querySelector(
+          '#GLUXZipUpdate input[type="submit"], #GLUXZipUpdate .a-button-input'
+        )
+        if (!applyBtn) return 'NO_APPLY'
+        applyBtn.click()
+        await wait(2000)
+
+        // 5. Click Continue/Done
+        const continueBtn = document.querySelector(
+          '.a-popover-footer .a-button-primary .a-button-input, #GLUXConfirmClose .a-button-input, button[name="glowDoneButton"]'
+        )
+        if (continueBtn) {
+          continueBtn.click()
+          return 'SUCCESS_CONTINUE'
+        }
+
+        return 'SUCCESS_ZIP_ONLY'
+      })
+
+      console.log(`[trySetUSDelivery] Result: ${result}`)
+
+      if (result === 'ALREADY_US' || result.startsWith('SUCCESS')) {
+        if (result.startsWith('SUCCESS')) {
+          await page.waitForTimeout(1000)
+          await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
+          await page
+            .reload({ waitUntil: 'domcontentloaded' })
+            .catch((err) => {
+              const message = String(err?.message || err)
+              if (!message.includes('ERR_ABORTED') && !message.includes('frame was detached')) {
+                throw err
+              }
+              console.debug('[trySetUSDelivery] Reload skipped because Amazon was already navigating.')
+            })
+          await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+          await page.waitForTimeout(500)
+          console.log('[trySetUSDelivery] Reloaded page to apply location.')
+        }
+        return // Success — exit retry loop
       }
 
-      return 'SUCCESS_ZIP_ONLY'
-    })
-
-    console.log(`[trySetUSDelivery] Result: ${result}`)
-
-    // Warning if location not properly set
-    if (!result.startsWith('SUCCESS') && result !== 'ALREADY_US') {
-      console.warn(
-        `[trySetUSDelivery] ⚠️ Location setting incomplete (${result}). Prices may be in local currency.`
-      )
+      // Failed — retry after waiting for DOM to fully render
+      if (attempt < MAX_ATTEMPTS) {
+        console.warn(`[trySetUSDelivery] ⚠️ Attempt ${attempt} failed (${result}). Waiting 3s for DOM then retrying...`)
+        await page.waitForTimeout(3000)
+      } else {
+        console.warn(
+          `[trySetUSDelivery] ⚠️ Location setting incomplete after ${MAX_ATTEMPTS} attempts (${result}). Prices may be in local currency.`
+        )
+      }
+    } catch (err) {
+      console.error('[trySetUSDelivery] Error during hardening:', err)
+      if (attempt === MAX_ATTEMPTS) {
+        console.warn('[trySetUSDelivery] ⚠️ Location setting failed - prices may be inaccurate!')
+      }
     }
-
-    if (result.startsWith('SUCCESS')) {
-      await page.waitForTimeout(1000)
-      await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
-      await page
-        .reload({ waitUntil: 'domcontentloaded' })
-        .catch((err) => {
-          const message = String(err?.message || err)
-          if (!message.includes('ERR_ABORTED') && !message.includes('frame was detached')) {
-            throw err
-          }
-          console.debug('[trySetUSDelivery] Reload skipped because Amazon was already navigating.')
-        })
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
-      await page.waitForTimeout(500)
-      console.log('[trySetUSDelivery] Reloaded page to apply location.')
-    }
-  } catch (err) {
-    console.error('[trySetUSDelivery] Error during hardening:', err)
-    console.warn('[trySetUSDelivery] ⚠️ Location setting failed - prices may be inaccurate!')
   }
 }
 

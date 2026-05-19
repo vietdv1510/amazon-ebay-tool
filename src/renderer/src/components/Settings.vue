@@ -75,12 +75,11 @@
             </div>
           </div>
 
-          <!-- [HIDDEN] Headless Mode - Enforced permanently in backend
           <div class="flex items-center justify-between space-x-2 pt-2">
             <div class="flex flex-col space-y-1">
               <Label>Ẩn trình duyệt (Headless Mode)</Label>
               <p class="text-[0.8rem] text-muted-foreground">
-                Khi bật, Playwright chạy ẩn — không mở cửa sổ Chrome. Khuyên dùng để tăng hiệu suất.
+                Khi bật, Playwright chạy ẩn — không mở cửa sổ Chrome. Tắt nếu bị Amazon chặn.
               </p>
             </div>
             <SwitchRoot
@@ -91,7 +90,6 @@
               <SwitchThumb :class="switchThumbClass" />
             </SwitchRoot>
           </div>
-          -->
 
           <div class="flex items-center justify-between space-x-2 pt-2">
             <div class="flex flex-col space-y-1">
@@ -520,6 +518,13 @@
               <Input type="text" placeholder="Ví dụ: US WAREHOUSE" v-model="form.defaultLocation" />
               <p class="text-[0.8rem] text-muted-foreground">
                 Địa điểm kho hàng xuất hiện trong listing
+              </p>
+            </div>
+            <div class="space-y-2">
+              <Label>Country (Action Header)</Label>
+              <Input type="text" placeholder="Ví dụ: US, Thailand, UK" v-model="form.ebayCountry" />
+              <p class="text-[0.8rem] text-muted-foreground">
+                Quốc gia trong tiêu đề cột Action của file CSV. Mặc định: US
               </p>
             </div>
             <div class="space-y-2">

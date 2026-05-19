@@ -437,7 +437,7 @@ const stopCrawl = () => {
 const crawlItem = async (row) => {
   updateRow({ id: row.id, status: 'CRAWLING', log: 'Khởi động trình duyệt...' })
   try {
-    const response = await window.api.crawl.asin(row.asin)
+    const response = await window.api.crawl.asin(row.asin, row.amazonUrl || '')
     if (response.ok) {
       const p = response.data
       const mul = props.settings.priceMultiplier || 1.5

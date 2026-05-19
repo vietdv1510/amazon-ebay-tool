@@ -491,7 +491,7 @@ const getCellUsageLabel = (row, col) => {
 
 const isStandardCellRequired = (row, col) => {
   if (isAspectCol(col)) return false
-  const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType]
+  const requiredCols = ROW_REQUIRED_COLUMNS.value[row._rowType]
   return requiredCols?.has(col) || false
 }
 
@@ -542,9 +542,12 @@ const cancelEdit = () => {
 }
 
 // Required columns in eBay File Exchange for item/listing rows.
-const ACTION_HEADER = '*Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)'
-const ALWAYS_REQUIRED_COLUMNS = [
-  ACTION_HEADER,
+const ACTION_HEADER = computed(() => {
+  const country = props.settings.ebayCountry || 'US'
+  return `*Action(SiteID=US|Country=${country}|Currency=USD|Version=1193|CC=UTF-8)`
+})
+const ALWAYS_REQUIRED_COLUMNS = computed(() => [
+  ACTION_HEADER.value,
   '*Category',
   '*Title',
   '*Description',
@@ -553,13 +556,13 @@ const ALWAYS_REQUIRED_COLUMNS = [
   '*Duration',
   '*Location',
   '*DispatchTimeMax',
-]
+])
 
-const ROW_REQUIRED_COLUMNS = {
-  parent: new Set([...ALWAYS_REQUIRED_COLUMNS, 'RelationshipDetails']),
+const ROW_REQUIRED_COLUMNS = computed(() => ({
+  parent: new Set([...ALWAYS_REQUIRED_COLUMNS.value, 'RelationshipDetails']),
   child: new Set(['Relationship', 'RelationshipDetails', '*Quantity', '*StartPrice', 'CustomLabel']),
-  single: new Set([...ALWAYS_REQUIRED_COLUMNS, '*StartPrice', '*Quantity'])
-}
+  single: new Set([...ALWAYS_REQUIRED_COLUMNS.value, '*StartPrice', '*Quantity'])
+}))
 
 const readyProducts = computed(() =>
   rowData.value.filter(r => r.status === 'DONE' && isRowReady(r))
@@ -570,7 +573,7 @@ const isValEmpty = (val) => val == null || String(val).trim() === ''
 const isCellMissingRequired = (row, col) => {
   const empty = isValEmpty(row[col])
   // Standard fixed required columns (includes *, Relationship*, CustomLabel, etc.)
-  const requiredCols = ROW_REQUIRED_COLUMNS[row._rowType]
+  const requiredCols = ROW_REQUIRED_COLUMNS.value[row._rowType]
   if (requiredCols?.has(col)) {
     return empty
   }
@@ -651,16 +654,16 @@ const buildPreview = async () => {
       const aspectCols = buildAspectColumns(r, newCatMeta[r.ebayCategory], strictestUsage)
       const aspValues = catAspectValues[r.ebayCategory] || {}
 
-      // Ensure REQUIRED aspects are included; auto-fill "Does Not Apply" if it's a valid value.
+      // Ensure REQUIRED aspects are included; auto-fill empty required cells.
       if (newCatMeta[r.ebayCategory]) {
         for (const [colName, usage] of Object.entries(newCatMeta[r.ebayCategory])) {
           if (usage === 'REQUIRED') {
             const aspName = aspectNameFromCol(colName)
             const headerKey = getAspectHeader(aspName, strictestUsage[colName])
             // Skip if already filled by buildAspectColumns (check by actual header key)
-            if (headerKey in aspectCols) continue
-            const validVals = aspValues[aspName] || []
-            aspectCols[headerKey] = validVals.includes('Does Not Apply') ? 'Does Not Apply' : ''
+            if (headerKey in aspectCols && aspectCols[headerKey]) continue
+            // Auto-fill: Brand → 'Unbrand', others → 'Does Not Apply'
+            aspectCols[headerKey] = aspName === 'Brand' ? 'Unbrand' : 'Does Not Apply'
           }
         }
       }
@@ -671,7 +674,7 @@ const buildPreview = async () => {
         rows.push({
           _rowType: 'parent',
           _ebayCategory: r.ebayCategory || '',
-          [ACTION_HEADER]: 'Add',
+          [ACTION_HEADER.value]: 'Add',
           'CustomLabel': r.asin,
           '*Category': r.ebayCategory || '',
           'StoreCategory': '',
@@ -709,7 +712,7 @@ const buildPreview = async () => {
           rows.push({
             _rowType: 'child',
             _ebayCategory: r.ebayCategory || '',
-            [ACTION_HEADER]: '',
+            [ACTION_HEADER.value]: '',
             'CustomLabel': v.asin || '',
             '*Category': '',
             'StoreCategory': '',
@@ -742,7 +745,7 @@ const buildPreview = async () => {
         rows.push({
           _rowType: 'single',
           _ebayCategory: r.ebayCategory || '',
-          [ACTION_HEADER]: 'Add',
+          [ACTION_HEADER.value]: 'Add',
           'CustomLabel': r.asin,
           '*Category': r.ebayCategory || '',
           'StoreCategory': '',
@@ -798,7 +801,7 @@ const buildPreview = async () => {
     // 10: Policies
     // 11: Everything else
     const COLUMN_ORDER = [
-      ACTION_HEADER,
+      ACTION_HEADER.value,
       'CustomLabel', '*Category', 'StoreCategory', '*Title', 'Subtitle',
       // Variation + pricing grouped together so parent/child price is visible side-by-side
       'Relationship', 'RelationshipDetails',

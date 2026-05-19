@@ -23,7 +23,7 @@ const api = {
 
   // Crawl
   crawl: {
-    asin: (asin) => ipcRenderer.invoke('crawl:asin', asin),
+    asin: (asin, amazonUrl) => ipcRenderer.invoke('crawl:asin', asin, amazonUrl),
     cancel: (asin) => ipcRenderer.invoke('crawl:cancel', asin),
     onProgress: (callback) => {
       ipcRenderer.on('crawl-progress', (_, data) => callback(data))
