@@ -348,13 +348,25 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     await page.waitForTimeout(3000 + Math.random() * 2000)
 
     progressCb('[PROGRESS] Checking delivery address...')
+    let deliveryChanged = false
     if (options.forceUSLocation !== false) {
-      await trySetUSDelivery(page)
+      deliveryChanged = await trySetUSDelivery(page)
+    }
+
+    // If delivery location changed, re-wait for price elements to update
+    if (deliveryChanged) {
+      progressCb('[PROGRESS] Location changed — waiting for prices to update...')
+      await page.waitForTimeout(2000)
+      await Promise.allSettled([
+        page.waitForSelector('.a-price .a-offscreen', { timeout: 8000 }),
+        page.waitForSelector('#corePrice_feature_div', { timeout: 8000 }),
+      ])
     }
 
     progressCb('[PROGRESS] Extracting product data...')
 
     // ── Title ────────────────────────────────────────────────────────────
+    // Re-fetch HTML AFTER delivery location is set — critical for correct prices
     let html = await getStablePageContent(page)
     let $ = cheerio.load(html)
 
@@ -1087,7 +1099,7 @@ async function getStablePageContent(page, options = {}) {
  * Wrapped with a hard timeout to prevent hanging.
  */
 async function trySetUSDelivery(page) {
-  const MAX_ATTEMPTS = 2
+  const MAX_ATTEMPTS = 3
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -1106,16 +1118,25 @@ async function trySetUSDelivery(page) {
         const btn = document.querySelector('#nav-global-location-popover-link, #glow-ingress-block')
         if (!btn) return 'NO_BUTTON'
         btn.click()
-        await wait(2000)
+        await wait(2500)
 
-        // 3. Enter Zip
+        // 3. Enter Zip — use native setter to ensure React/Amazon JS detects the change
         const input = document.querySelector('#GLUXZipUpdateInput')
         if (!input) return 'NO_INPUT'
-        input.value = '10001'
-        // Trigger input events so Amazon knows we typed
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, 'value'
+        )?.set
+        if (nativeInputValueSetter) {
+          nativeInputValueSetter.call(input, '10001')
+        } else {
+          input.value = '10001'
+        }
         input.dispatchEvent(new Event('input', { bubbles: true }))
         input.dispatchEvent(new Event('change', { bubbles: true }))
-        await wait(500)
+        // Also fire keydown/keyup to satisfy Amazon's event listeners
+        input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }))
+        input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }))
+        await wait(800)
 
         // 4. Click Apply
         const applyBtn = document.querySelector(
@@ -1123,7 +1144,7 @@ async function trySetUSDelivery(page) {
         )
         if (!applyBtn) return 'NO_APPLY'
         applyBtn.click()
-        await wait(2000)
+        await wait(2500)
 
         // 5. Click Continue/Done
         const continueBtn = document.querySelector(
@@ -1139,24 +1160,41 @@ async function trySetUSDelivery(page) {
 
       console.log(`[trySetUSDelivery] Result: ${result}`)
 
-      if (result === 'ALREADY_US' || result.startsWith('SUCCESS')) {
-        if (result.startsWith('SUCCESS')) {
-          await page.waitForTimeout(1000)
-          await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
-          await page
-            .reload({ waitUntil: 'domcontentloaded' })
-            .catch((err) => {
-              const message = String(err?.message || err)
-              if (!message.includes('ERR_ABORTED') && !message.includes('frame was detached')) {
-                throw err
-              }
-              console.debug('[trySetUSDelivery] Reload skipped because Amazon was already navigating.')
-            })
-          await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
-          await page.waitForTimeout(500)
-          console.log('[trySetUSDelivery] Reloaded page to apply location.')
+      if (result === 'ALREADY_US') {
+        return false // Already US, no change
+      }
+
+      if (result.startsWith('SUCCESS')) {
+        await page.waitForTimeout(1500)
+        await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
+        await page
+          .reload({ waitUntil: 'domcontentloaded' })
+          .catch((err) => {
+            const message = String(err?.message || err)
+            if (!message.includes('ERR_ABORTED') && !message.includes('frame was detached')) {
+              throw err
+            }
+            console.debug('[trySetUSDelivery] Reload skipped because Amazon was already navigating.')
+          })
+        await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {})
+        await page.waitForTimeout(2000)
+
+        // Verify the location actually changed
+        const verifyResult = await page.evaluate(() => {
+          const locText = document.querySelector('#glow-ingress-block, #nav-global-location-popover-link')?.textContent || ''
+          return locText.includes('10001') || locText.includes('New York') || locText.includes('United States')
+        })
+
+        if (verifyResult) {
+          console.log('[trySetUSDelivery] ✅ Verified: location is now US (10001).')
+          return true // Changed successfully
+        } else {
+          console.warn(`[trySetUSDelivery] ⚠️ Attempt ${attempt}: Location set but verification failed.`)
+          if (attempt < MAX_ATTEMPTS) {
+            await page.waitForTimeout(2000)
+            continue // Retry
+          }
         }
-        return // Success — exit retry loop
       }
 
       // Failed — retry after waiting for DOM to fully render
@@ -1175,6 +1213,7 @@ async function trySetUSDelivery(page) {
       }
     }
   }
+  return false // Could not change
 }
 
 /**
