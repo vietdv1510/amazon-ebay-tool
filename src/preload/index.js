@@ -68,6 +68,17 @@ const api = {
       ipcRenderer.on('r2-upload-progress', (_, data) => callback(data))
       return () => ipcRenderer.removeAllListeners('r2-upload-progress')
     }
+  },
+
+  // Crawl History
+  history: {
+    saveCurrent: (products) => ipcRenderer.invoke('history:saveCurrent', products),
+    listSessions: () => ipcRenderer.invoke('history:listSessions'),
+    loadSession: (id) => ipcRenderer.invoke('history:loadSession', id),
+    deleteSession: (id) => ipcRenderer.invoke('history:deleteSession', id),
+    deleteProduct: (id, asin) => ipcRenderer.invoke('history:deleteProduct', id, asin),
+    updateProduct: (id, asin, data) => ipcRenderer.invoke('history:updateProduct', id, asin, data),
+    renameSession: (id, name) => ipcRenderer.invoke('history:renameSession', id, name),
   }
 }
 

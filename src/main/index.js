@@ -5,6 +5,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs'
 import { crawlAmazonWithRetry, cancelCrawl, closeBrowser } from './crawler'
+import { saveSession, listSessions, loadSession, deleteSession, deleteProduct, updateProduct, renameSession } from './history'
 import { batchGenerate } from './ai-gen'
 import { uploadToR2, uploadProductAssetsToR2, testR2Connection, resetR2Client } from './r2-uploader'
 import {
@@ -199,6 +200,15 @@ ipcMain.handle('settings:save', (_, settings) => {
   saveSettings(settings)
   return { ok: true }
 })
+
+// ─── Crawl History ────────────────────────────────────────────────────────────
+ipcMain.handle('history:saveCurrent', (_, products) => saveSession(products))
+ipcMain.handle('history:listSessions', () => listSessions())
+ipcMain.handle('history:loadSession', (_, sessionId) => loadSession(sessionId))
+ipcMain.handle('history:deleteSession', (_, sessionId) => deleteSession(sessionId))
+ipcMain.handle('history:deleteProduct', (_, sessionId, asin) => deleteProduct(sessionId, asin))
+ipcMain.handle('history:updateProduct', (_, sessionId, asin, updates) => updateProduct(sessionId, asin, updates))
+ipcMain.handle('history:renameSession', (_, sessionId, newName) => renameSession(sessionId, newName))
 
 // File dialog - open CSV/Excel
 ipcMain.handle('dialog:openFile', async () => {

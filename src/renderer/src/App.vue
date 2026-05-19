@@ -75,6 +75,17 @@
           <span v-if="!sidebarCollapsed">Export Preview</span>
         </Button>
 
+        <Button
+          :variant="currentPage === 'history' ? 'secondary' : 'ghost'"
+          class="w-full nav-btn"
+          :class="sidebarCollapsed ? 'justify-center px-0' : 'justify-start'"
+          @click="currentPage = 'history'"
+          :title="sidebarCollapsed ? 'Crawl History' : ''"
+        >
+          <HistoryIcon class="w-4 h-4 flex-shrink-0" :class="{ 'mr-2': !sidebarCollapsed }" />
+          <span v-if="!sidebarCollapsed">Lịch sử Crawl</span>
+        </Button>
+
         <div
           v-if="!sidebarCollapsed"
           class="nav-label text-xs font-semibold text-muted-foreground px-2 py-1 mt-4 uppercase tracking-wider"
@@ -144,6 +155,9 @@
         :initial-settings="settings"
         @save="handleSettingsSave"
       />
+      <KeepAlive>
+        <CrawlHistory v-if="currentPage === 'history'" @navigate="p => currentPage = p" />
+      </KeepAlive>
     </div>
     <Toaster position="bottom-right" richColors />
   </div>
@@ -155,6 +169,7 @@ import Workspace from './components/Workspace.vue'
 import ExportPreview from './components/ExportPreview.vue'
 import Queue from './components/Queue.vue'
 import Settings from './components/Settings.vue'
+import CrawlHistory from './components/CrawlHistory.vue'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -164,7 +179,8 @@ import {
   Settings as SettingsIcon,
   FileSpreadsheet,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  History as HistoryIcon
 } from 'lucide-vue-next'
 import { globalRowData as rowData } from './store'
 

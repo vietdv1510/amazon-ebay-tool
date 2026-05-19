@@ -193,6 +193,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as xlsx from 'xlsx'
+import { toast } from 'vue-sonner'
 
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -427,6 +428,22 @@ const startCrawl = async () => {
   const workers = Array.from({ length: Math.min(threads, queue.length) }, () => worker())
   await Promise.all(workers)
   isCrawling.value = false
+
+  // Auto-save crawled products to history
+  const doneProducts = rowData.value.filter(r => r.status === 'DONE')
+  if (doneProducts.length > 0) {
+    try {
+      const result = await window.api.history.saveCurrent(JSON.parse(JSON.stringify(doneProducts)))
+      if (result?.ok) {
+        toast.success('Đã lưu lịch sử', {
+          description: `${doneProducts.length} sản phẩm đã được lưu vào lịch sử crawl.`,
+          duration: 3000
+        })
+      }
+    } catch (e) {
+      console.error('[Queue] Auto-save history failed:', e)
+    }
+  }
 }
 
 const stopCrawl = () => {

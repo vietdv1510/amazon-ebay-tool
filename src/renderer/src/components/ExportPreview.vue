@@ -297,6 +297,10 @@ const toggleSelectiveMode = () => {
   if (!selectiveMode.value) {
     selectedProducts.value = new Set() // Reset khi tắt
   } else {
+    // Rebuild if rows are missing _productAsin (stale data from hot-reload)
+    if (previewRows.value.length > 0 && !previewRows.value[0]._productAsin) {
+      buildPreview()
+    }
     // Mặc định chọn tất cả khi bật
     const allAsins = previewRows.value
       .filter(r => r._rowType === 'parent' || r._rowType === 'single')
