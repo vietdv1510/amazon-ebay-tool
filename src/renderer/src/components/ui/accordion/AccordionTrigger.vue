@@ -1,8 +1,8 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { ChevronDownIcon } from '@radix-icons/vue';
-import { AccordionHeader, AccordionTrigger } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { ChevronDownIcon } from '@radix-icons/vue'
+import { AccordionHeader, AccordionTrigger } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -10,11 +10,11 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>
@@ -24,13 +24,15 @@ const delegatedProps = reactiveOmit(props, "class");
       :class="
         cn(
           'flex flex-1 items-center justify-between py-4 text-sm font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180',
-          props.class,
+          props.class
         )
       "
     >
       <slot />
       <slot name="icon">
-        <ChevronDownIcon class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+        <ChevronDownIcon
+          class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+        />
       </slot>
     </AccordionTrigger>
   </AccordionHeader>

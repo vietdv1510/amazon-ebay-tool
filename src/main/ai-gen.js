@@ -96,8 +96,7 @@ export async function generateTitle(originalTitle, settings) {
  * Generate optimized description (HTML)
  */
 export async function generateDescription(product, settings) {
-  const promptTemplate =
-    settings.aiDescriptionPrompt?.trim() || DEFAULT_DESCRIPTION_PROMPT
+  const promptTemplate = settings.aiDescriptionPrompt?.trim() || DEFAULT_DESCRIPTION_PROMPT
 
   const bulletText = (product.bulletPoints || []).map((b) => `- ${b}`).join('\n')
   const specsText = product.specs
@@ -136,15 +135,15 @@ export async function batchGenerate(products, settings, progressCb) {
       // Generate title if enabled
       if (settings.aiRewriteTitle !== false && product.title) {
         result.title = await generateTitle(product.title, settings)
-        console.log(
-          `[AI-Gen] Title: "${product.title.substring(0, 40)}..." → "${result.title}"`
-        )
+        console.log(`[AI-Gen] Title: "${product.title.substring(0, 40)}..." → "${result.title}"`)
       }
 
       // Generate description if enabled
       if (settings.aiRewriteDescription !== false) {
         result.description = await generateDescription(product, settings)
-        console.log(`[AI-Gen] Description generated for ${product.asin} (${result.description.length} chars)`)
+        console.log(
+          `[AI-Gen] Description generated for ${product.asin} (${result.description.length} chars)`
+        )
       }
 
       result.ok = true

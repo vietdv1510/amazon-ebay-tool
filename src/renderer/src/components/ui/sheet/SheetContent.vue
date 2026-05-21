@@ -1,45 +1,45 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { Cross2Icon } from '@radix-icons/vue';
+import { reactiveOmit } from '@vueuse/core'
+import { Cross2Icon } from '@radix-icons/vue'
 import {
   DialogClose,
   DialogContent,
   DialogOverlay,
   DialogPortal,
-  useForwardPropsEmits,
-} from "reka-ui";
-import { cn } from '@/utils';
-import { sheetVariants } from ".";
+  useForwardPropsEmits
+} from 'reka-ui'
+import { cn } from '@/utils'
+import { sheetVariants } from '.'
 
 defineOptions({
-  inheritAttrs: false,
-});
+  inheritAttrs: false
+})
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
+    skipCheck: true
   },
   side: { type: null, required: false },
   forceMount: { type: Boolean, required: false },
   disableOutsidePointerEvents: { type: Boolean, required: false },
   asChild: { type: Boolean, required: false },
-  as: { type: null, required: false },
-});
+  as: { type: null, required: false }
+})
 
 const emits = defineEmits([
-  "escapeKeyDown",
-  "pointerDownOutside",
-  "focusOutside",
-  "interactOutside",
-  "openAutoFocus",
-  "closeAutoFocus",
-]);
+  'escapeKeyDown',
+  'pointerDownOutside',
+  'focusOutside',
+  'interactOutside',
+  'openAutoFocus',
+  'closeAutoFocus'
+])
 
-const delegatedProps = reactiveOmit(props, "class", "side");
+const delegatedProps = reactiveOmit(props, 'class', 'side')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>

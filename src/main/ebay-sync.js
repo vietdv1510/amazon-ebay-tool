@@ -61,16 +61,27 @@ export async function syncCategoryTree(settings, onProgress) {
   db.exec('DELETE FROM categories')
 
   // Flatten tree → array
-  const insertStmt = db.prepare('INSERT OR REPLACE INTO categories (categoryId, categoryName, categoryPath, parentId, level, isLeaf) VALUES (?, ?, ?, ?, ?, ?)')
+  const insertStmt = db.prepare(
+    'INSERT OR REPLACE INTO categories (categoryId, categoryName, categoryPath, parentId, level, isLeaf) VALUES (?, ?, ?, ?, ?, ?)'
+  )
   let count = 0
 
   const insertAll = db.transaction(() => {
     function walk(node, parentId, level, parentPath = '') {
       const children = node.childCategoryTreeNodes || []
       const isLeaf = children.length === 0 ? 1 : 0
-      const currentPath = parentPath ? `${parentPath} > ${node.category.categoryName}` : node.category.categoryName
+      const currentPath = parentPath
+        ? `${parentPath} > ${node.category.categoryName}`
+        : node.category.categoryName
 
-      insertStmt.run(node.category.categoryId, node.category.categoryName, currentPath, parentId, level, isLeaf)
+      insertStmt.run(
+        node.category.categoryId,
+        node.category.categoryName,
+        currentPath,
+        parentId,
+        level,
+        isLeaf
+      )
       count++
       for (const child of children) {
         walk(child, node.category.categoryId, level + 1, currentPath)

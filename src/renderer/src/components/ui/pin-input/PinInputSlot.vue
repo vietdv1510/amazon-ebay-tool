@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { PinInputInput, useForwardProps } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { PinInputInput, useForwardProps } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   index: { type: Number, required: true },
@@ -11,13 +11,13 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwardedProps = useForwardProps(delegatedProps);
+const forwardedProps = useForwardProps(delegatedProps)
 </script>
 
 <template>
@@ -26,7 +26,7 @@ const forwardedProps = useForwardProps(delegatedProps);
     :class="
       cn(
         'relative text-center focus:outline-none focus:ring-2 focus:ring-ring focus:relative focus:z-10 flex h-9 w-9 items-center justify-center border-y border-r border-input text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md',
-        props.class,
+        props.class
       )
     "
   />

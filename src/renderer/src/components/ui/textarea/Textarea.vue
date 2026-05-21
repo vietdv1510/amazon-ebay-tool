@@ -1,23 +1,23 @@
 <script setup>
-import { useVModel } from "@vueuse/core";
-import { cn } from '@/utils';
+import { useVModel } from '@vueuse/core'
+import { cn } from '@/utils'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
+    skipCheck: true
   },
   defaultValue: { type: [String, Number], required: false },
-  modelValue: { type: [String, Number], required: false },
-});
+  modelValue: { type: [String, Number], required: false }
+})
 
-const emits = defineEmits(["update:modelValue"]);
+const emits = defineEmits(['update:modelValue'])
 
-const modelValue = useVModel(props, "modelValue", emits, {
+const modelValue = useVModel(props, 'modelValue', emits, {
   passive: true,
-  defaultValue: props.defaultValue,
-});
+  defaultValue: props.defaultValue
+})
 </script>
 
 <template>
@@ -26,7 +26,7 @@ const modelValue = useVModel(props, "modelValue", emits, {
     :class="
       cn(
         'flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-        props.class,
+        props.class
       )
     "
   />

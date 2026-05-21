@@ -1,9 +1,9 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { Primitive } from "reka-ui";
-import { computed } from "vue";
-import { cn } from '@/utils';
-import { useCommand } from ".";
+import { reactiveOmit } from '@vueuse/core'
+import { Primitive } from 'reka-ui'
+import { computed } from 'vue'
+import { cn } from '@/utils'
+import { useCommand } from '.'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -11,16 +11,14 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const { filterState } = useCommand();
-const isRender = computed(
-  () => !!filterState.search && filterState.filtered.count === 0,
-);
+const { filterState } = useCommand()
+const isRender = computed(() => !!filterState.search && filterState.filtered.count === 0)
 </script>
 
 <template>

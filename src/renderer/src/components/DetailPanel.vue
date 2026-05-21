@@ -32,40 +32,55 @@
       <!-- ASIN + Status + Rating -->
       <div class="meta-row">
         <span class="tag">{{ form.asin }}</span>
-        <Badge :variant="form.status === 'DONE' ? 'default' : 'secondary'" class="text-xs">{{ form.status }}</Badge>
+        <Badge :variant="form.status === 'DONE' ? 'default' : 'secondary'" class="text-xs">{{
+          form.status
+        }}</Badge>
         <div v-if="form.rating" class="flex items-center gap-1 ml-auto">
           <Star class="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-          <span class="text-xs text-muted-foreground">{{ form.rating }} ({{ form.reviewCount }})</span>
+          <span class="text-xs text-muted-foreground"
+            >{{ form.rating }} ({{ form.reviewCount }})</span
+          >
         </div>
       </div>
 
       <!-- Title -->
-      <div class="form-group" style="margin-top:12px">
+      <div class="form-group" style="margin-top: 12px">
         <Label>Tiêu đề (eBay Title — max 80)</Label>
-        <Textarea v-model="form.title" rows="3"
-          :class="{ 'border-destructive': form.title?.length > 80 }" class="mt-1" />
+        <Textarea
+          v-model="form.title"
+          rows="3"
+          :class="{ 'border-destructive': form.title?.length > 80 }"
+          class="mt-1"
+        />
         <span class="form-hint" :class="{ 'text-destructive': form.title?.length > 80 }">
           {{ form.title?.length || 0 }}/80 ký tự
         </span>
       </div>
 
       <!-- Brand + Price -->
-      <div class="two-col" style="margin-top:10px">
+      <div class="two-col" style="margin-top: 10px">
         <div class="form-group">
           <Label>Thương hiệu</Label>
           <Input v-model="form.brand" class="mt-1" />
         </div>
         <div class="form-group">
           <Label>Giá eBay ($)</Label>
-          <Input type="number" step="0.01" v-model.number="form.sellPrice" class="mt-1 text-green-600 font-semibold" />
+          <Input
+            type="number"
+            step="0.01"
+            v-model.number="form.sellPrice"
+            class="mt-1 text-green-600 font-semibold"
+          />
         </div>
       </div>
 
       <!-- Amazon Original Price -->
-      <div class="two-col" style="margin-top:6px">
+      <div class="two-col" style="margin-top: 6px">
         <div class="form-group">
           <Label class="text-muted-foreground text-xs">Giá gốc Amazon</Label>
-          <div class="text-sm mt-1 text-muted-foreground">${{ form.originalPrice?.toFixed?.(2) || form.originalPrice || '—' }}</div>
+          <div class="text-sm mt-1 text-muted-foreground">
+            ${{ form.originalPrice?.toFixed?.(2) || form.originalPrice || '—' }}
+          </div>
         </div>
         <div class="form-group" v-if="form.priceRange">
           <Label class="text-muted-foreground text-xs">Khoảng giá</Label>
@@ -83,10 +98,17 @@
       <!-- Category display -->
       <div v-if="form.ebayCategory" class="cat-selected mt-2" @click="showCategorySearch = true">
         <div class="flex flex-col min-w-0 flex-1">
-          <span class="text-sm font-medium text-foreground">{{ form.ebayCategoryName || 'Category' }}</span>
+          <span class="text-sm font-medium text-foreground">{{
+            form.ebayCategoryName || 'Category'
+          }}</span>
           <span class="text-xs text-muted-foreground">ID: {{ form.ebayCategory }}</span>
         </div>
-        <Button variant="ghost" size="icon" class="h-6 w-6 flex-shrink-0" @click.stop="clearCategory">
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-6 w-6 flex-shrink-0"
+          @click.stop="clearCategory"
+        >
           <X class="w-3 h-3" />
         </Button>
       </div>
@@ -108,7 +130,9 @@
             class="h-8 border-0 shadow-none focus-visible:ring-0 p-0"
             @keydown.enter="searchCategory"
           />
-          <Button variant="ghost" size="sm" @click="searchCategory" :disabled="catSearching">Tìm</Button>
+          <Button variant="ghost" size="sm" @click="searchCategory" :disabled="catSearching"
+            >Tìm</Button
+          >
         </div>
 
         <div v-if="catResults.length > 0" class="cat-results-list">
@@ -123,7 +147,10 @@
             <span class="text-[10px] text-blue-500 font-mono">ID: {{ cat.categoryId }}</span>
           </div>
         </div>
-        <div v-else-if="catSearched && !catSearching" class="text-xs text-muted-foreground text-center py-4">
+        <div
+          v-else-if="catSearched && !catSearching"
+          class="text-xs text-muted-foreground text-center py-4"
+        >
           Không tìm thấy category phù hợp.
         </div>
       </div>
@@ -131,7 +158,9 @@
       <!-- 🔴 Required Aspects -->
       <div v-if="requiredAspects.length > 0" class="mt-4">
         <div class="section-title flex items-center">
-          <ClipboardCheck class="w-4 h-4 mr-2 text-red-500" /> Bắt buộc ({{ requiredAspects.length }})
+          <ClipboardCheck class="w-4 h-4 mr-2 text-red-500" /> Bắt buộc ({{
+            requiredAspects.length
+          }})
         </div>
         <div class="aspects-list mt-2">
           <div v-for="aspect in requiredAspects" :key="aspect.name" class="aspect-row">
@@ -145,11 +174,18 @@
                   <SelectValue :placeholder="`Chọn ${aspect.name}`" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="v in aspect.values.slice(0, 50)" :key="v" :value="v">{{ v }}</SelectItem>
+                  <SelectItem v-for="v in aspect.values.slice(0, 50)" :key="v" :value="v">{{
+                    v
+                  }}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Input v-else v-model="form.aspectValues[aspect.name]" class="mt-1 h-8 text-xs" :placeholder="aspect.name" />
+            <Input
+              v-else
+              v-model="form.aspectValues[aspect.name]"
+              class="mt-1 h-8 text-xs"
+              :placeholder="aspect.name"
+            />
           </div>
         </div>
       </div>
@@ -157,25 +193,39 @@
       <!-- 🟡 Recommended Aspects -->
       <div v-if="recommendedAspects.length > 0" class="mt-3">
         <Collapsible :default-open="true">
-          <CollapsibleTrigger class="flex items-center gap-2 text-xs text-amber-600 hover:text-amber-500 cursor-pointer font-semibold [&[data-state=open]>svg]:rotate-90">
+          <CollapsibleTrigger
+            class="flex items-center gap-2 text-xs text-amber-600 hover:text-amber-500 cursor-pointer font-semibold [&[data-state=open]>svg]:rotate-90"
+          >
             <ChevronRight class="w-3 h-3 transition-transform duration-200" />
             Nên có ({{ recommendedAspects.length }})
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div class="aspects-list mt-2">
               <div v-for="aspect in recommendedAspects" :key="aspect.name" class="aspect-row">
-                <Label class="text-xs font-medium text-amber-700 dark:text-amber-400">{{ aspect.name }}</Label>
-                <div v-if="aspect.mode === 'SELECTION_ONLY' && aspect.values.length > 0" class="mt-1">
+                <Label class="text-xs font-medium text-amber-700 dark:text-amber-400">{{
+                  aspect.name
+                }}</Label>
+                <div
+                  v-if="aspect.mode === 'SELECTION_ONLY' && aspect.values.length > 0"
+                  class="mt-1"
+                >
                   <Select v-model="form.aspectValues[aspect.name]">
                     <SelectTrigger class="h-8 text-xs">
                       <SelectValue :placeholder="`Chọn ${aspect.name}`" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem v-for="v in aspect.values.slice(0, 50)" :key="v" :value="v">{{ v }}</SelectItem>
+                      <SelectItem v-for="v in aspect.values.slice(0, 50)" :key="v" :value="v">{{
+                        v
+                      }}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <Input v-else v-model="form.aspectValues[aspect.name]" class="mt-1 h-8 text-xs" :placeholder="aspect.name" />
+                <Input
+                  v-else
+                  v-model="form.aspectValues[aspect.name]"
+                  class="mt-1 h-8 text-xs"
+                  :placeholder="aspect.name"
+                />
               </div>
             </div>
           </CollapsibleContent>
@@ -185,25 +235,41 @@
       <!-- ⚪ Optional Aspects (collapsed by default) -->
       <div v-if="optionalAspects.length > 0" class="mt-3">
         <Collapsible>
-          <CollapsibleTrigger class="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer [&[data-state=open]>svg]:rotate-90">
+          <CollapsibleTrigger
+            class="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer [&[data-state=open]>svg]:rotate-90"
+          >
             <ChevronRight class="w-3 h-3 transition-transform duration-200" />
             Không bắt buộc ({{ optionalAspects.length }})
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div class="aspects-list mt-2">
-              <div v-for="aspect in optionalAspects.slice(0, 15)" :key="aspect.name" class="aspect-row">
+              <div
+                v-for="aspect in optionalAspects.slice(0, 15)"
+                :key="aspect.name"
+                class="aspect-row"
+              >
                 <Label class="text-xs font-medium text-muted-foreground">{{ aspect.name }}</Label>
-                <div v-if="aspect.mode === 'SELECTION_ONLY' && aspect.values.length > 0" class="mt-1">
+                <div
+                  v-if="aspect.mode === 'SELECTION_ONLY' && aspect.values.length > 0"
+                  class="mt-1"
+                >
                   <Select v-model="form.aspectValues[aspect.name]">
                     <SelectTrigger class="h-8 text-xs">
                       <SelectValue :placeholder="`Chọn ${aspect.name}`" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem v-for="v in aspect.values.slice(0, 50)" :key="v" :value="v">{{ v }}</SelectItem>
+                      <SelectItem v-for="v in aspect.values.slice(0, 50)" :key="v" :value="v">{{
+                        v
+                      }}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <Input v-else v-model="form.aspectValues[aspect.name]" class="mt-1 h-8 text-xs" :placeholder="aspect.name" />
+                <Input
+                  v-else
+                  v-model="form.aspectValues[aspect.name]"
+                  class="mt-1 h-8 text-xs"
+                  :placeholder="aspect.name"
+                />
               </div>
             </div>
           </CollapsibleContent>
@@ -223,7 +289,13 @@
             <thead class="sticky top-0 bg-muted/80 backdrop-blur">
               <tr>
                 <th class="text-left px-2 py-1.5 font-semibold">ASIN</th>
-                <th v-for="dimName in variationDimNames" :key="dimName" class="text-left px-2 py-1.5 font-semibold">{{ dimName }}</th>
+                <th
+                  v-for="dimName in variationDimNames"
+                  :key="dimName"
+                  class="text-left px-2 py-1.5 font-semibold"
+                >
+                  {{ dimName }}
+                </th>
                 <th class="text-right px-2 py-1.5 font-semibold">Giá ($)</th>
                 <th class="text-center px-2 py-1.5 font-semibold">SL</th>
                 <th class="text-center px-2 py-1.5 font-semibold">Ảnh</th>
@@ -232,18 +304,35 @@
             </thead>
             <tbody>
               <tr v-for="(v, i) in form.variations" :key="i" class="border-t hover:bg-muted/30">
-                <td class="px-2 py-1 font-mono text-[10px] text-muted-foreground">{{ v.asin?.slice(0, 10) || '—' }}</td>
+                <td class="px-2 py-1 font-mono text-[10px] text-muted-foreground">
+                  {{ v.asin?.slice(0, 10) || '—' }}
+                </td>
                 <td v-for="dimName in variationDimNames" :key="dimName" class="px-2 py-1">
-                  <span class="inline-block px-1.5 py-0.5 bg-muted rounded text-[10px]">{{ v.attributes?.[dimName] || '—' }}</span>
+                  <span class="inline-block px-1.5 py-0.5 bg-muted rounded text-[10px]">{{
+                    v.attributes?.[dimName] || '—'
+                  }}</span>
                 </td>
                 <td class="text-right px-2 py-1">
-                  <Input class="h-6 w-[65px] text-[11px] px-1 text-right inline-flex" type="number" step="0.01" v-model.number="v.price" />
+                  <Input
+                    class="h-6 w-[65px] text-[11px] px-1 text-right inline-flex"
+                    type="number"
+                    step="0.01"
+                    v-model.number="v.price"
+                  />
                 </td>
                 <td class="text-center px-2 py-1">
-                  <Input class="h-6 w-[45px] text-[11px] px-1 text-center inline-flex" type="number" v-model.number="v.quantity" />
+                  <Input
+                    class="h-6 w-[45px] text-[11px] px-1 text-center inline-flex"
+                    type="number"
+                    v-model.number="v.quantity"
+                  />
                 </td>
                 <td class="text-center px-2 py-1">
-                  <img v-if="v.image" :src="v.image" class="w-6 h-6 rounded border object-cover inline-block" />
+                  <img
+                    v-if="v.image"
+                    :src="v.image"
+                    class="w-6 h-6 rounded border object-cover inline-block"
+                  />
                   <span v-else class="text-muted-foreground">—</span>
                 </td>
                 <td class="px-1">
@@ -265,7 +354,11 @@
       <!-- Bullet Points (editable) -->
       <div class="mt-3">
         <div class="section-title flex items-center justify-between">
-          <span class="flex items-center"><List class="w-4 h-4 mr-2" /> Đặc điểm sản phẩm ({{ form.bulletPoints?.length || 0 }})</span>
+          <span class="flex items-center"
+            ><List class="w-4 h-4 mr-2" /> Đặc điểm sản phẩm ({{
+              form.bulletPoints?.length || 0
+            }})</span
+          >
           <button
             @click="form.bulletPoints = [...(form.bulletPoints || []), '']"
             class="flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-400"
@@ -274,11 +367,7 @@
           </button>
         </div>
         <div class="mt-2 space-y-1.5">
-          <div
-            v-for="(bp, i) in (form.bulletPoints || [])"
-            :key="i"
-            class="flex items-start gap-1.5"
-          >
+          <div v-for="(bp, i) in form.bulletPoints || []" :key="i" class="flex items-start gap-1.5">
             <span class="text-muted-foreground text-xs mt-1.5 flex-shrink-0">•</span>
             <Textarea
               :value="bp"
@@ -294,7 +383,9 @@
               <Trash2 class="w-3.5 h-3.5" />
             </button>
           </div>
-          <div v-if="!form.bulletPoints?.length" class="text-xs text-muted-foreground italic">Chưa có đặc điểm nào</div>
+          <div v-if="!form.bulletPoints?.length" class="text-xs text-muted-foreground italic">
+            Chưa có đặc điểm nào
+          </div>
         </div>
       </div>
 
@@ -335,7 +426,11 @@
       <!-- Specs (editable) -->
       <div class="mt-3">
         <div class="section-title flex items-center justify-between">
-          <span class="flex items-center"><ClipboardList class="w-4 h-4 mr-2" /> Thông số kỹ thuật ({{ Object.keys(form.specs || {}).length }})</span>
+          <span class="flex items-center"
+            ><ClipboardList class="w-4 h-4 mr-2" /> Thông số kỹ thuật ({{
+              Object.keys(form.specs || {}).length
+            }})</span
+          >
           <button
             @click="addSpecRow"
             class="flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-400"
@@ -344,11 +439,7 @@
           </button>
         </div>
         <div class="mt-2 space-y-1.5">
-          <div
-            v-for="(val, key) in (form.specs || {})"
-            :key="key"
-            class="flex items-center gap-1.5"
-          >
+          <div v-for="(val, key) in form.specs || {}" :key="key" class="flex items-center gap-1.5">
             <Input
               :value="key"
               @change="renameSpecKey(key, $event.target.value)"
@@ -368,7 +459,12 @@
               <Trash2 class="w-3.5 h-3.5" />
             </button>
           </div>
-          <div v-if="!Object.keys(form.specs || {}).length" class="text-xs text-muted-foreground italic">Chưa có thông số nào</div>
+          <div
+            v-if="!Object.keys(form.specs || {}).length"
+            class="text-xs text-muted-foreground italic"
+          >
+            Chưa có thông số nào
+          </div>
         </div>
       </div>
 
@@ -382,8 +478,18 @@
 
       <!-- BSR & Availability -->
       <div class="mt-3 flex flex-wrap gap-2">
-        <Badge v-if="form.inStock" variant="outline" class="text-xs text-green-600 border-green-600/30">In Stock</Badge>
-        <Badge v-if="form.inStock === false" variant="outline" class="text-xs text-red-500 border-red-500/30">Out of Stock</Badge>
+        <Badge
+          v-if="form.inStock"
+          variant="outline"
+          class="text-xs text-green-600 border-green-600/30"
+          >In Stock</Badge
+        >
+        <Badge
+          v-if="form.inStock === false"
+          variant="outline"
+          class="text-xs text-red-500 border-red-500/30"
+          >Out of Stock</Badge
+        >
       </div>
     </div>
 
@@ -402,12 +508,31 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import {
-  X, Image as ImageIcon, Palette, Plus, ClipboardList, Save,
-  Search, Tag, Star, ClipboardCheck, ChevronRight, List, FileText, FolderOpen,
-  Trash2, PlusCircle
+  X,
+  Image as ImageIcon,
+  Palette,
+  Plus,
+  ClipboardList,
+  Save,
+  Search,
+  Tag,
+  Star,
+  ClipboardCheck,
+  ChevronRight,
+  List,
+  FileText,
+  FolderOpen,
+  Trash2,
+  PlusCircle
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -418,22 +543,25 @@ const emit = defineEmits(['close', 'update'])
 
 const form = reactive({
   ...props.row,
-  variations: props.row.variations ? props.row.variations.map(v => ({ ...v, attributes: { ...v.attributes } })) : [],
+  variations: props.row.variations
+    ? props.row.variations.map((v) => ({ ...v, attributes: { ...v.attributes } }))
+    : [],
   aspectValues: props.row.aspectValues ? { ...props.row.aspectValues } : {},
-  ebayCategoryName: props.row.ebayCategoryName || '',
+  ebayCategoryName: props.row.ebayCategoryName || ''
 })
 
 const activeImg = ref(0)
 
 // ─── Dirty Check ──────────────────────────────────────────────────────────────
-const getFormState = (source) => JSON.stringify({
-  title: source.title,
-  brand: source.brand,
-  sellPrice: source.sellPrice,
-  ebayCategory: source.ebayCategory,
-  aspectValues: source.aspectValues || {},
-  variations: source.variations || [],
-})
+const getFormState = (source) =>
+  JSON.stringify({
+    title: source.title,
+    brand: source.brand,
+    sellPrice: source.sellPrice,
+    ebayCategory: source.ebayCategory,
+    aspectValues: source.aspectValues || {},
+    variations: source.variations || []
+  })
 
 // Snapshot taken after onMounted auto-init completes (not from props.row directly)
 const initialSnapshot = ref('')
@@ -512,9 +640,7 @@ const autoSelectCategory = async () => {
   if (!props.row.title?.trim()) return // No title to search with
   try {
     catSearching.value = true
-    const res = await window.api.ebay.categorySuggestions(
-      (props.row.title || '').substring(0, 150)
-    )
+    const res = await window.api.ebay.categorySuggestions((props.row.title || '').substring(0, 150))
     if (res.ok && res.data?.length > 0) {
       await selectCategory(res.data[0]) // Auto-select first (highest relevancy)
     }
@@ -552,18 +678,20 @@ const autoMapAspect = (aspectName) => {
   for (const [key, val] of Object.entries(specs)) {
     if (normalize(key) === normName) return val
   }
-  
+
   // 2. Custom robust keyword mapping
   const matchKeys = (keywords) => {
     for (const [key, val] of Object.entries(specs)) {
       const normKey = normalize(key)
-      if (keywords.some(k => normKey.includes(k))) return val
+      if (keywords.some((k) => normKey.includes(k))) return val
     }
     return null
   }
 
-  if (normName === 'brand' || normName === 'brandname') return form.brand || matchKeys(['brand']) || 'Unbranded'
-  if (normName === 'mpn' || normName === 'partnumber') return matchKeys(['partnumber', 'mpn']) || 'Does Not Apply'
+  if (normName === 'brand' || normName === 'brandname')
+    return form.brand || matchKeys(['brand']) || 'Unbranded'
+  if (normName === 'mpn' || normName === 'partnumber')
+    return matchKeys(['partnumber', 'mpn']) || 'Does Not Apply'
   if (normName === 'model') return matchKeys(['modelnumber', 'itemmodelnumber', 'model']) || ''
   if (normName === 'upc') return matchKeys(['upc']) || 'Does Not Apply'
   if (normName === 'ean') return matchKeys(['ean']) || 'Does Not Apply'
@@ -578,7 +706,8 @@ const autoMapAspect = (aspectName) => {
   if (normName === 'pattern') return matchKeys(['pattern']) || ''
   if (normName === 'shape') return matchKeys(['shape', 'itemshape']) || ''
   if (normName === 'weight') return matchKeys(['weight', 'itemweight']) || ''
-  if (normName === 'countryregionofmanufacture' || normName === 'countryoforigin') return matchKeys(['countryoforigin']) || ''
+  if (normName === 'countryregionofmanufacture' || normName === 'countryoforigin')
+    return matchKeys(['countryoforigin']) || ''
 
   // 3. Fallback substring match
   for (const [key, val] of Object.entries(specs)) {
@@ -591,16 +720,22 @@ const autoMapAspect = (aspectName) => {
   return ''
 }
 
-const requiredAspects = computed(() => allAspects.value.filter(a => a.required || a.usage === 'REQUIRED'))
-const recommendedAspects = computed(() => allAspects.value.filter(a => !a.required && a.usage === 'RECOMMENDED'))
-const optionalAspects = computed(() => allAspects.value.filter(a => !a.required && a.usage !== 'RECOMMENDED'))
+const requiredAspects = computed(() =>
+  allAspects.value.filter((a) => a.required || a.usage === 'REQUIRED')
+)
+const recommendedAspects = computed(() =>
+  allAspects.value.filter((a) => !a.required && a.usage === 'RECOMMENDED')
+)
+const optionalAspects = computed(() =>
+  allAspects.value.filter((a) => !a.required && a.usage !== 'RECOMMENDED')
+)
 
 // ─── Variations ────────────────────────────────────────────────────────────────
 const variationDimNames = computed(() => {
   if (!form.variations || form.variations.length === 0) return []
   const allKeys = new Set()
-  form.variations.forEach(v => {
-    Object.keys(v.attributes || {}).forEach(k => allKeys.add(k))
+  form.variations.forEach((v) => {
+    Object.keys(v.attributes || {}).forEach((k) => allKeys.add(k))
   })
   return [...allKeys]
 })
@@ -619,9 +754,7 @@ const addSpecRow = () => {
 const renameSpecKey = (oldKey, newKey) => {
   if (!newKey || newKey === oldKey) return
   const entries = Object.entries(form.specs)
-  form.specs = Object.fromEntries(
-    entries.map(([k, v]) => (k === oldKey ? [newKey, v] : [k, v]))
-  )
+  form.specs = Object.fromEntries(entries.map(([k, v]) => (k === oldKey ? [newKey, v] : [k, v])))
 }
 
 const deleteSpec = (key) => {
@@ -633,8 +766,8 @@ const deleteSpec = (key) => {
 const save = () => {
   emit('update', {
     ...form,
-    variations: form.variations.map(v => ({ ...v })),
-    aspectValues: { ...form.aspectValues },
+    variations: form.variations.map((v) => ({ ...v })),
+    aspectValues: { ...form.aspectValues }
   })
 }
 </script>
@@ -656,7 +789,11 @@ const save = () => {
   flex-shrink: 0;
 }
 
-.panel-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
 
 .panel-body {
   flex: 1;
@@ -674,38 +811,71 @@ const save = () => {
 }
 
 /* Gallery */
-.image-gallery { display: flex; flex-direction: column; gap: 8px; }
+.image-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .gallery-main {
-  width: 100%; height: 180px;
+  width: 100%;
+  height: 180px;
   object-fit: contain;
   background: var(--bg-card);
   border-radius: 8px;
   border: 1px solid var(--border);
 }
-.gallery-thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+.gallery-thumbs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .gallery-thumb {
-  width: 44px; height: 44px;
+  width: 44px;
+  height: 44px;
   object-fit: cover;
   border-radius: 6px;
   border: 2px solid transparent;
   cursor: pointer;
   background: var(--bg-card);
 }
-.gallery-thumb.active { border-color: var(--accent); }
+.gallery-thumb.active {
+  border-color: var(--accent);
+}
 
 .image-placeholder {
-  width: 100%; height: 80px;
-  display: flex; align-items: center; justify-content: center;
+  width: 100%;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 12px;
 }
 
-.meta-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-.form-hint { font-size: 10px; color: var(--text-muted); }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.section-title { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.form-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 
 .description-images {
   border: 1px solid hsl(var(--border));
@@ -766,14 +936,18 @@ const save = () => {
 
 /* Category */
 .cat-selected {
-  display: flex; align-items: center; gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
   border-radius: 8px;
   cursor: pointer;
 }
-.cat-selected:hover { border-color: hsl(var(--primary)); }
+.cat-selected:hover {
+  border-color: hsl(var(--primary));
+}
 
 .cat-results-panel {
   border: 1px solid hsl(var(--border));
@@ -781,23 +955,56 @@ const save = () => {
   padding: 8px;
   background: hsl(var(--card));
 }
-.cat-search-wrap { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-.cat-results-list { max-height: 250px; overflow-y: auto; }
+.cat-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.cat-results-list {
+  max-height: 250px;
+  overflow-y: auto;
+}
 .cat-result-item {
   padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
   border: 1px solid transparent;
 }
-.cat-result-item:hover { background: hsl(var(--muted)); border-color: hsl(var(--border)); }
+.cat-result-item:hover {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
 
 /* Aspects */
-.aspects-list { display: flex; flex-direction: column; gap: 8px; }
-.aspect-row { }
+.aspects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.aspect-row {
+}
 
 /* Specs */
-.specs-table { display: flex; flex-direction: column; gap: 0; }
-.spec-row { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid hsl(var(--border) / 0.3); font-size: 11px; }
-.spec-key { color: var(--text-muted); min-width: 100px; flex-shrink: 0; font-weight: 500; }
-.spec-val { color: var(--text-secondary); }
+.specs-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.spec-row {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid hsl(var(--border) / 0.3);
+  font-size: 11px;
+}
+.spec-key {
+  color: var(--text-muted);
+  min-width: 100px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.spec-val {
+  color: var(--text-secondary);
+}
 </style>

@@ -77,22 +77,6 @@
 
           <div class="flex items-center justify-between space-x-2 pt-2">
             <div class="flex flex-col space-y-1">
-              <Label>Ẩn trình duyệt (Headless Mode)</Label>
-              <p class="text-[0.8rem] text-muted-foreground">
-                Khi bật, Playwright chạy ẩn — không mở cửa sổ Chrome. Tắt nếu bị Amazon chặn.
-              </p>
-            </div>
-            <SwitchRoot
-              v-model="form.headlessMode"
-              @update:model-value="() => saveNow()"
-              :class="switchClass"
-            >
-              <SwitchThumb :class="switchThumbClass" />
-            </SwitchRoot>
-          </div>
-
-          <div class="flex items-center justify-between space-x-2 pt-2">
-            <div class="flex flex-col space-y-1">
               <Label>Tự động đổi vùng sang Mỹ (Zip 10001)</Label>
               <p class="text-[0.8rem] text-muted-foreground">
                 Tự động thiết lập địa chỉ giao hàng tại Mỹ để lấy được giá chuẩn nhất (tránh bị lệch
@@ -480,18 +464,39 @@
           <div class="grid grid-cols-3 gap-6">
             <div class="space-y-2">
               <Label>Condition</Label>
-              <Input type="text" v-model="form.defaultCondition" @change="saveNow" placeholder="Ví dụ: 1000" />
-              <p class="text-[0.8rem] text-muted-foreground">Mặc định: <code class="font-mono">1000</code> (New)</p>
+              <Input
+                type="text"
+                v-model="form.defaultCondition"
+                @change="saveNow"
+                placeholder="Ví dụ: 1000"
+              />
+              <p class="text-[0.8rem] text-muted-foreground">
+                Mặc định: <code class="font-mono">1000</code> (New)
+              </p>
             </div>
             <div class="space-y-2">
               <Label>Format</Label>
-              <Input type="text" v-model="form.defaultFormat" @change="saveNow" placeholder="Ví dụ: FixedPrice" />
-              <p class="text-[0.8rem] text-muted-foreground">Mặc định: <code class="font-mono">FixedPrice</code></p>
+              <Input
+                type="text"
+                v-model="form.defaultFormat"
+                @change="saveNow"
+                placeholder="Ví dụ: FixedPrice"
+              />
+              <p class="text-[0.8rem] text-muted-foreground">
+                Mặc định: <code class="font-mono">FixedPrice</code>
+              </p>
             </div>
             <div class="space-y-2">
               <Label>Duration</Label>
-              <Input type="text" v-model="form.defaultDuration" @change="saveNow" placeholder="Ví dụ: GTC" />
-              <p class="text-[0.8rem] text-muted-foreground">Mặc định: <code class="font-mono">GTC</code> (Good Till Cancelled)</p>
+              <Input
+                type="text"
+                v-model="form.defaultDuration"
+                @change="saveNow"
+                placeholder="Ví dụ: GTC"
+              />
+              <p class="text-[0.8rem] text-muted-foreground">
+                Mặc định: <code class="font-mono">GTC</code> (Good Till Cancelled)
+              </p>
             </div>
           </div>
 

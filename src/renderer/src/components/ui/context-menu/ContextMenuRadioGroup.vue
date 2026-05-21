@@ -1,14 +1,14 @@
 <script setup>
-import { ContextMenuRadioGroup, useForwardPropsEmits } from "reka-ui";
+import { ContextMenuRadioGroup, useForwardPropsEmits } from 'reka-ui'
 
 const props = defineProps({
   modelValue: { type: null, required: false },
   asChild: { type: Boolean, required: false },
-  as: { type: null, required: false },
-});
-const emits = defineEmits(["update:modelValue"]);
+  as: { type: null, required: false }
+})
+const emits = defineEmits(['update:modelValue'])
 
-const forwarded = useForwardPropsEmits(props, emits);
+const forwarded = useForwardPropsEmits(props, emits)
 </script>
 
 <template>

@@ -11,18 +11,16 @@ const EBAY_CATEGORY_TREE_ID = '0' // US marketplace
 const DEFAULT_EBAY = {
   ebayClientId: process.env.EBAY_CLIENT_ID,
   ebayClientSecret: process.env.EBAY_CLIENT_SECRET,
-  ebayEnv: process.env.EBAY_ENV || 'sandbox',
+  ebayEnv: process.env.EBAY_ENV || 'sandbox'
 }
 
 let tokenCache = {
   sandbox: null,
-  production: null,
+  production: null
 }
 
 function getBaseUrl(env) {
-  return env === 'production'
-    ? 'https://api.ebay.com'
-    : 'https://api.sandbox.ebay.com'
+  return env === 'production' ? 'https://api.ebay.com' : 'https://api.sandbox.ebay.com'
 }
 
 /**
@@ -40,8 +38,8 @@ async function getAppToken(clientId, clientSecret, env = 'sandbox') {
   const res = await fetch(`${base}/identity/v1/oauth2/token`, {
     method: 'POST',
     headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
     },
     body: 'grant_type=client_credentials&scope=https%3A%2F%2Fapi.ebay.com%2Foauth%2Fapi_scope'
   })
@@ -54,7 +52,7 @@ async function getAppToken(clientId, clientSecret, env = 'sandbox') {
   const data = await res.json()
   tokenCache[env] = {
     token: data.access_token,
-    expiresAt: Date.now() + (data.expires_in * 1000)
+    expiresAt: Date.now() + data.expires_in * 1000
   }
 
   return data.access_token
@@ -74,9 +72,9 @@ async function ebayGet(path) {
 
   const res = await fetch(`${base}${path}`, {
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+      'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
     }
   })
 
@@ -99,13 +97,16 @@ export async function getCategorySuggestions(query) {
     `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_category_suggestions?q=${encoded}`
   )
 
-  return (data.categorySuggestions || []).slice(0, 8).map(s => ({
+  return (data.categorySuggestions || []).slice(0, 8).map((s) => ({
     categoryId: s.category.categoryId,
     categoryName: s.category.categoryName,
     categoryTreeNodeLevel: s.categoryTreeNodeLevel,
     relevancy: s.relevancy,
     // Build breadcrumb path
-    path: (s.categoryTreeNodeAncestors || []).map(p => p.categoryName).reverse().join(' › ')
+    path: (s.categoryTreeNodeAncestors || [])
+      .map((p) => p.categoryName)
+      .reverse()
+      .join(' › ')
   }))
 }
 
@@ -130,7 +131,7 @@ export async function getCategoryAspects(categoryId, settings) {
     `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}/get_item_aspects_for_category?category_id=${categoryId}`
   )
 
-  return (data.aspects || []).map(aspect => {
+  return (data.aspects || []).map((aspect) => {
     const constraint = aspect.aspectConstraint || {}
     const isRequired = constraint.aspectRequired === true
     const aspectUsage = constraint.aspectUsage || 'OPTIONAL'
@@ -150,7 +151,7 @@ export async function getCategoryAspects(categoryId, settings) {
       usage, // REQUIRED | RECOMMENDED | OPTIONAL
       mode: constraint.aspectMode || 'FREE_TEXT',
       cardinality: constraint.itemToAspectCardinality || 'SINGLE',
-      values: (aspect.aspectValues || []).map(v => v.localizedValue),
+      values: (aspect.aspectValues || []).map((v) => v.localizedValue)
     }
   })
 }
@@ -171,17 +172,15 @@ export async function getCategoryTree(settings) {
   }
 
   // 2. Fallback: call API
-  const data = await ebayGet(
-    `/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}`
-  )
+  const data = await ebayGet(`/commerce/taxonomy/v1/category_tree/${EBAY_CATEGORY_TREE_ID}`)
 
   const rootNodes = data.rootCategoryNode?.childCategoryTreeNodes || []
-  return rootNodes.map(node => ({
+  return rootNodes.map((node) => ({
     id: node.category.categoryId,
     name: node.category.categoryName,
-    children: (node.childCategoryTreeNodes || []).slice(0, 20).map(child => ({
+    children: (node.childCategoryTreeNodes || []).slice(0, 20).map((child) => ({
       id: child.category.categoryId,
-      name: child.category.categoryName,
+      name: child.category.categoryName
     }))
   }))
 }

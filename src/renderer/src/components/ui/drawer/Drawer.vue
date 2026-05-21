@@ -1,6 +1,6 @@
 <script setup>
-import { useForwardPropsEmits } from "reka-ui";
-import { DrawerRoot } from "vaul-vue";
+import { useForwardPropsEmits } from 'reka-ui'
+import { DrawerRoot } from 'vaul-vue'
 
 const props = defineProps({
   activeSnapPoint: { type: [Number, String, null], required: false },
@@ -19,19 +19,19 @@ const props = defineProps({
   handleOnly: { type: Boolean, required: false },
   preventScrollRestoration: { type: Boolean, required: false },
   snapPoints: { type: Array, required: false },
-  fadeFromIndex: { type: null, required: false },
-});
+  fadeFromIndex: { type: null, required: false }
+})
 
 const emits = defineEmits([
-  "drag",
-  "release",
-  "close",
-  "update:open",
-  "update:activeSnapPoint",
-  "animationEnd",
-]);
+  'drag',
+  'release',
+  'close',
+  'update:open',
+  'update:activeSnapPoint',
+  'animationEnd'
+])
 
-const forwarded = useForwardPropsEmits(props, emits);
+const forwarded = useForwardPropsEmits(props, emits)
 </script>
 
 <template>

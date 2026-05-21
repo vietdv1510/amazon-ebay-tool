@@ -1,13 +1,13 @@
 <script setup>
-import { cn } from '@/utils';
+import { cn } from '@/utils'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>
@@ -15,7 +15,7 @@ const props = defineProps({
     :class="
       cn(
         'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-0.5',
-        props.class,
+        props.class
       )
     "
   >

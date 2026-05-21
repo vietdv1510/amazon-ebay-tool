@@ -23,15 +23,15 @@ function getChromiumExecutable(headless = true) {
     if (process.platform === 'win32') {
       platformDir = 'chrome-headless-shell-win64'
     } else if (process.platform === 'darwin') {
-      platformDir = process.arch === 'arm64'
-        ? 'chrome-headless-shell-mac-arm64'
-        : 'chrome-headless-shell-mac-x64'
+      platformDir =
+        process.arch === 'arm64'
+          ? 'chrome-headless-shell-mac-arm64'
+          : 'chrome-headless-shell-mac-x64'
     } else {
       platformDir = 'chrome-headless-shell-linux-x64'
     }
-    const exeName = process.platform === 'win32'
-      ? 'chrome-headless-shell.exe'
-      : 'chrome-headless-shell'
+    const exeName =
+      process.platform === 'win32' ? 'chrome-headless-shell.exe' : 'chrome-headless-shell'
     return join(browsersPath, revision, platformDir, exeName)
   } else {
     // Full Chromium with GUI (needed for non-headless mode)
@@ -39,12 +39,15 @@ function getChromiumExecutable(headless = true) {
     if (process.platform === 'win32') {
       return join(browsersPath, revision, 'chrome-win64', 'chrome.exe')
     } else if (process.platform === 'darwin') {
-      const platformDir = process.arch === 'arm64'
-        ? 'chrome-mac-arm64'
-        : 'chrome-mac-x64'
+      const platformDir = process.arch === 'arm64' ? 'chrome-mac-arm64' : 'chrome-mac-x64'
       return join(
-        browsersPath, revision, platformDir,
-        'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'
+        browsersPath,
+        revision,
+        platformDir,
+        'Google Chrome for Testing.app',
+        'Contents',
+        'MacOS',
+        'Google Chrome for Testing'
       )
     } else {
       return join(browsersPath, revision, 'chrome-linux64', 'chrome')
@@ -118,7 +121,7 @@ export async function initBrowser(headless = true) {
         '--disable-translate',
         '--no-first-run',
         '--disable-background-timer-throttling',
-        '--js-flags=--max-old-space-size=128',
+        '--js-flags=--max-old-space-size=128'
       ]
     })
   }
@@ -163,7 +166,10 @@ export async function crawlAmazonWithRetry(asin, progressCb, options = {}) {
       lastError = err
       const retryable = isRetryableError(err)
       if (!retryable || attempt === MAX_RETRIES) {
-        console.error(`[Crawler] ❌ crawlAmazon failed (attempt ${attempt}/${MAX_RETRIES}, not retrying):`, err.message)
+        console.error(
+          `[Crawler] ❌ crawlAmazon failed (attempt ${attempt}/${MAX_RETRIES}, not retrying):`,
+          err.message
+        )
         throw err
       }
       const waitMs = BASE_DELAY_MS * Math.pow(3, attempt - 1) + Math.random() * 2000
@@ -219,7 +225,10 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
   try {
     // Prefer original Amazon URL from Excel; fallback to ASIN-constructed URL
-    const url = (amazonUrl && amazonUrl.includes('amazon.com')) ? amazonUrl : `https://www.amazon.com/dp/${asin}`
+    const url =
+      amazonUrl && amazonUrl.includes('amazon.com')
+        ? amazonUrl
+        : `https://www.amazon.com/dp/${asin}`
 
     // ── HTTP response guard: detect Amazon blocks before parsing ─────────
     let httpBlockError = null
@@ -227,14 +236,13 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       try {
         const resUrl = res.url()
         const status = res.status()
-        if (
-          resUrl.includes('amazon.com/dp/') &&
-          [503, 429, 403].includes(status)
-        ) {
+        if (resUrl.includes('amazon.com/dp/') && [503, 429, 403].includes(status)) {
           httpBlockError = new Error(`Amazon blocked request: HTTP ${status}`)
           console.error(`[Crawler] 🚫 HTTP ${status} detected on ${resUrl}`)
         }
-      } catch { /* ignore listener errors */ }
+      } catch {
+        /* ignore listener errors */
+      }
     })
 
     progressCb(`[PROGRESS] Opening Amazon page...`)
@@ -270,8 +278,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     // Amazon redirects invalid/unavailable products to homepage, search, or error pages.
     // Detect this immediately to avoid wasting 30+ seconds on empty extraction.
     const postLoadUrl = page.url()
-    const isStillProductPage =
-      postLoadUrl.includes('/dp/') || postLoadUrl.includes('/gp/product/')
+    const isStillProductPage = postLoadUrl.includes('/dp/') || postLoadUrl.includes('/gp/product/')
     if (!isStillProductPage) {
       console.error(`[Crawler] ❌ Amazon redirected away from product page`)
       console.error(`  - Expected: ${url}`)
@@ -292,7 +299,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       bodyLower.includes('captcha')
     ) {
       console.error('[Crawler] 🤖 CAPTCHA detected — Amazon is blocking this crawler session')
-      throw new Error('Amazon CAPTCHA detected. Please wait a few minutes and try again, or switch IP/VPN.')
+      throw new Error(
+        'Amazon CAPTCHA detected. Please wait a few minutes and try again, or switch IP/VPN.'
+      )
     }
 
     // Wait for product title to actually render (JS-driven pages load it late)
@@ -311,9 +320,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
     try {
       await page.waitForSelector(titleSelectorStr, { state: 'attached', timeout: 30000 })
     } catch {
-      console.warn(
-        '[Crawler] ⚠️ Title selector not found within 30s. Reloading page for retry...'
-      )
+      console.warn('[Crawler] ⚠️ Title selector not found within 30s. Reloading page for retry...')
       progressCb('[PROGRESS] Page loaded slowly — reloading and retrying...')
 
       try {
@@ -335,10 +342,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
         console.log('[Crawler] ✅ Title found after page reload!')
         progressCb('[PROGRESS] ✅ Page reloaded successfully')
       } catch (reloadErr) {
-        console.warn(
-          '[Crawler] ⚠️ Title still not found after reload:',
-          reloadErr.message
-        )
+        console.warn('[Crawler] ⚠️ Title still not found after reload:', reloadErr.message)
         // Don't throw here — continue with extraction.
         // Data Quality Gate at the end will catch truly empty pages.
       }
@@ -359,7 +363,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       await page.waitForTimeout(2000)
       await Promise.allSettled([
         page.waitForSelector('.a-price .a-offscreen', { timeout: 8000 }),
-        page.waitForSelector('#corePrice_feature_div', { timeout: 8000 }),
+        page.waitForSelector('#corePrice_feature_div', { timeout: 8000 })
       ])
     }
 
@@ -431,7 +435,7 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
           'error',
           '404',
           'sign in',
-          'amazon.com: online shopping',
+          'amazon.com: online shopping'
         ]
         const isNonProduct = NON_PRODUCT_TITLES.some(
           (t) => cleanTitle.toLowerCase() === t || cleanTitle.toLowerCase().startsWith(t + ' ')
@@ -482,7 +486,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
         { timeout: 8000 }
       ),
       page.waitForSelector('.a-price .a-offscreen', { timeout: 8000 }),
-      page.waitForSelector('#twister, #variation_color_name, #variation_size_name', { timeout: 8000 })
+      page.waitForSelector('#twister, #variation_color_name, #variation_size_name', {
+        timeout: 8000
+      })
     ])
 
     // Re-fetch HTML AFTER lazy sections loaded (captures JS-injected prices, variations)
@@ -811,7 +817,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
 
             const isBeforeBrandStory = (img) => {
               if (!brandStoryMarker) return true
-              return Boolean(img.compareDocumentPosition(brandStoryMarker) & Node.DOCUMENT_POSITION_FOLLOWING)
+              return Boolean(
+                img.compareDocumentPosition(brandStoryMarker) & Node.DOCUMENT_POSITION_FOLLOWING
+              )
             }
 
             const getImageSrc = (img) => {
@@ -1000,7 +1008,9 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
       const pageUrl = page.url()
       console.error(`[Crawler] ❌ Data Quality Gate FAILED for ASIN ${asin}:`)
       console.error(`  - title: "${title?.substring(0, 80)}"`)
-      console.error(`  - images: ${images.length}, price: ${price}, specs: ${Object.keys(specs).length}, bullets: ${bulletPoints.length}`)
+      console.error(
+        `  - images: ${images.length}, price: ${price}, specs: ${Object.keys(specs).length}, bullets: ${bulletPoints.length}`
+      )
       console.error(`  - final URL: ${pageUrl}`)
 
       // Check if Amazon redirected away from the product page
@@ -1101,7 +1111,9 @@ async function trySetUSDelivery(page) {
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      console.log(`[trySetUSDelivery] Hardening location to US (10001)... (attempt ${attempt}/${MAX_ATTEMPTS})`)
+      console.log(
+        `[trySetUSDelivery] Hardening location to US (10001)... (attempt ${attempt}/${MAX_ATTEMPTS})`
+      )
 
       const result = await page.evaluate(async () => {
         const wait = (ms) => new Promise((res) => setTimeout(res, ms))
@@ -1122,7 +1134,8 @@ async function trySetUSDelivery(page) {
         const input = document.querySelector('#GLUXZipUpdateInput')
         if (!input) return 'NO_INPUT'
         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-          window.HTMLInputElement.prototype, 'value'
+          window.HTMLInputElement.prototype,
+          'value'
         )?.set
         if (nativeInputValueSetter) {
           nativeInputValueSetter.call(input, '10001')
@@ -1165,29 +1178,35 @@ async function trySetUSDelivery(page) {
       if (result.startsWith('SUCCESS')) {
         await page.waitForTimeout(1500)
         await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
-        await page
-          .reload({ waitUntil: 'domcontentloaded' })
-          .catch((err) => {
-            const message = String(err?.message || err)
-            if (!message.includes('ERR_ABORTED') && !message.includes('frame was detached')) {
-              throw err
-            }
-            console.debug('[trySetUSDelivery] Reload skipped because Amazon was already navigating.')
-          })
+        await page.reload({ waitUntil: 'domcontentloaded' }).catch((err) => {
+          const message = String(err?.message || err)
+          if (!message.includes('ERR_ABORTED') && !message.includes('frame was detached')) {
+            throw err
+          }
+          console.debug('[trySetUSDelivery] Reload skipped because Amazon was already navigating.')
+        })
         await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {})
         await page.waitForTimeout(2000)
 
         // Verify the location actually changed
         const verifyResult = await page.evaluate(() => {
-          const locText = document.querySelector('#glow-ingress-block, #nav-global-location-popover-link')?.textContent || ''
-          return locText.includes('10001') || locText.includes('New York') || locText.includes('United States')
+          const locText =
+            document.querySelector('#glow-ingress-block, #nav-global-location-popover-link')
+              ?.textContent || ''
+          return (
+            locText.includes('10001') ||
+            locText.includes('New York') ||
+            locText.includes('United States')
+          )
         })
 
         if (verifyResult) {
           console.log('[trySetUSDelivery] ✅ Verified: location is now US (10001).')
           return true // Changed successfully
         } else {
-          console.warn(`[trySetUSDelivery] ⚠️ Attempt ${attempt}: Location set but verification failed.`)
+          console.warn(
+            `[trySetUSDelivery] ⚠️ Attempt ${attempt}: Location set but verification failed.`
+          )
           if (attempt < MAX_ATTEMPTS) {
             await page.waitForTimeout(2000)
             continue // Retry
@@ -1197,7 +1216,9 @@ async function trySetUSDelivery(page) {
 
       // Failed — retry after waiting for DOM to fully render
       if (attempt < MAX_ATTEMPTS) {
-        console.warn(`[trySetUSDelivery] ⚠️ Attempt ${attempt} failed (${result}). Waiting 3s for DOM then retrying...`)
+        console.warn(
+          `[trySetUSDelivery] ⚠️ Attempt ${attempt} failed (${result}). Waiting 3s for DOM then retrying...`
+        )
         await page.waitForTimeout(3000)
       } else {
         console.warn(
@@ -1284,9 +1305,7 @@ async function extractVariations($, html, page, basePrice, progressCb, defaultQu
     let imageMap = {}
     // colorImages maps dimension value → image array
     // More flexible pattern - look for colorImages followed by any key
-    const colorImgsMatch = html.match(
-      /"colorImages"\s*:\s*(\{[^}]*\})\s*(?:,|;|$)/
-    )
+    const colorImgsMatch = html.match(/"colorImages"\s*:\s*(\{[^}]*\})\s*(?:,|;|$)/)
     if (colorImgsMatch) {
       try {
         const colorData = JSON.parse(colorImgsMatch[1])

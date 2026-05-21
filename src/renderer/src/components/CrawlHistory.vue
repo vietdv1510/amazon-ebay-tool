@@ -15,25 +15,32 @@
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="sessions.length === 0 && currentView === 'list'" class="flex-1 flex flex-col items-center justify-center text-center p-8 min-h-[400px]">
+      <div
+        v-else-if="sessions.length === 0 && currentView === 'list'"
+        class="flex-1 flex flex-col items-center justify-center text-center p-8 min-h-[400px]"
+      >
         <div class="bg-muted/30 p-6 rounded-full mb-4">
           <History class="w-12 h-12 text-muted-foreground" />
         </div>
         <h3 class="text-xl font-semibold mb-2">Chưa có lịch sử crawl</h3>
-        <p class="text-muted-foreground text-sm">Dữ liệu sẽ tự động lưu sau mỗi lần crawl thành công.</p>
+        <p class="text-muted-foreground text-sm">
+          Dữ liệu sẽ tự động lưu sau mỗi lần crawl thành công.
+        </p>
       </div>
 
       <!-- SESSION LIST VIEW -->
       <div v-else-if="currentView === 'list'" class="flex-1 overflow-y-auto space-y-3 pb-4">
         <!-- Search -->
         <div class="flex items-center gap-2 mb-3">
-          <div class="relative flex-1 max-w-sm">
-            <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <div class="relative flex-1 max-w-sm group">
+            <Search
+              class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors duration-300 group-focus-within:text-primary"
+            />
             <input
               v-model="searchQuery"
               type="text"
               placeholder="Tìm theo tên session hoặc ASIN..."
-              class="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              class="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-background transition-all duration-300 placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 shadow-sm hover:border-muted-foreground/30"
             />
           </div>
           <Badge variant="outline" class="text-xs h-8 px-3">
@@ -42,11 +49,7 @@
         </div>
 
         <!-- Session cards -->
-        <div
-          v-for="session in filteredSessions"
-          :key="session.id"
-          class="session-card"
-        >
+        <div v-for="session in filteredSessions" :key="session.id" class="session-card">
           <div class="session-header">
             <div class="session-info">
               <div class="session-name-row">
@@ -79,7 +82,12 @@
                 </span>
               </div>
               <div v-if="session.previewAsins?.length" class="session-asins">
-                <Badge v-for="asin in session.previewAsins" :key="asin" variant="outline" class="text-[10px] h-5">
+                <Badge
+                  v-for="asin in session.previewAsins"
+                  :key="asin"
+                  variant="outline"
+                  class="text-[10px] h-5"
+                >
                   {{ asin }}
                 </Badge>
                 <span v-if="session.productCount > 5" class="text-[10px] text-muted-foreground">
@@ -88,13 +96,27 @@
               </div>
             </div>
             <div class="session-actions">
-              <Button size="sm" variant="outline" @click="openSession(session.id)" title="Xem chi tiết">
+              <Button
+                size="sm"
+                variant="outline"
+                @click="openSession(session.id)"
+                title="Xem chi tiết"
+              >
                 <Eye class="w-4 h-4 mr-1" /> Chi tiết
               </Button>
-              <Button size="sm" @click="loadSessionToExport(session.id)" title="Load tất cả vào Export Preview">
+              <Button
+                size="sm"
+                @click="loadSessionToExport(session.id)"
+                title="Load tất cả vào Export Preview"
+              >
                 <Upload class="w-4 h-4 mr-1" /> Load vào Export
               </Button>
-              <Button size="sm" variant="destructive" @click="confirmDeleteSession(session)" title="Xóa session">
+              <Button
+                size="sm"
+                variant="destructive"
+                @click="confirmDeleteSession(session)"
+                title="Xóa session"
+              >
                 <Trash2 class="w-4 h-4" />
               </Button>
             </div>
@@ -103,16 +125,26 @@
       </div>
 
       <!-- SESSION DETAIL VIEW -->
-      <div v-else-if="currentView === 'detail' && activeSession" class="flex-1 overflow-hidden flex flex-col">
+      <div
+        v-else-if="currentView === 'detail' && activeSession"
+        class="flex-1 overflow-hidden flex flex-col"
+      >
         <!-- Detail header -->
         <div class="flex items-center gap-3 mb-3 flex-shrink-0">
           <Button size="sm" variant="outline" @click="backToList">
             <ArrowLeft class="w-4 h-4 mr-1.5" /> Quay lại
           </Button>
           <h3 class="font-semibold text-sm">{{ activeSession.name }}</h3>
-          <Badge variant="outline" class="text-xs">{{ activeSession.products?.length || 0 }} sản phẩm</Badge>
+          <Badge variant="outline" class="text-xs"
+            >{{ activeSession.products?.length || 0 }} sản phẩm</Badge
+          >
           <div class="ml-auto flex gap-2">
-            <Button size="sm" variant="destructive" @click="deleteSelectedProducts" :disabled="selectedAsins.size === 0">
+            <Button
+              size="sm"
+              variant="destructive"
+              @click="deleteSelectedProducts"
+              :disabled="selectedAsins.size === 0"
+            >
               <Trash2 class="w-3.5 h-3.5 mr-1" /> Xóa đã chọn ({{ selectedAsins.size }})
             </Button>
             <Button size="sm" @click="loadSelectedToExport" :disabled="selectedAsins.size === 0">
@@ -127,7 +159,12 @@
             <thead>
               <tr>
                 <th class="checkbox-col">
-                  <input type="checkbox" :checked="isAllDetailSelected" @change="toggleSelectAllDetail" class="product-checkbox" />
+                  <input
+                    type="checkbox"
+                    :checked="isAllDetailSelected"
+                    @change="toggleSelectAllDetail"
+                    class="product-checkbox"
+                  />
                 </th>
                 <th class="w-[60px]">#</th>
                 <th class="w-[120px]">ASIN</th>
@@ -156,13 +193,21 @@
                 </td>
                 <td class="text-center text-muted-foreground text-xs">{{ idx + 1 }}</td>
                 <td>
-                  <a :href="`https://amazon.com/dp/${product.asin}`" target="_blank" class="text-xs font-mono text-primary hover:underline">
+                  <a
+                    :href="`https://amazon.com/dp/${product.asin}`"
+                    target="_blank"
+                    class="text-xs font-mono text-primary hover:underline"
+                  >
                     {{ product.asin }}
                   </a>
                 </td>
                 <td>
                   <div class="editable-cell-wrap" @dblclick="startDetailEdit(product, 'title')">
-                    <template v-if="detailEditing?.asin === product.asin && detailEditing?.field === 'title'">
+                    <template
+                      v-if="
+                        detailEditing?.asin === product.asin && detailEditing?.field === 'title'
+                      "
+                    >
                       <input
                         v-model="detailEditValue"
                         class="detail-edit-input"
@@ -172,13 +217,19 @@
                         ref="detailEditRef"
                       />
                     </template>
-                    <span v-else class="text-xs line-clamp-2" :title="product.title">{{ product.title }}</span>
+                    <span v-else class="text-xs line-clamp-2" :title="product.title">{{
+                      product.title
+                    }}</span>
                   </div>
                 </td>
                 <td class="text-center text-xs">${{ product.originalPrice }}</td>
                 <td>
                   <div class="editable-cell-wrap" @dblclick="startDetailEdit(product, 'sellPrice')">
-                    <template v-if="detailEditing?.asin === product.asin && detailEditing?.field === 'sellPrice'">
+                    <template
+                      v-if="
+                        detailEditing?.asin === product.asin && detailEditing?.field === 'sellPrice'
+                      "
+                    >
                       <input
                         v-model="detailEditValue"
                         class="detail-edit-input w-[70px]"
@@ -190,12 +241,18 @@
                         ref="detailEditRef"
                       />
                     </template>
-                    <span v-else class="text-xs font-semibold text-green-600">${{ product.sellPrice }}</span>
+                    <span v-else class="text-xs font-semibold text-green-600"
+                      >${{ product.sellPrice }}</span
+                    >
                   </div>
                 </td>
                 <td>
                   <div class="editable-cell-wrap" @dblclick="startDetailEdit(product, 'brand')">
-                    <template v-if="detailEditing?.asin === product.asin && detailEditing?.field === 'brand'">
+                    <template
+                      v-if="
+                        detailEditing?.asin === product.asin && detailEditing?.field === 'brand'
+                      "
+                    >
                       <input
                         v-model="detailEditValue"
                         class="detail-edit-input w-[90px]"
@@ -211,8 +268,16 @@
                 <td class="text-center text-xs">{{ product.images?.length || 0 }}</td>
                 <td class="text-center text-xs">{{ product.variations?.length || 0 }}</td>
                 <td>
-                  <div class="editable-cell-wrap" @dblclick="startDetailEdit(product, 'ebayCategory')">
-                    <template v-if="detailEditing?.asin === product.asin && detailEditing?.field === 'ebayCategory'">
+                  <div
+                    class="editable-cell-wrap"
+                    @dblclick="startDetailEdit(product, 'ebayCategory')"
+                  >
+                    <template
+                      v-if="
+                        detailEditing?.asin === product.asin &&
+                        detailEditing?.field === 'ebayCategory'
+                      "
+                    >
                       <input
                         v-model="detailEditValue"
                         class="detail-edit-input w-[90px]"
@@ -252,15 +317,24 @@
           Export đã có {{ rowData.length }} sản phẩm
         </h4>
         <p class="text-sm text-muted-foreground mb-1">
-          Bạn đang load thêm <strong>{{ mergeConfirm.products.length }}</strong> sản phẩm từ "<strong>{{ mergeConfirm.sessionName }}</strong>".
+          Bạn đang load thêm <strong>{{ mergeConfirm.products.length }}</strong> sản phẩm từ
+          "<strong>{{ mergeConfirm.sessionName }}</strong
+          >".
         </p>
         <p class="text-sm text-muted-foreground mb-4">Chọn cách xử lý:</p>
         <div class="flex justify-end gap-2">
           <Button size="sm" variant="outline" @click="mergeConfirm = null">Hủy</Button>
-          <Button size="sm" variant="destructive" @click="mergeAndNavigate(mergeConfirm.products, 'replace', mergeConfirm.sessionId)">
+          <Button
+            size="sm"
+            variant="destructive"
+            @click="mergeAndNavigate(mergeConfirm.products, 'replace', mergeConfirm.sessionId)"
+          >
             Thay thế tất cả
           </Button>
-          <Button size="sm" @click="mergeAndNavigate(mergeConfirm.products, 'merge', mergeConfirm.sessionId)">
+          <Button
+            size="sm"
+            @click="mergeAndNavigate(mergeConfirm.products, 'merge', mergeConfirm.sessionId)"
+          >
             Gộp thêm vào
           </Button>
         </div>
@@ -276,8 +350,17 @@ import { globalRowData as rowData, activeSessionId } from '../store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  History, ArrowLeft, Search, Package, Calendar, Layers, Eye,
-  Upload, Trash2, Loader2, Pencil
+  History,
+  ArrowLeft,
+  Search,
+  Package,
+  Calendar,
+  Layers,
+  Eye,
+  Upload,
+  Trash2,
+  Loader2,
+  Pencil
 } from 'lucide-vue-next'
 
 const emit = defineEmits(['navigate'])
@@ -309,9 +392,9 @@ const deleteConfirm = ref(null)
 const filteredSessions = computed(() => {
   if (!searchQuery.value.trim()) return sessions.value
   const q = searchQuery.value.toLowerCase()
-  return sessions.value.filter(s =>
-    s.name.toLowerCase().includes(q) ||
-    s.previewAsins?.some(a => a.toLowerCase().includes(q))
+  return sessions.value.filter(
+    (s) =>
+      s.name.toLowerCase().includes(q) || s.previewAsins?.some((a) => a.toLowerCase().includes(q))
   )
 })
 
@@ -363,7 +446,7 @@ const backToList = () => {
 const mergeConfirm = ref(null) // { products: [], sessionName: string, sessionId: string|null }
 
 const mergeAndNavigate = async (newProducts, mode, sessionId) => {
-  const mapped = newProducts.map(p => ({
+  const mapped = newProducts.map((p) => ({
     ...p,
     id: p.asin,
     status: 'DONE',
@@ -378,8 +461,8 @@ const mergeAndNavigate = async (newProducts, mode, sessionId) => {
     // Pause auto-save before mutating rowData to prevent watcher writing to old session
     activeSessionId.value = null
     // Merge: append only products whose ASIN is not already in rowData
-    const existingAsins = new Set(rowData.value.map(r => r.asin || r.id))
-    const toAdd = mapped.filter(p => !existingAsins.has(p.asin))
+    const existingAsins = new Set(rowData.value.map((r) => r.asin || r.id))
+    const toAdd = mapped.filter((p) => !existingAsins.has(p.asin))
     const skipped = mapped.length - toAdd.length
     rowData.value = [...rowData.value, ...toAdd]
     if (skipped > 0) {
@@ -387,7 +470,7 @@ const mergeAndNavigate = async (newProducts, mode, sessionId) => {
     }
     // Merged data = new snapshot, create a new session for auto-save
     try {
-      const doneProducts = rowData.value.filter(r => r.status === 'DONE')
+      const doneProducts = rowData.value.filter((r) => r.status === 'DONE')
       const res = await window.api.history.saveCurrent(JSON.parse(JSON.stringify(doneProducts)))
       if (res?.ok) activeSessionId.value = res.sessionId
     } catch (e) {
@@ -420,7 +503,7 @@ const loadSessionToExport = async (sessionId) => {
 
 const loadSelectedToExport = () => {
   if (!activeSession.value?.products?.length || selectedAsins.value.size === 0) return
-  const selected = activeSession.value.products.filter(p => selectedAsins.value.has(p.asin))
+  const selected = activeSession.value.products.filter((p) => selectedAsins.value.has(p.asin))
   loadProductsToExport(selected, `${selected.length} sản phẩm đã chọn`, activeSession.value.id)
 }
 
@@ -496,7 +579,7 @@ const toggleSelectAllDetail = () => {
   if (isAllDetailSelected.value) {
     selectedAsins.value = new Set()
   } else {
-    selectedAsins.value = new Set(activeSession.value.products.map(p => p.asin))
+    selectedAsins.value = new Set(activeSession.value.products.map((p) => p.asin))
   }
 }
 
@@ -523,8 +606,11 @@ const commitDetailEdit = async (product) => {
 const formatDate = (iso) => {
   if (!iso) return '—'
   const d = new Date(iso)
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-    ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  return (
+    d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+    ' ' +
+    d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  )
 }
 </script>
 
@@ -551,7 +637,9 @@ const formatDate = (iso) => {
   border: 1px solid hsl(var(--border));
   border-radius: 12px;
   padding: 16px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 .session-card:hover {
   border-color: hsl(var(--primary) / 0.3);
@@ -716,7 +804,7 @@ const formatDate = (iso) => {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -728,6 +816,6 @@ const formatDate = (iso) => {
   border-radius: 12px;
   padding: 24px;
   min-width: 360px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 </style>

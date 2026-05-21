@@ -100,14 +100,13 @@ export function getDb() {
   // Migration: add categoryPath column for older databases
   try {
     const cols = db.pragma('table_info(categories)')
-    if (!cols.find(c => c.name === 'categoryPath')) {
+    if (!cols.find((c) => c.name === 'categoryPath')) {
       db.exec('ALTER TABLE categories ADD COLUMN categoryPath TEXT')
     }
   } catch (_) {}
 
   return db
 }
-
 
 // ─── Category Queries ──────────────────────────────────────────────────────────
 
@@ -118,13 +117,17 @@ export function getDb() {
 export function getAspectsFromCache(categoryId) {
   const database = getDb()
 
-  const aspects = database.prepare(`
+  const aspects = database
+    .prepare(
+      `
     SELECT aspectName, usage, mode, cardinality, dataType
     FROM aspects WHERE categoryId = ?
     ORDER BY
       CASE usage WHEN 'REQUIRED' THEN 0 WHEN 'RECOMMENDED' THEN 1 ELSE 2 END,
       aspectName
-  `).all(categoryId)
+  `
+    )
+    .all(categoryId)
 
   if (aspects.length === 0) return null // Cache miss
 
@@ -134,13 +137,13 @@ export function getAspectsFromCache(categoryId) {
     WHERE categoryId = ? AND aspectName = ?
   `)
 
-  return aspects.map(a => ({
+  return aspects.map((a) => ({
     name: a.aspectName,
     required: a.usage === 'REQUIRED',
     usage: a.usage, // REQUIRED | RECOMMENDED | OPTIONAL
     mode: a.mode,
     cardinality: a.cardinality,
-    values: valuesStmt.all(categoryId, a.aspectName).map(v => v.value),
+    values: valuesStmt.all(categoryId, a.aspectName).map((v) => v.value)
   }))
 }
 
@@ -154,22 +157,26 @@ export function getCategoryTreeFromCache() {
   if (count.cnt === 0) return null // Cache miss
 
   // Get level 1 categories
-  const level1 = database.prepare(`
+  const level1 = database
+    .prepare(
+      `
     SELECT categoryId, categoryName FROM categories WHERE level = 1 ORDER BY categoryName
-  `).all()
+  `
+    )
+    .all()
 
   // Get level 2 children for each level 1
   const childStmt = database.prepare(`
     SELECT categoryId, categoryName FROM categories WHERE parentId = ? ORDER BY categoryName LIMIT 30
   `)
 
-  return level1.map(node => ({
+  return level1.map((node) => ({
     id: node.categoryId,
     name: node.categoryName,
-    children: childStmt.all(node.categoryId).map(c => ({
+    children: childStmt.all(node.categoryId).map((c) => ({
       id: c.categoryId,
-      name: c.categoryName,
-    })),
+      name: c.categoryName
+    }))
   }))
 }
 
@@ -179,54 +186,71 @@ export function getSyncStatus() {
   const database = getDb()
 
   const catCount = database.prepare('SELECT COUNT(*) as cnt FROM categories').get().cnt
-  const aspectCatCount = database.prepare('SELECT COUNT(DISTINCT categoryId) as cnt FROM aspects').get().cnt
+  const aspectCatCount = database
+    .prepare('SELECT COUNT(DISTINCT categoryId) as cnt FROM aspects')
+    .get().cnt
   const lastSync = database.prepare("SELECT value FROM sync_meta WHERE key = 'lastSyncTime'").get()
-  const treeVersion = database.prepare("SELECT value FROM sync_meta WHERE key = 'treeVersion'").get()
+  const treeVersion = database
+    .prepare("SELECT value FROM sync_meta WHERE key = 'treeVersion'")
+    .get()
 
   return {
     categoryCount: catCount,
     aspectCategoryCount: aspectCatCount,
     lastSyncTime: lastSync?.value || null,
-    treeVersion: treeVersion?.value || null,
+    treeVersion: treeVersion?.value || null
   }
 }
 
 export function searchCategoriesOffline(query) {
   const database = getDb()
-  const terms = query.trim().split(/\s+/).filter(t => t.length > 0)
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter((t) => t.length > 0)
   if (terms.length === 0) return []
 
   // Helper: check if categoryPath column exists
   const hasCategoryPath = (() => {
     try {
       const cols = database.pragma('table_info(categories)')
-      return cols.some(c => c.name === 'categoryPath')
-    } catch { return false }
+      return cols.some((c) => c.name === 'categoryPath')
+    } catch {
+      return false
+    }
   })()
   const nameExpr = hasCategoryPath
     ? '(categoryName LIKE ? OR COALESCE(categoryPath, categoryName) LIKE ?)'
     : 'categoryName LIKE ?'
 
-  const makeParams = (t) => hasCategoryPath ? [`%${t}%`, `%${t}%`] : [`%${t}%`]
+  const makeParams = (t) => (hasCategoryPath ? [`%${t}%`, `%${t}%`] : [`%${t}%`])
 
   // Step 1: AND — tất cả terms phải match
   const andConditions = terms.map(() => nameExpr).join(' AND ')
   const andParams = terms.flatMap(makeParams)
-  let rows = database.prepare(`
+  let rows = database
+    .prepare(
+      `
     SELECT categoryId, categoryName, level, isLeaf
     FROM categories WHERE ${andConditions}
     ORDER BY level ASC, isLeaf DESC LIMIT 20
-  `).all(...andParams)
+  `
+    )
+    .all(...andParams)
 
   // Step 2: OR — bất kỳ term nào match (dùng orParams riêng, không dùng andParams)
   if (rows.length === 0 && terms.length > 1) {
     const orConditions = terms.map(() => nameExpr).join(' OR ')
-    const orParams = terms.flatMap(makeParams)  // fix: dùng orParams đúng số lượng
-    rows = database.prepare(`
+    const orParams = terms.flatMap(makeParams) // fix: dùng orParams đúng số lượng
+    rows = database
+      .prepare(
+        `
       SELECT categoryId, categoryName, level, isLeaf
       FROM categories WHERE ${orConditions}
       ORDER BY isLeaf DESC, level ASC LIMIT 20
-    `).all(...orParams)
+    `
+      )
+      .all(...orParams)
   }
 
   // Step 3: Per-term fallback — thử từng term riêng lẻ, lấy term đầu tiên có kết quả
@@ -234,16 +258,23 @@ export function searchCategoriesOffline(query) {
   if (rows.length === 0) {
     for (const t of terms) {
       const p = makeParams(t)
-      const r = database.prepare(`
+      const r = database
+        .prepare(
+          `
         SELECT categoryId, categoryName, level, isLeaf
         FROM categories WHERE ${nameExpr}
         ORDER BY isLeaf DESC, level ASC LIMIT 20
-      `).all(...p)
-      if (r.length > 0) { rows = r; break }
+      `
+        )
+        .all(...p)
+      if (r.length > 0) {
+        rows = r
+        break
+      }
     }
   }
 
-  return rows.map(r => ({
+  return rows.map((r) => ({
     categoryId: r.categoryId,
     categoryName: r.categoryName,
     categoryTreeNodeLevel: r.level,
@@ -254,9 +285,13 @@ export function searchCategoriesOffline(query) {
 
 export function setSyncMeta(key, value) {
   const database = getDb()
-  database.prepare(`
+  database
+    .prepare(
+      `
     INSERT OR REPLACE INTO sync_meta (key, value, updatedAt) VALUES (?, ?, datetime('now'))
-  `).run(key, value)
+  `
+    )
+    .run(key, value)
 }
 
 /**

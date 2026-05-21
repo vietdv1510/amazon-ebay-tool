@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { AccordionItem, useForwardProps } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { AccordionItem, useForwardProps } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   disabled: { type: Boolean, required: false },
@@ -12,13 +12,13 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwardedProps = useForwardProps(delegatedProps);
+const forwardedProps = useForwardProps(delegatedProps)
 </script>
 
 <template>

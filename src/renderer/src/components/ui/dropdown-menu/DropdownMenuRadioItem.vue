@@ -1,12 +1,8 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { DotFilledIcon } from '@radix-icons/vue';
-import {
-  DropdownMenuItemIndicator,
-  DropdownMenuRadioItem,
-  useForwardPropsEmits,
-} from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { DotFilledIcon } from '@radix-icons/vue'
+import { DropdownMenuItemIndicator, DropdownMenuRadioItem, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   value: { type: null, required: true },
@@ -17,15 +13,15 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const emits = defineEmits(["select"]);
+const emits = defineEmits(['select'])
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
@@ -34,7 +30,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
     :class="
       cn(
         'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-        props.class,
+        props.class
       )
     "
   >

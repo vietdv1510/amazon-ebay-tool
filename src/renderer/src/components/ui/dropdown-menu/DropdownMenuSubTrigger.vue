@@ -1,8 +1,8 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { ChevronRightIcon } from '@radix-icons/vue';
-import { DropdownMenuSubTrigger, useForwardProps } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { ChevronRightIcon } from '@radix-icons/vue'
+import { DropdownMenuSubTrigger, useForwardProps } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   disabled: { type: Boolean, required: false },
@@ -12,13 +12,13 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwardedProps = useForwardProps(delegatedProps);
+const forwardedProps = useForwardProps(delegatedProps)
 </script>
 
 <template>
@@ -27,7 +27,7 @@ const forwardedProps = useForwardProps(delegatedProps);
     :class="
       cn(
         'flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent',
-        props.class,
+        props.class
       )
     "
   >

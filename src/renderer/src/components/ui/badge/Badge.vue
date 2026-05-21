@@ -1,15 +1,15 @@
 <script setup>
-import { cn } from '@/utils';
-import { badgeVariants } from ".";
+import { cn } from '@/utils'
+import { badgeVariants } from '.'
 
 const props = defineProps({
   variant: { type: null, required: false },
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>

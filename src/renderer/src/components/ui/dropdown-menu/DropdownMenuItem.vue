@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { DropdownMenuItem, useForwardProps } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { DropdownMenuItem, useForwardProps } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   disabled: { type: Boolean, required: false },
@@ -11,14 +11,14 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
+    skipCheck: true
   },
-  inset: { type: Boolean, required: false },
-});
+  inset: { type: Boolean, required: false }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwardedProps = useForwardProps(delegatedProps);
+const forwardedProps = useForwardProps(delegatedProps)
 </script>
 
 <template>
@@ -28,7 +28,7 @@ const forwardedProps = useForwardProps(delegatedProps);
       cn(
         'relative flex cursor-default select-none items-center rounded-sm gap-2 px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0',
         inset && 'pl-8',
-        props.class,
+        props.class
       )
     "
   >

@@ -13,7 +13,6 @@
           Import
         </Button>
 
-
         <Button v-if="!isCrawling" size="sm" :disabled="!hasPendingRows" @click="startCrawl">
           <Play class="w-4 h-4 mr-2" />
           Start Crawl
@@ -34,19 +33,27 @@
     <div class="workspace-body h-full">
       <div class="flex-1 overflow-hidden flex flex-col mx-4 mt-4 h-full">
         <!-- Empty state -->
-        <div v-if="rowData.length === 0" class="flex-1 flex flex-col items-center justify-center text-center p-8 h-full min-h-[400px]">
+        <div
+          v-if="rowData.length === 0"
+          class="flex-1 flex flex-col items-center justify-center text-center p-8 h-full min-h-[400px]"
+        >
           <div class="empty-icon bg-muted/30 p-6 rounded-full mb-4">
             <FolderOpen class="w-12 h-12 text-muted-foreground" />
           </div>
           <h3 class="text-xl font-semibold mb-2">Chưa có sản phẩm</h3>
-          <p class="text-muted-foreground mb-6 max-w-sm">Import file Excel/CSV chứa cột ASIN để bắt đầu crawl dữ liệu từ Amazon.</p>
+          <p class="text-muted-foreground mb-6 max-w-sm">
+            Import file Excel/CSV chứa cột ASIN để bắt đầu crawl dữ liệu từ Amazon.
+          </p>
           <Button size="lg" @click="handleImportFile" class="shadow-sm">
             <Upload class="w-5 h-5 mr-2" />
             Import file ASIN
           </Button>
         </div>
 
-        <div v-else class="flex-1 h-full overflow-hidden flex flex-col bg-card rounded-t-xl shadow-sm mx-4 border-0 ring-1 ring-border/50 border-b-0">
+        <div
+          v-else
+          class="flex-1 h-full overflow-hidden flex flex-col bg-card rounded-t-xl shadow-sm mx-4 border-0 ring-1 ring-border/50 border-b-0"
+        >
           <Table class="relative w-full" wrapperClass="flex-1 min-h-0">
             <TableHeader class="sticky top-0 bg-muted/80 backdrop-blur z-10">
               <TableRow class="hover:bg-transparent">
@@ -66,10 +73,15 @@
                 v-for="(row, index) in rowData"
                 :key="row.id"
                 class="hover:bg-muted/50 transition-colors"
-                :class="{ 'bg-green-50 dark:bg-green-950/20': row.status === 'DONE', 'bg-red-50 dark:bg-red-950/20': row.status === 'ERROR' }"
+                :class="{
+                  'bg-green-50 dark:bg-green-950/20': row.status === 'DONE',
+                  'bg-red-50 dark:bg-red-950/20': row.status === 'ERROR'
+                }"
               >
                 <!-- # -->
-                <TableCell class="text-center font-medium text-muted-foreground text-sm">{{ index + 1 }}</TableCell>
+                <TableCell class="text-center font-medium text-muted-foreground text-sm">{{
+                  index + 1
+                }}</TableCell>
 
                 <!-- ASIN -->
                 <TableCell>
@@ -88,7 +100,9 @@
                 <!-- Product -->
                 <TableCell>
                   <div class="flex items-start gap-2 max-w-[260px] whitespace-normal">
-                    <div class="w-8 h-8 rounded border bg-muted/50 flex-shrink-0 overflow-hidden mt-0.5 flex items-center justify-center">
+                    <div
+                      class="w-8 h-8 rounded border bg-muted/50 flex-shrink-0 overflow-hidden mt-0.5 flex items-center justify-center"
+                    >
                       <img
                         v-if="row.images && row.images.length > 0"
                         :src="row.images[0]"
@@ -98,11 +112,21 @@
                       <ImageIcon v-else class="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div class="flex flex-col min-w-0 flex-1 whitespace-normal">
-                      <span v-if="row.brand" class="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{{ row.brand }}</span>
-                      <span class="text-xs font-medium text-foreground line-clamp-2 leading-tight" :title="row.title">{{ row.title || '—' }}</span>
+                      <span
+                        v-if="row.brand"
+                        class="text-[9px] font-bold uppercase tracking-wider text-muted-foreground"
+                        >{{ row.brand }}</span
+                      >
+                      <span
+                        class="text-xs font-medium text-foreground line-clamp-2 leading-tight"
+                        :title="row.title"
+                        >{{ row.title || '—' }}</span
+                      >
                       <div v-if="row.rating" class="flex items-center gap-1 mt-0.5">
                         <Star class="w-3 h-3 text-amber-500 fill-amber-500" />
-                        <span class="text-[11px] text-muted-foreground">{{ row.rating }} ({{ formatNumber(row.reviewCount) }})</span>
+                        <span class="text-[11px] text-muted-foreground"
+                          >{{ row.rating }} ({{ formatNumber(row.reviewCount) }})</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -110,7 +134,9 @@
 
                 <!-- Original Price -->
                 <TableCell class="text-right">
-                  <span v-if="row.originalPrice" class="font-semibold text-sm">${{ row.originalPrice }}</span>
+                  <span v-if="row.originalPrice" class="font-semibold text-sm"
+                    >${{ row.originalPrice }}</span
+                  >
                   <span v-else class="text-muted-foreground text-sm">—</span>
                 </TableCell>
 
@@ -124,7 +150,11 @@
 
                 <!-- Variations -->
                 <TableCell class="text-center">
-                  <Badge v-if="row.variations?.length" variant="secondary" class="text-xs tabular-nums">
+                  <Badge
+                    v-if="row.variations?.length"
+                    variant="secondary"
+                    class="text-xs tabular-nums"
+                  >
                     {{ row.variations.length }}
                   </Badge>
                   <span v-else class="text-muted-foreground">—</span>
@@ -132,12 +162,20 @@
 
                 <!-- Status -->
                 <TableCell class="text-center">
-                  <Badge 
-                    :variant="row.status === 'DONE' ? 'default' : row.status === 'ERROR' ? 'destructive' : 'secondary'"
+                  <Badge
+                    :variant="
+                      row.status === 'DONE'
+                        ? 'default'
+                        : row.status === 'ERROR'
+                          ? 'destructive'
+                          : 'secondary'
+                    "
                     :class="[
                       'font-medium text-xs',
                       row.status === 'DONE' ? 'bg-green-600 hover:bg-green-700 text-white' : '',
-                      row.status === 'CRAWLING' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse border-blue-200' : ''
+                      row.status === 'CRAWLING'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse border-blue-200'
+                        : ''
                     ]"
                   >
                     <Loader2 v-if="row.status === 'CRAWLING'" class="w-3 h-3 mr-1 animate-spin" />
@@ -150,7 +188,10 @@
 
                 <!-- Progress -->
                 <TableCell>
-                  <div class="text-[11px] text-muted-foreground font-mono truncate max-w-[250px]" :title="row.log">
+                  <div
+                    class="text-[11px] text-muted-foreground font-mono truncate max-w-[250px]"
+                    :title="row.log"
+                  >
                     {{ row.log }}
                   </div>
                 </TableCell>
@@ -159,11 +200,17 @@
                   <button
                     @click.stop="deleteRow(row)"
                     :disabled="row.status === 'CRAWLING'"
-                    :title="row.status === 'CRAWLING' ? 'Đang crawl, chờ hoàn tất mới xóa được' : 'Xóa sản phẩm này'"
+                    :title="
+                      row.status === 'CRAWLING'
+                        ? 'Đang crawl, chờ hoàn tất mới xóa được'
+                        : 'Xóa sản phẩm này'
+                    "
                     class="inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors"
-                    :class="row.status === 'CRAWLING'
-                      ? 'text-muted-foreground/30 cursor-not-allowed'
-                      : 'text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'"
+                    :class="
+                      row.status === 'CRAWLING'
+                        ? 'text-muted-foreground/30 cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
+                    "
                   >
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
@@ -177,15 +224,26 @@
 
     <!-- Status bar -->
     <div class="status-bar">
-      <span>Tổng: <b>{{ stats.total }}</b></span>
+      <span
+        >Tổng: <b>{{ stats.total }}</b></span
+      >
       <span class="sep">|</span>
-      <span class="s-ok">Thành công: <b>{{ stats.done }}</b></span>
+      <span class="s-ok"
+        >Thành công: <b>{{ stats.done }}</b></span
+      >
       <span class="sep">|</span>
-      <span class="s-warn">Chờ: <b>{{ stats.pending }}</b></span>
+      <span class="s-warn"
+        >Chờ: <b>{{ stats.pending }}</b></span
+      >
       <span class="sep">|</span>
-      <span class="s-err">Lỗi: <b>{{ stats.error }}</b></span>
+      <span class="s-err"
+        >Lỗi: <b>{{ stats.error }}</b></span
+      >
       <span v-if="isCrawling" class="sep">|</span>
-      <span v-if="isCrawling" class="s-warn pulse flex items-center"><Loader2 class="w-4 h-4 mr-1 animate-spin" /> Đang crawl {{ stats.crawling }} luồng...</span>
+      <span v-if="isCrawling" class="s-warn pulse flex items-center"
+        ><Loader2 class="w-4 h-4 mr-1 animate-spin" /> Đang crawl
+        {{ stats.crawling }} luồng...</span
+      >
     </div>
   </div>
 </template>
@@ -195,10 +253,40 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as xlsx from 'xlsx'
 import { toast } from 'vue-sonner'
 
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell
+} from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Play, Pause, Square, Search, Trash2, FolderOpen, ArrowRight, ExternalLink, Settings, Download, X, ListOrdered, Upload, CheckCircle2, AlertCircle, Clock, Loader2, Star, Image as ImageIcon, Sparkles, Cloud } from 'lucide-vue-next'
+import {
+  RefreshCw,
+  Play,
+  Pause,
+  Square,
+  Search,
+  Trash2,
+  FolderOpen,
+  ArrowRight,
+  ExternalLink,
+  Settings,
+  Download,
+  X,
+  ListOrdered,
+  Upload,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Loader2,
+  Star,
+  Image as ImageIcon,
+  Sparkles,
+  Cloud
+} from 'lucide-vue-next'
 
 const props = defineProps({
   settings: { type: Object, required: true }
@@ -237,8 +325,10 @@ const stats = computed(() => {
 
 watch(stats, (s) => emit('stats-update', s))
 
-const hasPendingRows = computed(() => rowData.value.some(r => r.status === 'PENDING' || r.status === 'ERROR'))
-const hasDoneRows = computed(() => rowData.value.some(r => r.status === 'DONE'))
+const hasPendingRows = computed(() =>
+  rowData.value.some((r) => r.status === 'PENDING' || r.status === 'ERROR')
+)
+const hasDoneRows = computed(() => rowData.value.some((r) => r.status === 'DONE'))
 
 // ─── AI Gen ──────────────────────────────────────────────────────────────
 const isAiGenerating = ref(false)
@@ -248,7 +338,7 @@ const isAiResultOk = (result) =>
   result?.ok === true || result?.success === true || !!result?.title || !!result?.description
 
 const handleAiGen = async () => {
-  const doneRows = rowData.value.filter(r => r.status === 'DONE')
+  const doneRows = rowData.value.filter((r) => r.status === 'DONE')
   if (doneRows.length === 0) return
 
   isAiGenerating.value = true
@@ -261,23 +351,28 @@ const handleAiGen = async () => {
 
   try {
     // Always send ORIGINAL content to AI (not previously gen'd)
-    const products = JSON.parse(JSON.stringify(doneRows.map(r => ({
-      asin: r.asin,
-      title: r._originalTitle || r.title,
-      bulletPoints: r.bulletPoints || [],
-      description: r._originalDescription || r.description || '',
-      specs: r.specs || {}
-    }))))
+    const products = JSON.parse(
+      JSON.stringify(
+        doneRows.map((r) => ({
+          asin: r.asin,
+          title: r._originalTitle || r.title,
+          bulletPoints: r.bulletPoints || [],
+          description: r._originalDescription || r.description || '',
+          specs: r.specs || {}
+        }))
+      )
+    )
 
     const res = await window.api.ai.batchGenerate(products)
     if (res.ok) {
       // Apply results to store
       for (const result of res.data) {
-        const row = rowData.value.find(r => r.asin === result.asin)
+        const row = rowData.value.find((r) => r.asin === result.asin)
         if (row && isAiResultOk(result)) {
           // Save originals for re-gen
           if (!row._originalTitle) row._originalTitle = row.title
-          if (!row._originalDescription) row._originalDescription = row.description || row.descriptionHtml || ''
+          if (!row._originalDescription)
+            row._originalDescription = row.description || row.descriptionHtml || ''
           if (result.title) row.title = result.title
           if (result.description) {
             row.descriptionHtml = result.description
@@ -287,7 +382,7 @@ const handleAiGen = async () => {
         }
       }
       const successCount = res.data.filter(isAiResultOk).length
-      const failed = res.data.filter(r => !isAiResultOk(r))
+      const failed = res.data.filter((r) => !isAiResultOk(r))
       if (failed.length > 0) {
         const firstError = failed[0]?.error ? `\n${failed[0].error}` : ''
         alert(`Lỗi AI Gen ${failed.length}/${doneRows.length} sản phẩm${firstError}`)
@@ -311,7 +406,7 @@ const isCdnUploading = ref(false)
 const cdnUploadProgress = ref('Upload CDN')
 
 const handleCdnUpload = async () => {
-  const doneRows = rowData.value.filter(r => r.status === 'DONE' && r.images?.length > 0)
+  const doneRows = rowData.value.filter((r) => r.status === 'DONE' && r.images?.length > 0)
   if (doneRows.length === 0) return
 
   isCdnUploading.value = true
@@ -320,7 +415,10 @@ const handleCdnUpload = async () => {
   try {
     for (const row of doneRows) {
       cdnUploadProgress.value = `${++processed}/${doneRows.length}`
-      const res = await window.api.r2.uploadImages({ images: JSON.parse(JSON.stringify(row.images)), asin: row.asin })
+      const res = await window.api.r2.uploadImages({
+        images: JSON.parse(JSON.stringify(row.images)),
+        asin: row.asin
+      })
       if (res.ok) {
         row.images = res.data
         row._cdnUploaded = true
@@ -360,16 +458,26 @@ const handleImportFile = async () => {
     const jsonData = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' })
     if (jsonData.length < 2) return alert('File cần ít nhất 1 dòng tiêu đề + 1 dòng dữ liệu.')
 
-    const header = (jsonData[0] || []).map(h => String(h ?? '').toUpperCase().trim())
-    let colIdx = header.findIndex(h => ['ASIN', 'ID', 'ITEM', 'SKU'].includes(h))
-    if (colIdx === -1) colIdx = header.findIndex(h => h && (h.includes('URL') || h.includes('AMAZON') || h.includes('LINK')))
+    const header = (jsonData[0] || []).map((h) =>
+      String(h ?? '')
+        .toUpperCase()
+        .trim()
+    )
+    let colIdx = header.findIndex((h) => ['ASIN', 'ID', 'ITEM', 'SKU'].includes(h))
+    if (colIdx === -1)
+      colIdx = header.findIndex(
+        (h) => h && (h.includes('URL') || h.includes('AMAZON') || h.includes('LINK'))
+      )
     if (colIdx === -1) colIdx = 1
 
     const newRows = []
     let skipped = 0
     for (let i = 1; i < jsonData.length; i++) {
       const row = jsonData[i]
-      if (!row || !Array.isArray(row)) { skipped++; continue }
+      if (!row || !Array.isArray(row)) {
+        skipped++
+        continue
+      }
 
       let asin = null
       let amazonUrl = ''
@@ -383,8 +491,14 @@ const handleImportFile = async () => {
         }
       }
 
-      if (!asin) { skipped++; continue }
-      if (rowData.value.some(r => r.asin === asin)) { skipped++; continue }
+      if (!asin) {
+        skipped++
+        continue
+      }
+      if (rowData.value.some((r) => r.asin === asin)) {
+        skipped++
+        continue
+      }
 
       newRows.push({
         id: `${Date.now()}_${i}`,
@@ -392,29 +506,37 @@ const handleImportFile = async () => {
         amazonUrl,
         status: 'PENDING',
         log: 'Chờ lệnh...',
-        title: '', brand: '', originalPrice: '', sellPrice: '',
-        images: [], variations: [], rating: 0, reviewCount: 0,
+        title: '',
+        brand: '',
+        originalPrice: '',
+        sellPrice: '',
+        images: [],
+        variations: [],
+        rating: 0,
+        reviewCount: 0
       })
     }
 
     if (newRows.length === 0) {
-      return alert(`Không tìm được ASIN hợp lệ nào.\nKiểm tra file có cột ASIN hoặc Amazon URL không.\n(Bỏ qua: ${skipped} dòng)`)
+      return alert(
+        `Không tìm được ASIN hợp lệ nào.\nKiểm tra file có cột ASIN hoặc Amazon URL không.\n(Bỏ qua: ${skipped} dòng)`
+      )
     }
 
     rowData.value = [...rowData.value, ...newRows]
-    if (skipped > 0) alert(`Import thành công ${newRows.length} ASIN. Bỏ qua ${skipped} dòng không hợp lệ/trùng.`)
+    if (skipped > 0)
+      alert(`Import thành công ${newRows.length} ASIN. Bỏ qua ${skipped} dòng không hợp lệ/trùng.`)
   } catch (err) {
     console.error(err)
     alert('Lỗi import: ' + err.message)
   }
 }
 
-
 // ─── Crawl ────────────────────────────────────────────────────────────────
 const startCrawl = async () => {
   isCrawling.value = true
   stopRequested = false
-  const pending = rowData.value.filter(r => r.status === 'PENDING' || r.status === 'ERROR')
+  const pending = rowData.value.filter((r) => r.status === 'PENDING' || r.status === 'ERROR')
   const queue = [...pending]
   const threads = props.settings.crawlThreads || 3
 
@@ -430,7 +552,7 @@ const startCrawl = async () => {
   isCrawling.value = false
 
   // Auto-save crawled products to history
-  const doneProducts = rowData.value.filter(r => r.status === 'DONE')
+  const doneProducts = rowData.value.filter((r) => r.status === 'DONE')
   if (doneProducts.length > 0) {
     try {
       const result = await window.api.history.saveCurrent(JSON.parse(JSON.stringify(doneProducts)))
@@ -466,7 +588,7 @@ const crawlItem = async (row) => {
         sellPrice: (p.priceConfigured * mul).toFixed(2),
         brand: p.brand,
         images: p.images || [],
-        variations: (p.variations || []).map(v => ({
+        variations: (p.variations || []).map((v) => ({
           ...v,
           price: v.price ? Number((v.price * mul).toFixed(2)) : undefined
         })),
@@ -482,7 +604,7 @@ const crawlItem = async (row) => {
         availability: p.availability || '',
         priceRange: p.priceRange || '',
         status: 'DONE',
-        log: `✓ Hoàn tất — ${(p.images || []).length} ảnh, ${(p.variations || []).length} biến thể`,
+        log: `✓ Hoàn tất — ${(p.images || []).length} ảnh, ${(p.variations || []).length} biến thể`
       }
       updateRow(doneRow)
       // Auto-select eBay category sau khi crawl xong (fire & forget)
@@ -504,7 +626,10 @@ const autoSelectCategory = async (doneRow) => {
   const hasNoImages = !doneRow.images || doneRow.images.length === 0
   const hasNoPrice = !doneRow.originalPrice || doneRow.originalPrice <= 0
   if (hasNoImages && hasNoPrice) {
-    console.warn('[AutoCategory] Skipping — no images and no price, data likely invalid:', doneRow.asin)
+    console.warn(
+      '[AutoCategory] Skipping — no images and no price, data likely invalid:',
+      doneRow.asin
+    )
     return
   }
 
@@ -519,13 +644,13 @@ const autoSelectCategory = async (doneRow) => {
     const res = await window.api.ebay.categorySuggestions(query)
     if (res.ok && res.data?.length > 0) {
       const cat = res.data[0]
-      const current = rowData.value.find(r => r.id === doneRow.id)
+      const current = rowData.value.find((r) => r.id === doneRow.id)
       if (current && !current.ebayCategory) {
         updateRow({
           id: doneRow.id,
           ebayCategory: cat.categoryId,
           ebayCategoryName: cat.categoryName,
-          log: `✓ Hoàn tất — ${cat.categoryName} (ID: ${cat.categoryId})`,
+          log: `✓ Hoàn tất — ${cat.categoryName} (ID: ${cat.categoryId})`
         })
       }
     }
@@ -541,8 +666,14 @@ const buildCategoryQuery = (row) => {
   // Reject known non-product titles early
   const titleLower = (row.title || '').toLowerCase().trim()
   const NON_PRODUCT_PATTERNS = [
-    'amazon.com', 'amazon', 'page not found', 'robot check',
-    'something went wrong', 'sign in', 'error', '404',
+    'amazon.com',
+    'amazon',
+    'page not found',
+    'robot check',
+    'something went wrong',
+    'sign in',
+    'error',
+    '404'
   ]
   if (!titleLower || NON_PRODUCT_PATTERNS.includes(titleLower)) {
     console.warn('[buildCategoryQuery] Rejected non-product title:', row.title)
@@ -556,18 +687,71 @@ const buildCategoryQuery = (row) => {
     const reversed = [...row.categories].reverse()
     for (const cat of reversed) {
       const term = cat.trim()
-      if (term.length > 3) return term  // dùng single term cụ thể nhất còn lại
+      if (term.length > 3) return term // dùng single term cụ thể nhất còn lại
     }
   }
 
   // Ưu tiên 2: Lấy noun chính từ title, BỎ brand (brand hiếm khi có trong categoryName eBay)
   const stopWords = new Set([
-    'for','with','and','the','a','an','of','in','to','by','set','pack',
-    'pcs','piece','pieces','lot','new','best','top','pro','max','plus',
-    'mini','ultra','ultraclean','inch','mm','cm','ft','oz','lb','kg','x','vs',
-    'black','white','gray','grey','blue','red','green','silver','gold',
-    'free','resistant','remover','shred','hard','areas','adults','kids','count',
-    'care','oral','mint','plaque','refill','heads','access',
+    'for',
+    'with',
+    'and',
+    'the',
+    'a',
+    'an',
+    'of',
+    'in',
+    'to',
+    'by',
+    'set',
+    'pack',
+    'pcs',
+    'piece',
+    'pieces',
+    'lot',
+    'new',
+    'best',
+    'top',
+    'pro',
+    'max',
+    'plus',
+    'mini',
+    'ultra',
+    'ultraclean',
+    'inch',
+    'mm',
+    'cm',
+    'ft',
+    'oz',
+    'lb',
+    'kg',
+    'x',
+    'vs',
+    'black',
+    'white',
+    'gray',
+    'grey',
+    'blue',
+    'red',
+    'green',
+    'silver',
+    'gold',
+    'free',
+    'resistant',
+    'remover',
+    'shred',
+    'hard',
+    'areas',
+    'adults',
+    'kids',
+    'count',
+    'care',
+    'oral',
+    'mint',
+    'plaque',
+    'refill',
+    'heads',
+    'access'
   ])
 
   const brand = (row.brand || '').toLowerCase()
@@ -577,11 +761,12 @@ const buildCategoryQuery = (row) => {
   const words = title
     .replace(/[^a-zA-Z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter(w =>
-      w.length > 2 &&
-      !/^\d+$/.test(w) &&
-      !stopWords.has(w.toLowerCase()) &&
-      !brandWords.has(w.toLowerCase())   // bỏ brand words
+    .filter(
+      (w) =>
+        w.length > 2 &&
+        !/^\d+$/.test(w) &&
+        !stopWords.has(w.toLowerCase()) &&
+        !brandWords.has(w.toLowerCase()) // bỏ brand words
     )
 
   // Lấy 2-3 noun đầu tiên còn lại (thường là loại sản phẩm)
@@ -590,7 +775,7 @@ const buildCategoryQuery = (row) => {
 }
 
 const updateRow = (updates) => {
-  const existing = rowData.value.find(r => r.id === updates.id)
+  const existing = rowData.value.find((r) => r.id === updates.id)
   if (existing) {
     Object.assign(existing, updates)
   }
@@ -599,20 +784,22 @@ const updateRow = (updates) => {
 const deleteRow = (row) => {
   if (row.status === 'CRAWLING') return
   if (!confirm(`Xóa sản phẩm "${row.title || row.asin}"?`)) return
-  rowData.value = rowData.value.filter(r => r.id !== row.id)
+  rowData.value = rowData.value.filter((r) => r.id !== row.id)
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────
 let unsubProgress = null
 onMounted(() => {
   unsubProgress = window.api.crawl.onProgress(({ asin, message }) => {
-    const row = rowData.value.find(r => r.asin === asin)
+    const row = rowData.value.find((r) => r.asin === asin)
     if (row && row.status === 'CRAWLING') {
-      row.log = message  // mutate directly — avoids spread + full object replace
+      row.log = message // mutate directly — avoids spread + full object replace
     }
   })
 })
-onUnmounted(() => { if (unsubProgress) unsubProgress() })
+onUnmounted(() => {
+  if (unsubProgress) unsubProgress()
+})
 </script>
 
 <style scoped>
@@ -629,7 +816,6 @@ onUnmounted(() => { if (unsubProgress) unsubProgress() })
   overflow: hidden;
   min-height: 0;
 }
-
 
 /* Table wrap fix */
 .table-container {

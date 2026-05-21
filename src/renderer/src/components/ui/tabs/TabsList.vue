@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { TabsList } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { TabsList } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   loop: { type: Boolean, required: false },
@@ -10,11 +10,11 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>
@@ -23,7 +23,7 @@ const delegatedProps = reactiveOmit(props, "class");
     :class="
       cn(
         'inline-flex items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground',
-        props.class,
+        props.class
       )
     "
   >

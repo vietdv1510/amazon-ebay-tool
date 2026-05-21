@@ -1,9 +1,9 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { ChevronRightIcon } from '@radix-icons/vue';
-import { CalendarNext, useForwardProps } from "reka-ui";
-import { cn } from '@/utils';
-import { buttonVariants } from '@/components/ui/button';
+import { reactiveOmit } from '@vueuse/core'
+import { ChevronRightIcon } from '@radix-icons/vue'
+import { CalendarNext, useForwardProps } from 'reka-ui'
+import { cn } from '@/utils'
+import { buttonVariants } from '@/components/ui/button'
 
 const props = defineProps({
   nextPage: { type: Function, required: false },
@@ -12,13 +12,13 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwardedProps = useForwardProps(delegatedProps);
+const forwardedProps = useForwardProps(delegatedProps)
 </script>
 
 <template>
@@ -27,7 +27,7 @@ const forwardedProps = useForwardProps(delegatedProps);
       cn(
         buttonVariants({ variant: 'outline' }),
         'h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100',
-        props.class,
+        props.class
       )
     "
     v-bind="forwardedProps"

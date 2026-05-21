@@ -1,13 +1,13 @@
 <script setup>
-import { cn } from '@/utils';
+import { cn } from '@/utils'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>

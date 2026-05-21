@@ -45,7 +45,10 @@ export function saveSession(products) {
 export function listSessions() {
   try {
     const dir = getHistoryDir()
-    const files = readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse()
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith('.json'))
+      .sort()
+      .reverse()
     const sessions = []
     for (const file of files) {
       try {
@@ -57,7 +60,7 @@ export function listSessions() {
           createdAt: data.createdAt,
           productCount: data.productCount || data.products?.length || 0,
           // Include first few ASINs for preview
-          previewAsins: (data.products || []).slice(0, 5).map(p => p.asin)
+          previewAsins: (data.products || []).slice(0, 5).map((p) => p.asin)
         })
       } catch {
         // Skip corrupt files
@@ -114,7 +117,7 @@ export function deleteProduct(sessionId, asin) {
   try {
     const session = loadSession(sessionId)
     if (!session) return { ok: false, error: 'Session not found' }
-    session.products = session.products.filter(p => p.asin !== asin)
+    session.products = session.products.filter((p) => p.asin !== asin)
     session.productCount = session.products.length
     const filePath = join(getHistoryDir(), `${sessionId}.json`)
     writeFileSync(filePath, JSON.stringify(session, null, 2), 'utf-8')
@@ -141,7 +144,7 @@ export function updateProduct(sessionId, asin, updates) {
   try {
     const session = loadSession(sessionId)
     if (!session) return { ok: false, error: 'Session not found' }
-    const idx = session.products.findIndex(p => p.asin === asin)
+    const idx = session.products.findIndex((p) => p.asin === asin)
     if (idx === -1) return { ok: false, error: 'Product not found' }
     session.products[idx] = { ...session.products[idx], ...updates }
     const filePath = join(getHistoryDir(), `${sessionId}.json`)

@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { ProgressIndicator, ProgressRoot } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { ProgressIndicator, ProgressRoot } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   modelValue: { type: [Number, null], required: false, default: 0 },
@@ -13,22 +13,17 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>
   <ProgressRoot
     v-bind="delegatedProps"
-    :class="
-      cn(
-        'relative h-2 w-full overflow-hidden rounded-full bg-primary/20',
-        props.class,
-      )
-    "
+    :class="cn('relative h-2 w-full overflow-hidden rounded-full bg-primary/20', props.class)"
   >
     <ProgressIndicator
       class="h-full w-full flex-1 bg-primary transition-all"

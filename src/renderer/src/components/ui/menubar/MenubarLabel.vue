@@ -1,6 +1,6 @@
 <script setup>
-import { MenubarLabel } from "reka-ui";
-import { cn } from '@/utils';
+import { MenubarLabel } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -8,18 +8,14 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
+    skipCheck: true
   },
-  inset: { type: Boolean, required: false },
-});
+  inset: { type: Boolean, required: false }
+})
 </script>
 
 <template>
-  <MenubarLabel
-    :class="
-      cn('px-2 py-1.5 text-sm font-semibold', inset && 'pl-8', props.class)
-    "
-  >
+  <MenubarLabel :class="cn('px-2 py-1.5 text-sm font-semibold', inset && 'pl-8', props.class)">
     <slot />
   </MenubarLabel>
 </template>

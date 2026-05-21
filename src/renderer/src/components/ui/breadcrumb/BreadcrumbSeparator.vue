@@ -1,22 +1,18 @@
 <script setup>
-import { ChevronRightIcon } from '@radix-icons/vue';
-import { cn } from '@/utils';
+import { ChevronRightIcon } from '@radix-icons/vue'
+import { cn } from '@/utils'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>
-  <li
-    role="presentation"
-    aria-hidden="true"
-    :class="cn('[&>svg]:size-3.5', props.class)"
-  >
+  <li role="presentation" aria-hidden="true" :class="cn('[&>svg]:size-3.5', props.class)">
     <slot>
       <ChevronRightIcon />
     </slot>

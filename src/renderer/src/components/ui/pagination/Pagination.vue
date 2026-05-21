@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { PaginationRoot, useForwardPropsEmits } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { PaginationRoot, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   page: { type: Number, required: false },
@@ -16,13 +16,13 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
-const emits = defineEmits(["update:page"]);
+    skipCheck: true
+  }
+})
+const emits = defineEmits(['update:page'])
 
-const delegatedProps = reactiveOmit(props, "class");
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const delegatedProps = reactiveOmit(props, 'class')
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>

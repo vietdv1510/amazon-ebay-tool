@@ -1,22 +1,26 @@
 <script setup>
-import { cn } from '@/utils';
+import { cn } from '@/utils'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
+    skipCheck: true
   },
   wrapperClass: {
     type: [String, Object, Array],
     required: false,
-    default: '',
+    default: ''
   }
-});
+})
 </script>
 
 <template>
-  <div :class="cn('relative w-full overflow-auto table-scroll-wrapper flex flex-col', props.wrapperClass)">
+  <div
+    :class="
+      cn('relative w-full overflow-auto table-scroll-wrapper flex flex-col', props.wrapperClass)
+    "
+  >
     <table :class="cn('w-full caption-bottom text-sm', props.class)">
       <slot />
     </table>

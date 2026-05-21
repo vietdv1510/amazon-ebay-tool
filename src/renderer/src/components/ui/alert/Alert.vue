@@ -1,15 +1,15 @@
 <script setup>
-import { cn } from '@/utils';
-import { alertVariants } from ".";
+import { cn } from '@/utils'
+import { alertVariants } from '.'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
+    skipCheck: true
   },
-  variant: { type: null, required: false },
-});
+  variant: { type: null, required: false }
+})
 </script>
 
 <template>

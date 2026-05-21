@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { PinInputRoot, useForwardPropsEmits } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { PinInputRoot, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   modelValue: { type: null, required: false, default: () => [] },
@@ -20,21 +20,18 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
-const emits = defineEmits(["update:modelValue", "complete"]);
+    skipCheck: true
+  }
+})
+const emits = defineEmits(['update:modelValue', 'complete'])
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
-  <PinInputRoot
-    v-bind="forwarded"
-    :class="cn('flex gap-2 items-center', props.class)"
-  >
+  <PinInputRoot v-bind="forwarded" :class="cn('flex gap-2 items-center', props.class)">
     <slot />
   </PinInputRoot>
 </template>

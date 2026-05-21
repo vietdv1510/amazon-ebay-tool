@@ -8,65 +8,98 @@
       </div>
 
       <div class="header-actions flex gap-2 items-center">
-          <!-- AI Gen button -->
-          <Button
-            v-if="settings.useGemini"
-            variant="outline" size="sm"
-            @click="handleAiGen"
-            :disabled="readyProducts.length === 0 || isAiGenerating"
-          >
-            {{ isAiGenerating ? aiGenProgress : 'Tạo mô tả bằng AI' }}
-          </Button>
+        <!-- AI Gen button -->
+        <Button
+          v-if="settings.useGemini"
+          variant="outline"
+          size="sm"
+          @click="handleAiGen"
+          :disabled="readyProducts.length === 0 || isAiGenerating"
+        >
+          {{ isAiGenerating ? aiGenProgress : 'Tạo mô tả bằng AI' }}
+        </Button>
 
-          <!-- Selective export toggle -->
-          <Button
-            size="sm"
-            :variant="selectiveMode ? 'default' : 'outline'"
-            @click="toggleSelectiveMode"
-            :disabled="previewRows.length === 0"
-            title="Bật/tắt chế độ chọn sản phẩm để export"
-          >
-            <ListFilter class="w-4 h-4 mr-1.5" />
-            {{ selectiveMode ? `Đã chọn (${selectedProductCount})` : 'Export tùy chỉnh' }}
-          </Button>
+        <!-- Selective export toggle -->
+        <Button
+          size="sm"
+          :variant="selectiveMode ? 'default' : 'outline'"
+          @click="toggleSelectiveMode"
+          :disabled="previewRows.length === 0"
+          title="Bật/tắt chế độ chọn sản phẩm để export"
+        >
+          <ListFilter class="w-4 h-4 mr-1.5" />
+          {{ selectiveMode ? `Đã chọn (${selectedProductCount})` : 'Export tùy chỉnh' }}
+        </Button>
 
-          <Button size="sm" variant="destructive" @click="handleExport(true)" :disabled="previewRows.length === 0" title="Ép xuất không cần kiểm tra lỗi">
-            Export thô (Bỏ qua lỗi)
-          </Button>
-          <Button size="sm" @click="handleExport(false)" :disabled="selectiveMode && selectedProductCount === 0 || previewRows.length === 0">
-            <Download class="w-4 h-4 mr-2" />
-            {{ selectiveMode ? `Export (${selectedProductCount})` : 'Export CSV' }}
-          </Button>
+        <Button
+          size="sm"
+          variant="destructive"
+          @click="handleExport(true)"
+          :disabled="previewRows.length === 0"
+          title="Ép xuất không cần kiểm tra lỗi"
+        >
+          Export thô (Bỏ qua lỗi)
+        </Button>
+        <Button
+          size="sm"
+          @click="handleExport(false)"
+          :disabled="(selectiveMode && selectedProductCount === 0) || previewRows.length === 0"
+        >
+          <Download class="w-4 h-4 mr-2" />
+          {{ selectiveMode ? `Export (${selectedProductCount})` : 'Export CSV' }}
+        </Button>
       </div>
     </div>
 
     <div class="flex-1 overflow-hidden flex flex-col mx-4 mt-4 mb-0 h-full">
       <!-- Empty state -->
-      <div v-if="readyProducts.length === 0" class="flex-1 flex flex-col items-center justify-center text-center p-8 h-full min-h-[400px]">
+      <div
+        v-if="readyProducts.length === 0"
+        class="flex-1 flex flex-col items-center justify-center text-center p-8 h-full min-h-[400px]"
+      >
         <div class="bg-muted/30 p-6 rounded-full mb-4">
           <FileSpreadsheet class="w-12 h-12 text-muted-foreground" />
         </div>
         <h3 class="text-xl font-semibold mb-2">Chưa có dữ liệu để preview</h3>
-        <p class="text-muted-foreground text-sm">Hãy crawl sản phẩm và chọn eBay Category trước khi xem preview.</p>
+        <p class="text-muted-foreground text-sm">
+          Hãy crawl sản phẩm và chọn eBay Category trước khi xem preview.
+        </p>
       </div>
 
       <!-- Stats bar -->
       <div v-else class="flex gap-3 mb-3 flex-shrink-0">
-        <div class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800">
+        <div
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800"
+        >
           <Package class="w-3.5 h-3.5 text-blue-500" />
-          <span class="text-xs font-medium text-blue-700 dark:text-blue-300">{{ readyProducts.length }} sản phẩm</span>
+          <span class="text-xs font-medium text-blue-700 dark:text-blue-300"
+            >{{ readyProducts.length }} sản phẩm</span
+          >
         </div>
-        <div class="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-950/30 rounded-md border border-green-200 dark:border-green-800">
+        <div
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-950/30 rounded-md border border-green-200 dark:border-green-800"
+        >
           <Rows3 class="w-3.5 h-3.5 text-green-500" />
-          <span class="text-xs font-medium text-green-700 dark:text-green-300">{{ previewRows.length }} dòng CSV</span>
+          <span class="text-xs font-medium text-green-700 dark:text-green-300"
+            >{{ previewRows.length }} dòng CSV</span
+          >
         </div>
-        <div class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 dark:bg-purple-950/30 rounded-md border border-purple-200 dark:border-purple-800">
+        <div
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 dark:bg-purple-950/30 rounded-md border border-purple-200 dark:border-purple-800"
+        >
           <Columns3 class="w-3.5 h-3.5 text-purple-500" />
-          <span class="text-xs font-medium text-purple-700 dark:text-purple-300">{{ allColumns.length }} cột</span>
+          <span class="text-xs font-medium text-purple-700 dark:text-purple-300"
+            >{{ allColumns.length }} cột</span
+          >
         </div>
-        <div v-if="errorCount > 0" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-800">
+        <div
+          v-if="errorCount > 0"
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-800"
+        >
           <AlertTriangle class="w-3.5 h-3.5 text-red-500" />
-          <span class="text-xs font-medium text-red-700 dark:text-red-300">{{ errorCount }} ô có lỗi dữ liệu</span>
+          <span class="text-xs font-medium text-red-700 dark:text-red-300"
+            >{{ errorCount }} ô có lỗi dữ liệu</span
+          >
         </div>
       </div>
 
@@ -76,23 +109,23 @@
           <span class="legend-group-label">Ý nghĩa cột & Ô</span>
           <div class="legend-items">
             <div class="legend-chip chip-req">
-              <span class="col-usage-badge badge-required" style="margin-left: 0;">Req</span>
+              <span class="col-usage-badge badge-required" style="margin-left: 0">Req</span>
               <span>Bắt buộc</span>
             </div>
             <div class="legend-chip chip-cond">
-              <span class="col-usage-badge badge-conditional" style="margin-left: 0;">Cond</span>
+              <span class="col-usage-badge badge-conditional" style="margin-left: 0">Cond</span>
               <span>Theo loại dòng</span>
             </div>
             <div class="legend-chip chip-rec">
-              <span class="col-usage-badge badge-recommended" style="margin-left: 0;">Rec</span>
+              <span class="col-usage-badge badge-recommended" style="margin-left: 0">Rec</span>
               <span>Nên có</span>
             </div>
             <div class="legend-chip chip-opt">
-              <span class="col-usage-badge badge-optional" style="margin-left: 0;">Opt</span>
+              <span class="col-usage-badge badge-optional" style="margin-left: 0">Opt</span>
               <span>Không bắt buộc</span>
             </div>
             <div class="legend-chip chip-mix">
-              <span class="col-usage-badge badge-mixed" style="margin-left: 0;">Mix</span>
+              <span class="col-usage-badge badge-mixed" style="margin-left: 0">Mix</span>
               <span>Khác theo danh mục</span>
             </div>
           </div>
@@ -118,7 +151,10 @@
       </div>
 
       <!-- Preview Table Skeleton -->
-      <div v-if="isPreviewLoading" class="flex-1 flex flex-col gap-4 mx-4 mt-2 h-full overflow-hidden">
+      <div
+        v-if="isPreviewLoading"
+        class="flex-1 flex flex-col gap-4 mx-4 mt-2 h-full overflow-hidden"
+      >
         <div class="flex items-center gap-4 border-b border-border/50 pb-3">
           <Skeleton class="h-8 w-[60px] rounded" />
           <Skeleton class="h-8 w-[100px] rounded" />
@@ -138,7 +174,12 @@
               <tr>
                 <th v-if="selectiveMode" class="checkbox-col">
                   <label class="select-all-wrap" title="Chọn / bỏ chọn tất cả">
-                    <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="product-checkbox" />
+                    <input
+                      type="checkbox"
+                      :checked="isAllSelected"
+                      @change="toggleSelectAll"
+                      class="product-checkbox"
+                    />
                   </label>
                 </th>
                 <th class="row-num-col">#</th>
@@ -158,22 +199,33 @@
                   <div class="col-header-content">
                     <span>{{ col }}</span>
                     <span v-if="isMixedUsageCol(col)" class="col-usage-badge badge-mixed">Mix</span>
-                    <span v-else-if="isConditionalRequiredCol(col)" class="col-usage-badge badge-conditional">Cond</span>
-                    <span v-else-if="isRequiredCol(col)" class="col-usage-badge badge-required">Req</span>
-                    <span v-else-if="isRecommendedCol(col)" class="col-usage-badge badge-recommended">Rec</span>
-                    <span v-else-if="isOptionalCol(col)" class="col-usage-badge badge-optional">Opt</span>
+                    <span
+                      v-else-if="isConditionalRequiredCol(col)"
+                      class="col-usage-badge badge-conditional"
+                      >Cond</span
+                    >
+                    <span v-else-if="isRequiredCol(col)" class="col-usage-badge badge-required"
+                      >Req</span
+                    >
+                    <span
+                      v-else-if="isRecommendedCol(col)"
+                      class="col-usage-badge badge-recommended"
+                      >Rec</span
+                    >
+                    <span v-else-if="isOptionalCol(col)" class="col-usage-badge badge-optional"
+                      >Opt</span
+                    >
                   </div>
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="(row, idx) in previewRows"
-                :key="idx"
-                :class="getRowClass(row)"
-              >
+              <tr v-for="(row, idx) in previewRows" :key="idx" :class="getRowClass(row)">
                 <td v-if="selectiveMode" class="checkbox-col">
-                  <label v-if="row._rowType === 'parent' || row._rowType === 'single'" class="checkbox-wrap">
+                  <label
+                    v-if="row._rowType === 'parent' || row._rowType === 'single'"
+                    class="checkbox-wrap"
+                  >
                     <input
                       type="checkbox"
                       :checked="selectedProducts.has(row._productAsin)"
@@ -185,14 +237,26 @@
                 <td class="row-num-col">{{ idx + 1 }}</td>
                 <td class="row-type-col">
                   <Badge
-                    :variant="row._rowType === 'parent' ? 'default' : row._rowType === 'child' ? 'outline' : 'secondary'"
+                    :variant="
+                      row._rowType === 'parent'
+                        ? 'default'
+                        : row._rowType === 'child'
+                          ? 'outline'
+                          : 'secondary'
+                    "
                     :class="{
                       'bg-blue-600 text-white': row._rowType === 'parent',
                       'bg-amber-500 text-white': row._rowType === 'single'
                     }"
                     class="text-[10px]"
                   >
-                    {{ row._rowType === 'parent' ? 'Parent' : row._rowType === 'child' ? 'Child' : 'Single' }}
+                    {{
+                      row._rowType === 'parent'
+                        ? 'Parent'
+                        : row._rowType === 'child'
+                          ? 'Child'
+                          : 'Single'
+                    }}
                   </Badge>
                 </td>
                 <td
@@ -200,21 +264,32 @@
                   :key="col"
                   class="cell editable-cell whitespace-normal min-w-[150px] max-w-[350px]"
                   :class="{
-                    'empty-required': isCellMissingRequired(row, col) && !validationErrors[`${idx}-${col}`],
+                    'empty-required':
+                      isCellMissingRequired(row, col) && !validationErrors[`${idx}-${col}`],
                     'empty-cell': isValEmpty(row[col]),
                     'error-cell': !!validationErrors[`${idx}-${col}`],
                     'action-col': col.startsWith('*Action')
                   }"
-                  :title="editingCell?.rowIdx === idx && editingCell?.col === col ? '' : (row[col] || '')"
+                  :title="
+                    editingCell?.rowIdx === idx && editingCell?.col === col ? '' : row[col] || ''
+                  "
                   @dblclick="startEdit(idx, col, row[col])"
                 >
                   <template v-if="editingCell?.rowIdx === idx && editingCell?.col === col">
                     <div class="cell-editor-popup">
                       <div class="cell-editor-actions">
-                        <button @mousedown.prevent="commitEdit(idx, col)" class="editor-btn btn-save" title="Lưu (Ctrl+Enter)">
+                        <button
+                          @mousedown.prevent="commitEdit(idx, col)"
+                          class="editor-btn btn-save"
+                          title="Lưu (Ctrl+Enter)"
+                        >
                           <Check class="w-3 h-3" />
                         </button>
-                        <button @mousedown.prevent="cancelEdit" class="editor-btn btn-cancel" title="Hủy (Esc)">
+                        <button
+                          @mousedown.prevent="cancelEdit"
+                          class="editor-btn btn-cancel"
+                          title="Hủy (Esc)"
+                        >
                           <X class="w-3 h-3" />
                         </button>
                       </div>
@@ -232,17 +307,47 @@
                   </template>
                   <template v-else-if="col === '*Title'">
                     <div class="p-2 w-full h-full flex flex-col justify-center">
-                      <span v-if="validationErrors[`${idx}-${col}`]" class="text-[10px] font-bold text-red-600 mb-1 leading-tight">{{ validationErrors[`${idx}-${col}`] }}</span>
-                      <span v-if="isValEmpty(row[col]) && isCellMissingRequired(row, col) && !validationErrors[`${idx}-${col}`]" class="empty-placeholder">Bắt buộc</span>
-                      <span v-else class="cell-content-title text-xs" :title="row[col]">{{ row[col] }}</span>
+                      <span
+                        v-if="validationErrors[`${idx}-${col}`]"
+                        class="text-[10px] font-bold text-red-600 mb-1 leading-tight"
+                        >{{ validationErrors[`${idx}-${col}`] }}</span
+                      >
+                      <span
+                        v-if="
+                          isValEmpty(row[col]) &&
+                          isCellMissingRequired(row, col) &&
+                          !validationErrors[`${idx}-${col}`]
+                        "
+                        class="empty-placeholder"
+                        >Bắt buộc</span
+                      >
+                      <span v-else class="cell-content-title text-xs" :title="row[col]">{{
+                        row[col]
+                      }}</span>
                     </div>
                   </template>
                   <template v-else>
                     <div class="cell-value-wrap w-full h-full flex flex-col justify-center">
-                      <span v-if="validationErrors[`${idx}-${col}`]" class="text-[10px] font-bold text-red-600 mb-1 leading-tight">{{ validationErrors[`${idx}-${col}`] }}</span>
-                      <span v-if="isValEmpty(row[col]) && isCellMissingRequired(row, col) && !validationErrors[`${idx}-${col}`]" class="empty-placeholder">Bắt buộc</span>
+                      <span
+                        v-if="validationErrors[`${idx}-${col}`]"
+                        class="text-[10px] font-bold text-red-600 mb-1 leading-tight"
+                        >{{ validationErrors[`${idx}-${col}`] }}</span
+                      >
+                      <span
+                        v-if="
+                          isValEmpty(row[col]) &&
+                          isCellMissingRequired(row, col) &&
+                          !validationErrors[`${idx}-${col}`]
+                        "
+                        class="empty-placeholder"
+                        >Bắt buộc</span
+                      >
                       <span v-else class="cell-content">{{ truncate(row[col], 40) }}</span>
-                      <span v-if="showCellUsageBadge(row, col)" class="cell-usage-tag" :class="'tag-' + getCellUsage(row, col)?.toLowerCase()">
+                      <span
+                        v-if="showCellUsageBadge(row, col)"
+                        class="cell-usage-tag"
+                        :class="'tag-' + getCellUsage(row, col)?.toLowerCase()"
+                      >
                         {{ getCellUsageLabel(row, col) }}
                       </span>
                     </div>
@@ -266,8 +371,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  FileSpreadsheet, Download, RefreshCw, AlertTriangle,
-  Package, Rows3, Columns3, Check, X, Sparkles, ListFilter
+  FileSpreadsheet,
+  Download,
+  RefreshCw,
+  AlertTriangle,
+  Package,
+  Rows3,
+  Columns3,
+  Check,
+  X,
+  Sparkles,
+  ListFilter
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -286,8 +400,8 @@ const selectedProductCount = computed(() => selectedProducts.value.size)
 const isAllSelected = computed(() => {
   const parentAsins = new Set(
     previewRows.value
-      .filter(r => r._rowType === 'parent' || r._rowType === 'single')
-      .map(r => r._productAsin)
+      .filter((r) => r._rowType === 'parent' || r._rowType === 'single')
+      .map((r) => r._productAsin)
   )
   return parentAsins.size > 0 && parentAsins.size === selectedProducts.value.size
 })
@@ -303,8 +417,8 @@ const toggleSelectiveMode = () => {
     }
     // Mặc định chọn tất cả khi bật
     const allAsins = previewRows.value
-      .filter(r => r._rowType === 'parent' || r._rowType === 'single')
-      .map(r => r._productAsin)
+      .filter((r) => r._rowType === 'parent' || r._rowType === 'single')
+      .map((r) => r._productAsin)
     selectedProducts.value = new Set(allAsins)
   }
 }
@@ -321,8 +435,8 @@ const toggleSelectAll = () => {
     selectedProducts.value = new Set()
   } else {
     const allAsins = previewRows.value
-      .filter(r => r._rowType === 'parent' || r._rowType === 'single')
-      .map(r => r._productAsin)
+      .filter((r) => r._rowType === 'parent' || r._rowType === 'single')
+      .map((r) => r._productAsin)
     selectedProducts.value = new Set(allAsins)
   }
 }
@@ -364,13 +478,17 @@ const handleAiGen = async () => {
   })
 
   try {
-    const products = JSON.parse(JSON.stringify(readyProducts.value.map(r => ({
-      asin: r.asin,
-      title: r._originalTitle || r.title,
-      bulletPoints: r.bulletPoints || [],
-      description: r._originalDescription || r.description || '',
-      specs: r.specs || {}
-    }))))
+    const products = JSON.parse(
+      JSON.stringify(
+        readyProducts.value.map((r) => ({
+          asin: r.asin,
+          title: r._originalTitle || r.title,
+          bulletPoints: r.bulletPoints || [],
+          description: r._originalDescription || r.description || '',
+          specs: r.specs || {}
+        }))
+      )
+    )
 
     const res = await window.api.ai.batchGenerate(products)
 
@@ -381,11 +499,12 @@ const handleAiGen = async () => {
       // Apply results to globalRowData (shared reactive store).
       // DetailPanel reads from the same ref → will see updated values on reopen.
       for (const result of res.data) {
-        const row = rowData.value.find(r => r.asin === result.asin)
+        const row = rowData.value.find((r) => r.asin === result.asin)
         if (row && isAiResultOk(result)) {
           // Preserve original for re-gen (only saved once)
           if (!row._originalTitle) row._originalTitle = row.title
-          if (!row._originalDescription) row._originalDescription = row.description || row.descriptionHtml || ''
+          if (!row._originalDescription)
+            row._originalDescription = row.description || row.descriptionHtml || ''
           if (result.title) row.title = result.title
           if (result.description) {
             row.descriptionHtml = result.description
@@ -398,10 +517,12 @@ const handleAiGen = async () => {
       await restoreTableScrollState(scrollState)
 
       const successCount = res.data.filter(isAiResultOk).length
-      const failed = res.data.filter(r => !isAiResultOk(r))
+      const failed = res.data.filter((r) => !isAiResultOk(r))
       if (failed.length > 0) {
         const firstError = failed[0]?.error ? `: ${failed[0].error}` : ''
-        toast.error(`AI Gen lỗi ${failed.length}/${readyProducts.value.length} sản phẩm${firstError}`)
+        toast.error(
+          `AI Gen lỗi ${failed.length}/${readyProducts.value.length} sản phẩm${firstError}`
+        )
       } else {
         toast.success(`AI Gen hoàn tất: ${successCount}/${readyProducts.value.length} sản phẩm`)
       }
@@ -464,9 +585,10 @@ const colHeaderUsage = computed(() => {
 })
 
 const isAspectCol = (col) => col.startsWith('C:') || col.startsWith('*C:')
-const aspectMetaKey = (col) => col.replace(/^\*C:/, 'C:')  // normalize *C:Brand → C:Brand for lookups
+const aspectMetaKey = (col) => col.replace(/^\*C:/, 'C:') // normalize *C:Brand → C:Brand for lookups
 const aspectNameFromCol = (col) => col.replace(/^\*?C:/, '')
-const getAspectHeader = (aspectName, usage) => usage === 'REQUIRED' ? `*C:${aspectName}` : `C:${aspectName}`
+const getAspectHeader = (aspectName, usage) =>
+  usage === 'REQUIRED' ? `*C:${aspectName}` : `C:${aspectName}`
 
 // Header helpers
 const isRequiredCol = (col) => {
@@ -593,7 +715,7 @@ const CSV_TO_ROW_FIELD = {
   '*Title': 'title',
   '*Description': 'descriptionHtml',
   '*StartPrice': 'sellPrice',
-  '*Quantity': null, // no direct map
+  '*Quantity': null // no direct map
 }
 
 const syncEditToRowData = (row, col, value) => {
@@ -603,7 +725,7 @@ const syncEditToRowData = (row, col, value) => {
   // Find the source product in rowData by ASIN
   const asin = row._productAsin
   if (!asin) return
-  const source = rowData.value.find(r => r.asin === asin)
+  const source = rowData.value.find((r) => r.asin === asin)
   if (!source) return
 
   // Check direct mapping first
@@ -636,7 +758,9 @@ const startEdit = async (rowIdx, col, currentValue) => {
   editingCell.value = { rowIdx, col }
   editingValue.value = currentValue || ''
   await nextTick()
-  const el = (Array.isArray(editInputRef.value) ? editInputRef.value[0] : editInputRef.value) || document.querySelector('.cell-textarea')
+  const el =
+    (Array.isArray(editInputRef.value) ? editInputRef.value[0] : editInputRef.value) ||
+    document.querySelector('.cell-textarea')
   if (el) {
     el.focus()
     el.select()
@@ -674,17 +798,23 @@ const ALWAYS_REQUIRED_COLUMNS = computed(() => [
   '*Format',
   '*Duration',
   '*Location',
-  '*DispatchTimeMax',
+  '*DispatchTimeMax'
 ])
 
 const ROW_REQUIRED_COLUMNS = computed(() => ({
   parent: new Set([...ALWAYS_REQUIRED_COLUMNS.value, 'RelationshipDetails']),
-  child: new Set(['Relationship', 'RelationshipDetails', '*Quantity', '*StartPrice', 'CustomLabel']),
+  child: new Set([
+    'Relationship',
+    'RelationshipDetails',
+    '*Quantity',
+    '*StartPrice',
+    'CustomLabel'
+  ]),
   single: new Set([...ALWAYS_REQUIRED_COLUMNS.value, '*StartPrice', '*Quantity'])
 }))
 
 const readyProducts = computed(() =>
-  rowData.value.filter(r => r.status === 'DONE' && isRowReady(r))
+  rowData.value.filter((r) => r.status === 'DONE' && isRowReady(r))
 )
 
 const isValEmpty = (val) => val == null || String(val).trim() === ''
@@ -732,7 +862,7 @@ const truncate = (str, len) => {
 const getRowClass = (row) => ({
   'parent-row': row._rowType === 'parent',
   'child-row': row._rowType === 'child',
-  'single-row': row._rowType === 'single',
+  'single-row': row._rowType === 'single'
 })
 
 const isPreviewLoading = ref(false)
@@ -763,7 +893,9 @@ const buildPreview = async () => {
           }
           newCatMeta[categoryId] = catMap
         }
-      } catch (e) { /* ignore: catMeta stays empty {} for this cat */ }
+      } catch (e) {
+        /* ignore: catMeta stays empty {} for this cat */
+      }
     }
 
     const strictestUsage = getStrictestAspectUsage(newCatMeta)
@@ -795,33 +927,33 @@ const buildPreview = async () => {
           _productAsin: r.asin,
           _ebayCategory: r.ebayCategory || '',
           [ACTION_HEADER.value]: 'Add',
-          'CustomLabel': r.asin,
+          CustomLabel: r.asin,
           '*Category': r.ebayCategory || '',
-          'StoreCategory': '',
+          StoreCategory: '',
           '*Title': cleanTitle(r.title),
-          'Subtitle': '',
-          'Relationship': '',
-          'RelationshipDetails': parentRelDetails,
-          'ScheduleTime': '',
+          Subtitle: '',
+          Relationship: '',
+          RelationshipDetails: parentRelDetails,
+          ScheduleTime: '',
           '*ConditionID': props.settings.defaultCondition || '1000',
           ...aspectCols,
-          'PicURL': (r.images || []).slice(0, 12).join('|'),
-          'GalleryType': '',
-          'VideoID': '',
+          PicURL: (r.images || []).slice(0, 12).join('|'),
+          GalleryType: '',
+          VideoID: '',
           '*Description': description,
           '*Format': props.settings.defaultFormat || 'FixedPrice',
           '*Duration': props.settings.defaultDuration || 'GTC',
           '*StartPrice': '',
-          'BuyItNowPrice': '',
-          'BestOfferEnabled': '',
+          BuyItNowPrice: '',
+          BestOfferEnabled: '',
           '*Quantity': '',
-          'ImmediatePayRequired': '',
+          ImmediatePayRequired: '',
           '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
           '*DispatchTimeMax': props.settings.dispatchTimeMax || '7',
           // Business Policies — sử dụng profile đã tạo trong Seller Hub (loại bỏ legacy fields)
-          'ShippingProfileName': props.settings.shippingProfileName || '',
-          'ReturnProfileName': props.settings.returnProfileName || '',
-          'PaymentProfileName': props.settings.paymentProfileName || '',
+          ShippingProfileName: props.settings.shippingProfileName || '',
+          ReturnProfileName: props.settings.returnProfileName || '',
+          PaymentProfileName: props.settings.paymentProfileName || ''
         })
 
         // Child rows
@@ -834,31 +966,31 @@ const buildPreview = async () => {
             _productAsin: r.asin,
             _ebayCategory: r.ebayCategory || '',
             [ACTION_HEADER.value]: '',
-            'CustomLabel': v.asin || '',
+            CustomLabel: v.asin || '',
             '*Category': '',
-            'StoreCategory': '',
+            StoreCategory: '',
             '*Title': '',
-            'Subtitle': '',
-            'Relationship': 'Variation',
-            'RelationshipDetails': childRelDetails,
-            'ScheduleTime': '',
+            Subtitle: '',
+            Relationship: 'Variation',
+            RelationshipDetails: childRelDetails,
+            ScheduleTime: '',
             '*ConditionID': '',
-            'PicURL': v.image || '',
-            'GalleryType': '',
-            'VideoID': '',
+            PicURL: v.image || '',
+            GalleryType: '',
+            VideoID: '',
             '*Description': '',
             '*Format': '',
             '*Duration': '',
             '*StartPrice': v.price != null && v.price > 0 ? v.price : r.sellPrice,
-            'BuyItNowPrice': '',
-            'BestOfferEnabled': '',
+            BuyItNowPrice: '',
+            BestOfferEnabled: '',
             '*Quantity': props.settings.defaultQuantity || v.quantity || 10,
-            'ImmediatePayRequired': '',
+            ImmediatePayRequired: '',
             '*Location': '',
             '*DispatchTimeMax': '',
-            'ShippingProfileName': '',
-            'ReturnProfileName': '',
-            'PaymentProfileName': '',
+            ShippingProfileName: '',
+            ReturnProfileName: '',
+            PaymentProfileName: ''
           })
         }
       } else {
@@ -868,33 +1000,33 @@ const buildPreview = async () => {
           _productAsin: r.asin,
           _ebayCategory: r.ebayCategory || '',
           [ACTION_HEADER.value]: 'Add',
-          'CustomLabel': r.asin,
+          CustomLabel: r.asin,
           '*Category': r.ebayCategory || '',
-          'StoreCategory': '',
+          StoreCategory: '',
           '*Title': cleanTitle(r.title),
-          'Subtitle': '',
-          'Relationship': '',
-          'RelationshipDetails': '',
-          'ScheduleTime': '',
+          Subtitle: '',
+          Relationship: '',
+          RelationshipDetails: '',
+          ScheduleTime: '',
           '*ConditionID': props.settings.defaultCondition || '1000',
           ...aspectCols,
-          'PicURL': (r.images || []).slice(0, 12).join('|'),
-          'GalleryType': '',
-          'VideoID': '',
+          PicURL: (r.images || []).slice(0, 12).join('|'),
+          GalleryType: '',
+          VideoID: '',
           '*Description': description,
           '*Format': props.settings.defaultFormat || 'FixedPrice',
           '*Duration': props.settings.defaultDuration || 'GTC',
           '*StartPrice': r.sellPrice,
-          'BuyItNowPrice': '',
-          'BestOfferEnabled': '',
+          BuyItNowPrice: '',
+          BestOfferEnabled: '',
           '*Quantity': props.settings.defaultQuantity || 10,
-          'ImmediatePayRequired': '',
+          ImmediatePayRequired: '',
           '*Location': props.settings.defaultLocation || 'US WAREHOUSE',
           '*DispatchTimeMax': props.settings.dispatchTimeMax || '7',
           // Business Policies — sử dụng profile đã tạo trong Seller Hub (loại bỏ legacy fields)
-          'ShippingProfileName': props.settings.shippingProfileName || '',
-          'ReturnProfileName': props.settings.returnProfileName || '',
-          'PaymentProfileName': props.settings.paymentProfileName || '',
+          ShippingProfileName: props.settings.shippingProfileName || '',
+          ReturnProfileName: props.settings.returnProfileName || '',
+          PaymentProfileName: props.settings.paymentProfileName || ''
         })
       }
     }
@@ -924,17 +1056,34 @@ const buildPreview = async () => {
     // 11: Everything else
     const COLUMN_ORDER = [
       ACTION_HEADER.value,
-      'CustomLabel', '*Category', 'StoreCategory', '*Title', 'Subtitle',
+      'CustomLabel',
+      '*Category',
+      'StoreCategory',
+      '*Title',
+      'Subtitle',
       // Variation + pricing grouped together so parent/child price is visible side-by-side
-      'Relationship', 'RelationshipDetails',
-      '*StartPrice', 'BuyItNowPrice', 'BestOfferEnabled', '*Quantity', 'ImmediatePayRequired',
+      'Relationship',
+      'RelationshipDetails',
+      '*StartPrice',
+      'BuyItNowPrice',
+      'BestOfferEnabled',
+      '*Quantity',
+      'ImmediatePayRequired',
       // Listing config
-      'ScheduleTime', '*ConditionID', '*Format', '*Duration',
+      'ScheduleTime',
+      '*ConditionID',
+      '*Format',
+      '*Duration',
       // aspect cols go here (ranks 4-6)
-      'PicURL', 'GalleryType', 'VideoID',
+      'PicURL',
+      'GalleryType',
+      'VideoID',
       '*Description',
-      '*Location', '*DispatchTimeMax',
-      'ShippingProfileName', 'ReturnProfileName', 'PaymentProfileName',
+      '*Location',
+      '*DispatchTimeMax',
+      'ShippingProfileName',
+      'ReturnProfileName',
+      'PaymentProfileName'
     ]
     const sorted = [...colSet].sort((a, b) => {
       const rank = (c) => {
@@ -980,12 +1129,12 @@ const refreshPreview = async () => {
 
 const buildDescription = (row) => {
   const parts = []
-  parts.push('<div style=\'max-width:800px;margin:0 auto;font-family:Arial,sans-serif\'>')
+  parts.push("<div style='max-width:800px;margin:0 auto;font-family:Arial,sans-serif'>")
 
   if (row.bulletPoints?.length > 0) {
-    parts.push('<h3 style=\'margin-bottom:8px\'>Product Features</h3>')
-    parts.push('<ul style=\'padding-left:18px\'>')
-    row.bulletPoints.forEach(bp => {
+    parts.push("<h3 style='margin-bottom:8px'>Product Features</h3>")
+    parts.push("<ul style='padding-left:18px'>")
+    row.bulletPoints.forEach((bp) => {
       parts.push(`<li style='margin-bottom:4px'>${escapeHtml(bp)}</li>`)
     })
     parts.push('</ul>')
@@ -995,9 +1144,11 @@ const buildDescription = (row) => {
     row.descriptionImages?.length > 0 ? row.descriptionImages : (row.images || []).slice(0, 5)
 
   if (descriptionImages.length > 0) {
-    parts.push('<div style=\'margin:16px 0\'>')
-    descriptionImages.forEach(img => {
-      parts.push(`<img src='${img}' style='max-width:700px;width:100%;display:block;margin:8px 0' />`)
+    parts.push("<div style='margin:16px 0'>")
+    descriptionImages.forEach((img) => {
+      parts.push(
+        `<img src='${img}' style='max-width:700px;width:100%;display:block;margin:8px 0' />`
+      )
     })
     parts.push('</div>')
   }
@@ -1013,10 +1164,12 @@ const buildDescription = (row) => {
   }
 
   if (row.specs && Object.keys(row.specs).length > 0) {
-    parts.push('<h3 style=\'margin-top:16px;margin-bottom:8px\'>Specifications</h3>')
-    parts.push('<table style=\'border-collapse:collapse;width:100%\'>')
+    parts.push("<h3 style='margin-top:16px;margin-bottom:8px'>Specifications</h3>")
+    parts.push("<table style='border-collapse:collapse;width:100%'>")
     for (const [key, val] of Object.entries(row.specs)) {
-      parts.push(`<tr><td style='border:1px solid #ddd;padding:6px 10px;font-weight:bold;width:35%'>${escapeHtml(key)}</td>`)
+      parts.push(
+        `<tr><td style='border:1px solid #ddd;padding:6px 10px;font-weight:bold;width:35%'>${escapeHtml(key)}</td>`
+      )
       parts.push(`<td style='border:1px solid #ddd;padding:6px 10px'>${escapeHtml(val)}</td></tr>`)
     }
     parts.push('</table>')
@@ -1028,7 +1181,11 @@ const buildDescription = (row) => {
 
 const escapeHtml = (str) => {
   if (!str) return ''
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 const getStrictestAspectUsage = (categoryMetaById) => {
@@ -1046,7 +1203,9 @@ const getStrictestAspectUsage = (categoryMetaById) => {
 
 const buildAspectColumns = (row, categoryMeta = null, strictestUsage = {}) => {
   const cols = {}
-  const allowedAspects = categoryMeta ? new Set(Object.keys(categoryMeta).map((col) => col.replace(/^\*?C:/, ''))) : null
+  const allowedAspects = categoryMeta
+    ? new Set(Object.keys(categoryMeta).map((col) => col.replace(/^\*?C:/, '')))
+    : null
 
   if (row.aspectValues) {
     for (const [name, val] of Object.entries(row.aspectValues)) {
@@ -1057,14 +1216,17 @@ const buildAspectColumns = (row, categoryMeta = null, strictestUsage = {}) => {
     }
   }
   if (row.brand && (!allowedAspects || allowedAspects.has('Brand'))) {
-    const brandHeader = getAspectHeader('Brand', strictestUsage['C:Brand'] || categoryMeta?.['C:Brand'])
+    const brandHeader = getAspectHeader(
+      'Brand',
+      strictestUsage['C:Brand'] || categoryMeta?.['C:Brand']
+    )
     if (!cols[brandHeader]) cols[brandHeader] = row.brand
   }
   return cols
 }
 
 const buildParentRelationshipDetails = (variations) => {
-  const dimValues = {}       // key → Map<lowerVal, originalVal> (giữ giá trị gốc, dedup theo lowercase)
+  const dimValues = {} // key → Map<lowerVal, originalVal> (giữ giá trị gốc, dedup theo lowercase)
   for (const v of variations) {
     for (const [key, val] of Object.entries(v.attributes || {})) {
       if (!dimValues[key]) dimValues[key] = new Map()
@@ -1089,7 +1251,7 @@ const cleanTitle = (title) => {
   if (!title) return ''
   return title
     .replace(/[\u{1F600}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // strip emoji
-    .replace(/[【】「」『』]/g, ' ')  // CJK brackets → space
+    .replace(/[【】「」『』]/g, ' ') // CJK brackets → space
     .replace(/\s+/g, ' ')
     .trim()
   // Note: 80-char limit NOT enforced here — validation in Preview will flag it for manual fix
@@ -1118,11 +1280,11 @@ const handleExport = async (force = false) => {
   // Filter by selection if selective mode is on
   let rowsToExport = previewRows.value
   if (selectiveMode.value && selectedProducts.value.size > 0) {
-    rowsToExport = previewRows.value.filter(r => selectedProducts.value.has(r._productAsin))
+    rowsToExport = previewRows.value.filter((r) => selectedProducts.value.has(r._productAsin))
   }
 
   // Remove internal fields before export
-  const exportRows = rowsToExport.map(r => {
+  const exportRows = rowsToExport.map((r) => {
     const clean = { ...r }
     delete clean._rowType
     delete clean._productAsin
@@ -1153,7 +1315,7 @@ const handleExport = async (force = false) => {
   csvLines.push(headers.join(','))
   // Data rows
   for (const row of exportRows) {
-    const cells = headers.map(h => csvEscape(row[h]))
+    const cells = headers.map((h) => csvEscape(row[h]))
     csvLines.push(cells.join(','))
   }
 
@@ -1170,9 +1332,12 @@ const handleExport = async (force = false) => {
 // Auto-build on mount and when ready products' preview-relevant fields change.
 // _version is bumped on every DetailPanel save, guaranteeing rebuild for ANY edit.
 const readyFingerprint = computed(() =>
-  readyProducts.value.map(r =>
-    `${r.asin}:${r.title}:${r.ebayCategory || ''}:${r.sellPrice || ''}:${r.brand || ''}:${r.images?.length || 0}:${r.descriptionImages?.length || 0}:${r.variations?.length || 0}:${r._version || 0}`
-  ).join(',')
+  readyProducts.value
+    .map(
+      (r) =>
+        `${r.asin}:${r.title}:${r.ebayCategory || ''}:${r.sellPrice || ''}:${r.brand || ''}:${r.images?.length || 0}:${r.descriptionImages?.length || 0}:${r.variations?.length || 0}:${r._version || 0}`
+    )
+    .join(',')
 )
 onMounted(buildPreview)
 onActivated(buildPreview)
@@ -1195,7 +1360,9 @@ watch(readyFingerprint, buildPreview)
   scrollbar-gutter: stable;
   background: hsl(var(--card));
   border-radius: 12px 12px 0 0;
-  box-shadow: 0 0 0 1px hsl(var(--border) / 0.5), 0 1px 3px rgba(0,0,0,.05);
+  box-shadow:
+    0 0 0 1px hsl(var(--border) / 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
 }
@@ -1242,7 +1409,7 @@ watch(readyFingerprint, buildPreview)
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
 }
 
@@ -1253,8 +1420,12 @@ watch(readyFingerprint, buildPreview)
   flex: 0 0 auto;
   padding: 0 16px;
 }
-.legend-group:first-child { padding-left: 0; }
-.legend-group:last-child { padding-right: 0; }
+.legend-group:first-child {
+  padding-left: 0;
+}
+.legend-group:last-child {
+  padding-right: 0;
+}
 
 .legend-group-label {
   font-size: 9px;
@@ -1304,27 +1475,71 @@ watch(readyFingerprint, buildPreview)
 }
 
 /* Row type chips */
-.chip-parent { background: hsl(210 100% 95%); border-color: hsl(210 80% 80%); color: hsl(210 70% 35%); }
-.dot-parent { background: hsl(210 80% 55%); }
+.chip-parent {
+  background: hsl(210 100% 95%);
+  border-color: hsl(210 80% 80%);
+  color: hsl(210 70% 35%);
+}
+.dot-parent {
+  background: hsl(210 80% 55%);
+}
 
-.chip-child { background: hsl(220 10% 96%); border-color: hsl(220 10% 82%); color: hsl(220 10% 40%); }
-.dot-child { background: hsl(220 10% 65%); }
+.chip-child {
+  background: hsl(220 10% 96%);
+  border-color: hsl(220 10% 82%);
+  color: hsl(220 10% 40%);
+}
+.dot-child {
+  background: hsl(220 10% 65%);
+}
 
-.chip-single { background: hsl(40 100% 94%); border-color: hsl(40 80% 72%); color: hsl(35 70% 35%); }
-.dot-single { background: hsl(35 85% 55%); }
+.chip-single {
+  background: hsl(40 100% 94%);
+  border-color: hsl(40 80% 72%);
+  color: hsl(35 70% 35%);
+}
+.dot-single {
+  background: hsl(35 85% 55%);
+}
 
-.chip-req { background: hsl(0 80% 95%); border-color: hsl(0 75% 80%); color: hsl(0 75% 50%); }
-.chip-req .chip-icon { color: hsl(0 75% 50%); }
+.chip-req {
+  background: hsl(0 80% 95%);
+  border-color: hsl(0 75% 80%);
+  color: hsl(0 75% 50%);
+}
+.chip-req .chip-icon {
+  color: hsl(0 75% 50%);
+}
 
-.chip-cond { background: hsl(38 92% 95%); border-color: hsl(38 92% 75%); color: hsl(35 92% 35%); }
+.chip-cond {
+  background: hsl(38 92% 95%);
+  border-color: hsl(38 92% 75%);
+  color: hsl(35 92% 35%);
+}
 
-.chip-rec { background: hsl(142 70% 95%); border-color: hsl(142 70% 80%); color: hsl(142 70% 35%); }
-.chip-rec .chip-icon { color: hsl(142 70% 45%); }
+.chip-rec {
+  background: hsl(142 70% 95%);
+  border-color: hsl(142 70% 80%);
+  color: hsl(142 70% 35%);
+}
+.chip-rec .chip-icon {
+  color: hsl(142 70% 45%);
+}
 
-.chip-opt { background: hsl(270 50% 95%); border-color: hsl(270 50% 80%); color: hsl(270 60% 40%); }
-.chip-opt .chip-icon { color: hsl(270 60% 40%); }
+.chip-opt {
+  background: hsl(270 50% 95%);
+  border-color: hsl(270 50% 80%);
+  color: hsl(270 60% 40%);
+}
+.chip-opt .chip-icon {
+  color: hsl(270 60% 40%);
+}
 
-.chip-mix { background: hsl(210 80% 96%); border-color: hsl(210 80% 75%); color: hsl(210 80% 35%); }
+.chip-mix {
+  background: hsl(210 80% 96%);
+  border-color: hsl(210 80% 75%);
+  color: hsl(210 80% 35%);
+}
 
 /* ─── Column header usage badges ─────────────────────────────────────────── */
 .col-usage-badge {
@@ -1338,11 +1553,26 @@ watch(readyFingerprint, buildPreview)
   text-transform: uppercase;
 }
 
-.badge-required { background: hsl(0 75% 55%); color: white; }
-.badge-conditional { background: hsl(38 92% 50%); color: white; }
-.badge-recommended { background: hsl(142 70% 45%); color: white; }
-.badge-optional { background: hsl(270 60% 50%); color: white; }
-.badge-mixed { background: hsl(210 80% 50%); color: white; }
+.badge-required {
+  background: hsl(0 75% 55%);
+  color: white;
+}
+.badge-conditional {
+  background: hsl(38 92% 50%);
+  color: white;
+}
+.badge-recommended {
+  background: hsl(142 70% 45%);
+  color: white;
+}
+.badge-optional {
+  background: hsl(270 60% 50%);
+  color: white;
+}
+.badge-mixed {
+  background: hsl(210 80% 50%);
+  color: white;
+}
 
 .col-multi-marker {
   font-size: 9px;
@@ -1379,10 +1609,21 @@ watch(readyFingerprint, buildPreview)
   opacity: 0.85;
 }
 
-.tag-required { background: hsl(0 80% 95%); color: hsl(0 75% 50%); border: 1px solid hsl(0 75% 80%); }
-.tag-recommended { background: hsl(142 70% 95%); color: hsl(142 70% 35%); border: 1px solid hsl(142 70% 80%); }
-.tag-optional { background: hsl(270 50% 95%); color: hsl(270 60% 40%); border: 1px solid hsl(270 50% 80%); }
-
+.tag-required {
+  background: hsl(0 80% 95%);
+  color: hsl(0 75% 50%);
+  border: 1px solid hsl(0 75% 80%);
+}
+.tag-recommended {
+  background: hsl(142 70% 95%);
+  color: hsl(142 70% 35%);
+  border: 1px solid hsl(142 70% 80%);
+}
+.tag-optional {
+  background: hsl(270 50% 95%);
+  color: hsl(270 60% 40%);
+  border: 1px solid hsl(270 50% 80%);
+}
 
 .preview-table th {
   position: sticky;

@@ -123,7 +123,9 @@ function buildCdnUrl(key, settings) {
   }
   // Fallback: use R2 public bucket URL format (requires public access enabled)
   // Note: S3 API endpoint requires auth, so we use the pub- format
-  console.warn('[R2] No custom domain set — using S3 endpoint URL (images won\'t display without public access or custom domain)')
+  console.warn(
+    "[R2] No custom domain set — using S3 endpoint URL (images won't display without public access or custom domain)"
+  )
   return `https://pub-${settings.r2AccountId}.r2.dev/${key}`
 }
 

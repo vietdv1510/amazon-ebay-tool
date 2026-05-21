@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { TabsContent } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { TabsContent } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   value: { type: [String, Number], required: true },
@@ -11,11 +11,11 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>
@@ -23,7 +23,7 @@ const delegatedProps = reactiveOmit(props, "class");
     :class="
       cn(
         'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        props.class,
+        props.class
       )
     "
     v-bind="delegatedProps"

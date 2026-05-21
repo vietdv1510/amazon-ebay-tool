@@ -1,13 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import {
-  SliderRange,
-  SliderRoot,
-  SliderThumb,
-  SliderTrack,
-  useForwardPropsEmits,
-} from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { SliderRange, SliderRoot, SliderThumb, SliderTrack, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   defaultValue: { type: Array, required: false },
@@ -28,14 +22,14 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
-const emits = defineEmits(["update:modelValue", "valueCommit"]);
+    skipCheck: true
+  }
+})
+const emits = defineEmits(['update:modelValue', 'valueCommit'])
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
@@ -43,7 +37,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
     :class="
       cn(
         'relative flex w-full touch-none select-none items-center data-[orientation=vertical]:flex-col data-[orientation=vertical]:w-1.5 data-[orientation=vertical]:h-full',
-        props.class,
+        props.class
       )
     "
     v-bind="forwarded"
@@ -51,9 +45,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
     <SliderTrack
       class="relative h-1.5 w-full data-[orientation=vertical]:w-1.5 grow overflow-hidden rounded-full bg-primary/20"
     >
-      <SliderRange
-        class="absolute h-full data-[orientation=vertical]:w-full bg-primary"
-      />
+      <SliderRange class="absolute h-full data-[orientation=vertical]:w-full bg-primary" />
     </SliderTrack>
     <SliderThumb
       v-for="(_, key) in modelValue"

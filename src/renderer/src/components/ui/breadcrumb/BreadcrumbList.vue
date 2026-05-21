@@ -1,13 +1,13 @@
 <script setup>
-import { cn } from '@/utils';
+import { cn } from '@/utils'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>
@@ -15,7 +15,7 @@ const props = defineProps({
     :class="
       cn(
         'flex flex-wrap items-center gap-1.5 break-words text-sm text-muted-foreground sm:gap-2.5',
-        props.class,
+        props.class
       )
     "
   >

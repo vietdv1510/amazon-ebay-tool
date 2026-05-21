@@ -5,7 +5,16 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs'
 import { crawlAmazonWithRetry, cancelCrawl, closeBrowser } from './crawler'
-import { saveSession, listSessions, loadSession, deleteSession, deleteProduct, updateProduct, updateSession, renameSession } from './history'
+import {
+  saveSession,
+  listSessions,
+  loadSession,
+  deleteSession,
+  deleteProduct,
+  updateProduct,
+  updateSession,
+  renameSession
+} from './history'
 import { batchGenerate } from './ai-gen'
 import { uploadToR2, uploadProductAssetsToR2, testR2Connection, resetR2Client } from './r2-uploader'
 import {
@@ -207,9 +216,15 @@ ipcMain.handle('history:listSessions', () => listSessions())
 ipcMain.handle('history:loadSession', (_, sessionId) => loadSession(sessionId))
 ipcMain.handle('history:deleteSession', (_, sessionId) => deleteSession(sessionId))
 ipcMain.handle('history:deleteProduct', (_, sessionId, asin) => deleteProduct(sessionId, asin))
-ipcMain.handle('history:updateProduct', (_, sessionId, asin, updates) => updateProduct(sessionId, asin, updates))
-ipcMain.handle('history:updateSession', (_, sessionId, products) => updateSession(sessionId, products))
-ipcMain.handle('history:renameSession', (_, sessionId, newName) => renameSession(sessionId, newName))
+ipcMain.handle('history:updateProduct', (_, sessionId, asin, updates) =>
+  updateProduct(sessionId, asin, updates)
+)
+ipcMain.handle('history:updateSession', (_, sessionId, products) =>
+  updateSession(sessionId, products)
+)
+ipcMain.handle('history:renameSession', (_, sessionId, newName) =>
+  renameSession(sessionId, newName)
+)
 
 // File dialog - open CSV/Excel
 ipcMain.handle('dialog:openFile', async () => {
@@ -263,7 +278,7 @@ ipcMain.handle('crawl:asin', async (event, asin, amazonUrl) => {
       })
     }
     const data = await crawlAmazonWithRetry(asin, progressCb, {
-      headless: settings.headlessMode === true,
+      headless: app.isPackaged ? true : settings.headlessMode === true,
       delay: settings.crawlDelay ?? 2,
       defaultQuantity: settings.defaultQuantity || 10,
       forceUSLocation: settings.forceUSLocation !== false,
@@ -421,7 +436,7 @@ ipcMain.handle('ai:batchGenerate', async (event, products) => {
     }
     const results = await batchGenerate(products, settings, progressCb)
     // Ensure results are plain serializable objects
-    const safeResults = results.map(r => ({
+    const safeResults = results.map((r) => ({
       asin: r.asin,
       ok: !!r.ok,
       title: r.title,

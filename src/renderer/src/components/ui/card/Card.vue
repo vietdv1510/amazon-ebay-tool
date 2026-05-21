@@ -1,21 +1,17 @@
 <script setup>
-import { cn } from '@/utils';
+import { cn } from '@/utils'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>
-  <div
-    :class="
-      cn('rounded-xl border bg-card text-card-foreground shadow', props.class)
-    "
-  >
+  <div :class="cn('rounded-xl border bg-card text-card-foreground shadow', props.class)">
     <slot />
   </div>
 </template>

@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { CalendarRoot, useForwardPropsEmits } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { CalendarRoot, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/utils'
 import {
   CalendarCell,
   CalendarCellTrigger,
@@ -13,8 +13,8 @@ import {
   CalendarHeader,
   CalendarHeading,
   CalendarNextButton,
-  CalendarPrevButton,
-} from ".";
+  CalendarPrevButton
+} from '.'
 
 const props = defineProps({
   defaultValue: { type: Object, required: false },
@@ -46,23 +46,19 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const emits = defineEmits(["update:modelValue", "update:placeholder"]);
+const emits = defineEmits(['update:modelValue', 'update:placeholder'])
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
-  <CalendarRoot
-    v-slot="{ grid, weekDays }"
-    :class="cn('p-3', props.class)"
-    v-bind="forwarded"
-  >
+  <CalendarRoot v-slot="{ grid, weekDays }" :class="cn('p-3', props.class)" v-bind="forwarded">
     <CalendarHeader>
       <CalendarPrevButton />
       <CalendarHeading />
@@ -84,11 +80,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
             :key="`weekDate-${index}`"
             class="mt-2 w-full"
           >
-            <CalendarCell
-              v-for="weekDate in weekDates"
-              :key="weekDate.toString()"
-              :date="weekDate"
-            >
+            <CalendarCell v-for="weekDate in weekDates" :key="weekDate.toString()" :date="weekDate">
               <CalendarCellTrigger :day="weekDate" :month="month.value" />
             </CalendarCell>
           </CalendarGridRow>

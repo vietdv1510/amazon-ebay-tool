@@ -1,5 +1,5 @@
 <script setup>
-import { CalendarGridHead } from "reka-ui";
+import { CalendarGridHead } from 'reka-ui'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -7,9 +7,9 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>

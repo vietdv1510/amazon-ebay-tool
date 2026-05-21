@@ -1,12 +1,12 @@
 <script setup>
-import { MinusIcon } from '@radix-icons/vue';
-import { Primitive, useForwardProps } from "reka-ui";
+import { MinusIcon } from '@radix-icons/vue'
+import { Primitive, useForwardProps } from 'reka-ui'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
-  as: { type: null, required: false },
-});
-const forwardedProps = useForwardProps(props);
+  as: { type: null, required: false }
+})
+const forwardedProps = useForwardProps(props)
 </script>
 
 <template>

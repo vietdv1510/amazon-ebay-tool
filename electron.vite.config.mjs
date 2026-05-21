@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.EBAY_CLIENT_ID': JSON.stringify(env.EBAY_CLIENT_ID || ''),
         'process.env.EBAY_CLIENT_SECRET': JSON.stringify(env.EBAY_CLIENT_SECRET || ''),
-        'process.env.EBAY_ENV': JSON.stringify(env.EBAY_ENV || 'sandbox'),
+        'process.env.EBAY_ENV': JSON.stringify(env.EBAY_ENV || 'sandbox')
       }
     },
     preload: {},

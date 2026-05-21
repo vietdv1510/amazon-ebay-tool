@@ -1,14 +1,14 @@
 <script setup>
-import { DotsHorizontalIcon } from '@radix-icons/vue';
-import { cn } from '@/utils';
+import { DotsHorizontalIcon } from '@radix-icons/vue'
+import { cn } from '@/utils'
 
 const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>

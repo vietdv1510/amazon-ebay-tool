@@ -1,7 +1,7 @@
 /**
  * Download Playwright's chromium-headless-shell for Windows x64.
  * Playwright 1.59.x uses revision 1217 (chromium_headless_shell-1217).
- * 
+ *
  * Usage: node scripts/download-win-chromium.js
  */
 const https = require('https')
@@ -59,29 +59,39 @@ function download(url, dest, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 5) return reject(new Error('Too many redirects'))
     const file = fs.createWriteStream(dest)
-    https.get(url, (res) => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        file.close()
-        fs.unlinkSync(dest)
-        return download(res.headers.location, dest, redirects + 1).then(resolve).catch(reject)
-      }
-      if (res.statusCode !== 200) {
-        file.close()
-        return reject(new Error(`HTTP ${res.statusCode} for ${url}`))
-      }
-      const total = parseInt(res.headers['content-length'] || '0', 10)
-      let received = 0
-      res.on('data', (chunk) => {
-        received += chunk.length
-        if (total > 0) {
-          const pct = ((received / total) * 100).toFixed(1)
-          process.stdout.write(`\r[Download] ${pct}% (${(received / 1024 / 1024).toFixed(1)}MB / ${(total / 1024 / 1024).toFixed(1)}MB)`)
+    https
+      .get(url, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          file.close()
+          fs.unlinkSync(dest)
+          return download(res.headers.location, dest, redirects + 1)
+            .then(resolve)
+            .catch(reject)
         }
+        if (res.statusCode !== 200) {
+          file.close()
+          return reject(new Error(`HTTP ${res.statusCode} for ${url}`))
+        }
+        const total = parseInt(res.headers['content-length'] || '0', 10)
+        let received = 0
+        res.on('data', (chunk) => {
+          received += chunk.length
+          if (total > 0) {
+            const pct = ((received / total) * 100).toFixed(1)
+            process.stdout.write(
+              `\r[Download] ${pct}% (${(received / 1024 / 1024).toFixed(1)}MB / ${(total / 1024 / 1024).toFixed(1)}MB)`
+            )
+          }
+        })
+        res.pipe(file)
+        file.on('finish', () => {
+          file.close()
+          process.stdout.write('\n')
+          resolve()
+        })
+        file.on('error', reject)
       })
-      res.pipe(file)
-      file.on('finish', () => { file.close(); process.stdout.write('\n'); resolve() })
-      file.on('error', reject)
-    }).on('error', reject)
+      .on('error', reject)
   })
 }
 

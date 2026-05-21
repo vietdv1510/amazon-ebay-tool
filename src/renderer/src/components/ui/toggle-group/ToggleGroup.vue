@@ -1,8 +1,8 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { ToggleGroupRoot, useForwardPropsEmits } from "reka-ui";
-import { provide } from "vue";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { ToggleGroupRoot, useForwardPropsEmits } from 'reka-ui'
+import { provide } from 'vue'
+import { cn } from '@/utils'
 
 const props = defineProps({
   rovingFocus: { type: Boolean, required: false },
@@ -20,21 +20,21 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
+    skipCheck: true
   },
   variant: { type: null, required: false },
-  size: { type: null, required: false },
-});
-const emits = defineEmits(["update:modelValue"]);
+  size: { type: null, required: false }
+})
+const emits = defineEmits(['update:modelValue'])
 
-provide("toggleGroup", {
+provide('toggleGroup', {
   variant: props.variant,
-  size: props.size,
-});
+  size: props.size
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>

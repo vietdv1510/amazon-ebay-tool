@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { MenubarRoot, useForwardPropsEmits } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { MenubarRoot, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   modelValue: { type: String, required: false },
@@ -11,14 +11,14 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
-const emits = defineEmits(["update:modelValue"]);
+    skipCheck: true
+  }
+})
+const emits = defineEmits(['update:modelValue'])
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
@@ -27,7 +27,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
     :class="
       cn(
         'flex h-9 items-center space-x-1 rounded-md border bg-background p-1 shadow-sm',
-        props.class,
+        props.class
       )
     "
   >

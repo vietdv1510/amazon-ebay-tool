@@ -1,7 +1,7 @@
 <script setup>
-import { Primitive } from "reka-ui";
-import { cn } from '@/utils';
-import { buttonVariants } from ".";
+import { Primitive } from 'reka-ui'
+import { cn } from '@/utils'
+import { buttonVariants } from '.'
 
 const props = defineProps({
   variant: { type: null, required: false },
@@ -9,11 +9,11 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
+    skipCheck: true
   },
   asChild: { type: Boolean, required: false },
-  as: { type: null, required: false, default: "button" },
-});
+  as: { type: null, required: false, default: 'button' }
+})
 </script>
 
 <template>

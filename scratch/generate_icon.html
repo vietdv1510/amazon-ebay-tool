@@ -1,88 +1,98 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<body style="margin:0; background: transparent;">
-<canvas id="c" width="1024" height="1024"></canvas>
-<script>
-const c = document.getElementById('c');
-const ctx = c.getContext('2d');
-const W = 1024, pad = 60, r = 180;
+  <body style="margin: 0; background: transparent">
+    <canvas id="c" width="1024" height="1024"></canvas>
+    <script>
+      const c = document.getElementById('c')
+      const ctx = c.getContext('2d')
+      const W = 1024,
+        pad = 60,
+        r = 180
 
-// Rounded rect with gradient background
-function roundedRect(x, y, w, h, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + w - radius, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
-  ctx.lineTo(x + w, y + h - radius);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
-  ctx.lineTo(x + radius, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-}
+      // Rounded rect with gradient background
+      function roundedRect(x, y, w, h, radius) {
+        ctx.beginPath()
+        ctx.moveTo(x + radius, y)
+        ctx.lineTo(x + w - radius, y)
+        ctx.quadraticCurveTo(x + w, y, x + w, y + radius)
+        ctx.lineTo(x + w, y + h - radius)
+        ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h)
+        ctx.lineTo(x + radius, y + h)
+        ctx.quadraticCurveTo(x, y + h, x, y + h - radius)
+        ctx.lineTo(x, y + radius)
+        ctx.quadraticCurveTo(x, y, x + radius, y)
+        ctx.closePath()
+      }
 
-// Background gradient
-const grad = ctx.createLinearGradient(0, 0, W, W);
-grad.addColorStop(0, '#312e81');   // deep indigo
-grad.addColorStop(0.5, '#6d28d9'); // violet
-grad.addColorStop(1, '#a78bfa');   // soft purple
+      // Background gradient
+      const grad = ctx.createLinearGradient(0, 0, W, W)
+      grad.addColorStop(0, '#312e81') // deep indigo
+      grad.addColorStop(0.5, '#6d28d9') // violet
+      grad.addColorStop(1, '#a78bfa') // soft purple
 
-roundedRect(pad, pad, W - pad*2, W - pad*2, r);
-ctx.fillStyle = grad;
-ctx.fill();
+      roundedRect(pad, pad, W - pad * 2, W - pad * 2, r)
+      ctx.fillStyle = grad
+      ctx.fill()
 
-// Subtle inner shadow / glow
-roundedRect(pad, pad, W - pad*2, W - pad*2, r);
-const shadowGrad = ctx.createLinearGradient(0, pad, 0, W - pad);
-shadowGrad.addColorStop(0, 'rgba(255,255,255,0.15)');
-shadowGrad.addColorStop(0.3, 'rgba(255,255,255,0)');
-shadowGrad.addColorStop(1, 'rgba(0,0,0,0.1)');
-ctx.fillStyle = shadowGrad;
-ctx.fill();
+      // Subtle inner shadow / glow
+      roundedRect(pad, pad, W - pad * 2, W - pad * 2, r)
+      const shadowGrad = ctx.createLinearGradient(0, pad, 0, W - pad)
+      shadowGrad.addColorStop(0, 'rgba(255,255,255,0.15)')
+      shadowGrad.addColorStop(0.3, 'rgba(255,255,255,0)')
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.1)')
+      ctx.fillStyle = shadowGrad
+      ctx.fill()
 
-// Draw "E" letter
-ctx.fillStyle = '#ffffff';
-const ex = 220, ey = 200, ew = 500, eh = 620, bar = 100;
+      // Draw "E" letter
+      ctx.fillStyle = '#ffffff'
+      const ex = 220,
+        ey = 200,
+        ew = 500,
+        eh = 620,
+        bar = 100
 
-// Top bar
-roundedRect(ex, ey, ew, bar, 20);
-ctx.fill();
-// Middle bar (shorter)
-roundedRect(ex, ey + (eh - bar) / 2, ew * 0.75, bar, 20);
-ctx.fill();
-// Bottom bar
-roundedRect(ex, ey + eh - bar, ew, bar, 20);
-ctx.fill();
-// Vertical bar (left)
-roundedRect(ex, ey, bar, eh, 20);
-ctx.fill();
+      // Top bar
+      roundedRect(ex, ey, ew, bar, 20)
+      ctx.fill()
+      // Middle bar (shorter)
+      roundedRect(ex, ey + (eh - bar) / 2, ew * 0.75, bar, 20)
+      ctx.fill()
+      // Bottom bar
+      roundedRect(ex, ey + eh - bar, ew, bar, 20)
+      ctx.fill()
+      // Vertical bar (left)
+      roundedRect(ex, ey, bar, eh, 20)
+      ctx.fill()
 
-// Arrow / rocket motif on middle bar
-ctx.beginPath();
-const ax = ex + ew * 0.75 - 30, ay = ey + (eh - bar) / 2 + bar/2;
-// Arrow pointing up-right
-ctx.save();
-ctx.translate(ax, ay);
-ctx.rotate(-Math.PI / 4);
-// Arrow shaft
-ctx.fillStyle = '#ffffff';
-ctx.fillRect(-15, -80, 30, 100);
-// Arrow head
-ctx.beginPath();
-ctx.moveTo(0, -120);
-ctx.lineTo(-40, -60);
-ctx.lineTo(40, -60);
-ctx.closePath();
-ctx.fill();
-ctx.restore();
+      // Arrow / rocket motif on middle bar
+      ctx.beginPath()
+      const ax = ex + ew * 0.75 - 30,
+        ay = ey + (eh - bar) / 2 + bar / 2
+      // Arrow pointing up-right
+      ctx.save()
+      ctx.translate(ax, ay)
+      ctx.rotate(-Math.PI / 4)
+      // Arrow shaft
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(-15, -80, 30, 100)
+      // Arrow head
+      ctx.beginPath()
+      ctx.moveTo(0, -120)
+      ctx.lineTo(-40, -60)
+      ctx.lineTo(40, -60)
+      ctx.closePath()
+      ctx.fill()
+      ctx.restore()
 
-// Export as PNG
-const link = document.createElement('a');
-link.download = 'ebay-engine-icon.png';
-link.href = c.toDataURL('image/png');
-link.click();
-document.body.innerHTML = '<h1>Icon generated! Check downloads.</h1><br><img src="' + c.toDataURL() + '" style="width:256px;height:256px;">';
-</script>
-</body>
+      // Export as PNG
+      const link = document.createElement('a')
+      link.download = 'ebay-engine-icon.png'
+      link.href = c.toDataURL('image/png')
+      link.click()
+      document.body.innerHTML =
+        '<h1>Icon generated! Check downloads.</h1><br><img src="' +
+        c.toDataURL() +
+        '" style="width:256px;height:256px;">'
+    </script>
+  </body>
 </html>

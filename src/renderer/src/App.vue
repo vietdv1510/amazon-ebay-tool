@@ -11,10 +11,7 @@
 
       <!-- Logo + Toggle row -->
       <div class="sidebar-logo-row" :class="{ 'justify-center px-0': sidebarCollapsed }">
-        <div
-          class="logo-icon flex-shrink-0"
-          :class="{ 'mx-auto': sidebarCollapsed }"
-        >
+        <div class="logo-icon flex-shrink-0" :class="{ 'mx-auto': sidebarCollapsed }">
           <img src="./assets/logo.png" class="w-7 h-7 object-contain" alt="Logo" />
         </div>
         <div v-if="!sidebarCollapsed" class="logo-text-wrap flex-1 min-w-0">
@@ -110,8 +107,6 @@
         class="sidebar-footer flex flex-col gap-2 border-t border-border/40"
         :class="{ 'p-2': sidebarCollapsed, 'px-3 py-3': !sidebarCollapsed }"
       >
-
-
         <button
           class="w-full flex items-center justify-center p-1.5 rounded-md hover:bg-muted/40 transition-all text-muted-foreground/60 hover:text-muted-foreground border border-transparent hover:border-border/30 group"
           @click="sidebarCollapsed = !sidebarCollapsed"
@@ -156,7 +151,7 @@
         @save="handleSettingsSave"
       />
       <KeepAlive>
-        <CrawlHistory v-if="currentPage === 'history'" @navigate="p => currentPage = p" />
+        <CrawlHistory v-if="currentPage === 'history'" @navigate="(p) => (currentPage = p)" />
       </KeepAlive>
     </div>
     <Toaster position="bottom-right" richColors />
@@ -192,13 +187,11 @@ const stats = ref({ total: 0, pending: 0, done: 0, error: 0 })
 
 // ── Badges computed trực tiếp từ store (không phụ thuộc vào tab đang active) ──
 // Amazon Crawler: số item chưa xử lý xong (PENDING + ERROR)
-const crawlerBadge = computed(() =>
-  rowData.value.filter(r => r.status === 'PENDING' || r.status === 'ERROR').length
+const crawlerBadge = computed(
+  () => rowData.value.filter((r) => r.status === 'PENDING' || r.status === 'ERROR').length
 )
 // Data Processing: tổng sản phẩm đã crawl xong
-const workspaceBadge = computed(() =>
-  rowData.value.filter(r => r.status === 'DONE').length
-)
+const workspaceBadge = computed(() => rowData.value.filter((r) => r.status === 'DONE').length)
 
 const settings = ref({
   priceMultiplier: 1.5,

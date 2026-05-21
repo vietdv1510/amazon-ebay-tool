@@ -1,8 +1,8 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { NavigationMenuRoot, useForwardPropsEmits } from "reka-ui";
-import { cn } from '@/utils';
-import NavigationMenuViewport from "./NavigationMenuViewport.vue";
+import { reactiveOmit } from '@vueuse/core'
+import { NavigationMenuRoot, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/utils'
+import NavigationMenuViewport from './NavigationMenuViewport.vue'
 
 const props = defineProps({
   modelValue: { type: String, required: false },
@@ -20,26 +20,21 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const emits = defineEmits(["update:modelValue"]);
+const emits = defineEmits(['update:modelValue'])
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
   <NavigationMenuRoot
     v-bind="forwarded"
-    :class="
-      cn(
-        'relative z-10 flex max-w-max flex-1 items-center justify-center',
-        props.class,
-      )
-    "
+    :class="cn('relative z-10 flex max-w-max flex-1 items-center justify-center', props.class)"
   >
     <slot />
     <NavigationMenuViewport />

@@ -1,13 +1,13 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { MagnifyingGlassIcon } from '@radix-icons/vue';
-import { ListboxFilter, useForwardProps } from "reka-ui";
-import { cn } from '@/utils';
-import { useCommand } from ".";
+import { reactiveOmit } from '@vueuse/core'
+import { MagnifyingGlassIcon } from '@radix-icons/vue'
+import { ListboxFilter, useForwardProps } from 'reka-ui'
+import { cn } from '@/utils'
+import { useCommand } from '.'
 
 defineOptions({
-  inheritAttrs: false,
-});
+  inheritAttrs: false
+})
 
 const props = defineProps({
   modelValue: { type: String, required: false },
@@ -18,15 +18,15 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 
-const forwardedProps = useForwardProps(delegatedProps);
+const forwardedProps = useForwardProps(delegatedProps)
 
-const { filterState } = useCommand();
+const { filterState } = useCommand()
 </script>
 
 <template>
@@ -39,7 +39,7 @@ const { filterState } = useCommand();
       :class="
         cn(
           'flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
-          props.class,
+          props.class
         )
       "
     />

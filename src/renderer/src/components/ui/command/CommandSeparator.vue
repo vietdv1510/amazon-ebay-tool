@@ -1,7 +1,7 @@
 <script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { Separator } from "reka-ui";
-import { cn } from '@/utils';
+import { reactiveOmit } from '@vueuse/core'
+import { Separator } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   orientation: { type: String, required: false },
@@ -11,18 +11,15 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>
-  <Separator
-    v-bind="delegatedProps"
-    :class="cn('-mx-1 h-px bg-border', props.class)"
-  >
+  <Separator v-bind="delegatedProps" :class="cn('-mx-1 h-px bg-border', props.class)">
     <slot />
   </Separator>
 </template>

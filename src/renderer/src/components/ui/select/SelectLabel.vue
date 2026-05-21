@@ -1,6 +1,6 @@
 <script setup>
-import { SelectLabel } from "reka-ui";
-import { cn } from '@/utils';
+import { SelectLabel } from 'reka-ui'
+import { cn } from '@/utils'
 
 const props = defineProps({
   for: { type: String, required: false },
@@ -9,9 +9,9 @@ const props = defineProps({
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
-    skipCheck: true,
-  },
-});
+    skipCheck: true
+  }
+})
 </script>
 
 <template>

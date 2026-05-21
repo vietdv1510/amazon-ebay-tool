@@ -1,5 +1,5 @@
 <script setup>
-import { AccordionRoot, useForwardPropsEmits } from "reka-ui";
+import { AccordionRoot, useForwardPropsEmits } from 'reka-ui'
 
 const props = defineProps({
   collapsible: { type: Boolean, required: false },
@@ -11,11 +11,11 @@ const props = defineProps({
   as: { type: null, required: false },
   type: { type: String, required: false },
   modelValue: { type: null, required: false },
-  defaultValue: { type: null, required: false },
-});
-const emits = defineEmits(["update:modelValue"]);
+  defaultValue: { type: null, required: false }
+})
+const emits = defineEmits(['update:modelValue'])
 
-const forwarded = useForwardPropsEmits(props, emits);
+const forwarded = useForwardPropsEmits(props, emits)
 </script>
 
 <template>
