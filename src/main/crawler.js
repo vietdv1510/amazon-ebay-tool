@@ -803,12 +803,10 @@ export async function crawlAmazon(asin, progressCb, options = {}) {
             const excludedAncestors = [
               '#aplusBrandStory_feature_div',
               '#brandStory_feature_div',
-              '[id*="BrandStory"]',
-              '[id*="brandStory"]',
-              '[id*="brand-story"]',
               '[class*="brand-story"]',
               '[cel_widget_id*="brandStory"]',
-              '[data-cel-widget*="brandStory"]'
+              '[data-cel-widget="aplusBrandStory"]',
+              '[data-cel-widget="brandStory"]'
             ].join(', ')
 
             const isBeforeBrandStory = (img) => {
