@@ -1003,7 +1003,13 @@ const buildDescription = (row) => {
   }
 
   if (row.description) {
-    parts.push(`<p style='margin-top:12px'>${escapeHtml(row.description.substring(0, 2000))}</p>`)
+    const desc = row.description.substring(0, 2000)
+    // If description already contains HTML tags (from AI Gen), render directly
+    if (/<[a-z][\s\S]*>/i.test(desc)) {
+      parts.push(`<div style='margin-top:12px'>${desc}</div>`)
+    } else {
+      parts.push(`<p style='margin-top:12px'>${escapeHtml(desc)}</p>`)
+    }
   }
 
   if (row.specs && Object.keys(row.specs).length > 0) {
