@@ -78,6 +78,7 @@ const api = {
     deleteSession: (id) => ipcRenderer.invoke('history:deleteSession', id),
     deleteProduct: (id, asin) => ipcRenderer.invoke('history:deleteProduct', id, asin),
     updateProduct: (id, asin, data) => ipcRenderer.invoke('history:updateProduct', id, asin, data),
+    updateSession: (id, products) => ipcRenderer.invoke('history:updateSession', id, products),
     renameSession: (id, name) => ipcRenderer.invoke('history:renameSession', id, name),
   }
 }

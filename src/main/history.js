@@ -154,6 +154,28 @@ export function updateProduct(sessionId, asin, updates) {
 }
 
 /**
+ * Update an entire session's products (for auto-save)
+ * @param {string} sessionId
+ * @param {Array} products - Full product array to replace
+ * @returns {{ ok: boolean }}
+ */
+export function updateSession(sessionId, products) {
+  try {
+    const filePath = join(getHistoryDir(), `${sessionId}.json`)
+    if (!existsSync(filePath)) return { ok: false, error: 'Session not found' }
+    const raw = readFileSync(filePath, 'utf-8')
+    const session = JSON.parse(raw)
+    session.products = products
+    session.productCount = products.length
+    writeFileSync(filePath, JSON.stringify(session, null, 2), 'utf-8')
+    return { ok: true }
+  } catch (err) {
+    console.error(`[History] Update session ${sessionId} failed:`, err)
+    return { ok: false, error: err.message }
+  }
+}
+
+/**
  * Rename a session
  * @param {string} sessionId
  * @param {string} newName

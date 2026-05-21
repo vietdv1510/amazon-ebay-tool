@@ -6,14 +6,6 @@
         <History class="w-5 h-5 mr-2.5 flex-shrink-0" />
         Lịch sử Crawl
       </div>
-      <div class="header-actions flex gap-2 items-center">
-        <Button v-if="currentView === 'detail'" size="sm" variant="outline" @click="backToList">
-          <ArrowLeft class="w-4 h-4 mr-1.5" /> Quay lại
-        </Button>
-        <Button v-if="currentView === 'detail'" size="sm" @click="loadSelectedToExport" :disabled="selectedAsins.size === 0">
-          <Upload class="w-4 h-4 mr-1.5" /> Load vào Export ({{ selectedAsins.size }})
-        </Button>
-      </div>
     </div>
 
     <div class="flex-1 overflow-hidden flex flex-col mx-4 mt-4 mb-0">
@@ -72,6 +64,7 @@
                   <span class="session-name" @dblclick="startRename(session)">
                     <Package class="w-4 h-4 text-primary mr-1.5 flex-shrink-0" />
                     {{ session.name }}
+                    <Pencil class="w-3 h-3 text-muted-foreground ml-1.5 edit-hint" />
                   </span>
                 </template>
               </div>
@@ -113,14 +106,17 @@
       <div v-else-if="currentView === 'detail' && activeSession" class="flex-1 overflow-hidden flex flex-col">
         <!-- Detail header -->
         <div class="flex items-center gap-3 mb-3 flex-shrink-0">
+          <Button size="sm" variant="outline" @click="backToList">
+            <ArrowLeft class="w-4 h-4 mr-1.5" /> Quay lại
+          </Button>
           <h3 class="font-semibold text-sm">{{ activeSession.name }}</h3>
           <Badge variant="outline" class="text-xs">{{ activeSession.products?.length || 0 }} sản phẩm</Badge>
           <div class="ml-auto flex gap-2">
-            <Button size="sm" variant="outline" @click="toggleSelectAllDetail">
-              {{ isAllDetailSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả' }}
-            </Button>
             <Button size="sm" variant="destructive" @click="deleteSelectedProducts" :disabled="selectedAsins.size === 0">
               <Trash2 class="w-3.5 h-3.5 mr-1" /> Xóa đã chọn ({{ selectedAsins.size }})
+            </Button>
+            <Button size="sm" @click="loadSelectedToExport" :disabled="selectedAsins.size === 0">
+              <Upload class="w-4 h-4 mr-1.5" /> Load vào Export ({{ selectedAsins.size }})
             </Button>
           </div>
         </div>
@@ -247,18 +243,41 @@
         </div>
       </div>
     </div>
+
+    <!-- Merge/Replace confirmation dialog -->
+    <div v-if="mergeConfirm" class="dialog-overlay" @click.self="mergeConfirm = null">
+      <div class="dialog-box">
+        <h4 class="font-semibold mb-2 flex items-center gap-2">
+          <Upload class="w-4 h-4 text-primary" />
+          Export đã có {{ rowData.length }} sản phẩm
+        </h4>
+        <p class="text-sm text-muted-foreground mb-1">
+          Bạn đang load thêm <strong>{{ mergeConfirm.products.length }}</strong> sản phẩm từ "<strong>{{ mergeConfirm.sessionName }}</strong>".
+        </p>
+        <p class="text-sm text-muted-foreground mb-4">Chọn cách xử lý:</p>
+        <div class="flex justify-end gap-2">
+          <Button size="sm" variant="outline" @click="mergeConfirm = null">Hủy</Button>
+          <Button size="sm" variant="destructive" @click="mergeAndNavigate(mergeConfirm.products, 'replace', mergeConfirm.sessionId)">
+            Thay thế tất cả
+          </Button>
+          <Button size="sm" @click="mergeAndNavigate(mergeConfirm.products, 'merge', mergeConfirm.sessionId)">
+            Gộp thêm vào
+          </Button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onActivated, nextTick } from 'vue'
 import { toast } from 'vue-sonner'
-import { globalRowData as rowData } from '../store'
+import { globalRowData as rowData, activeSessionId } from '../store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   History, ArrowLeft, Search, Package, Calendar, Layers, Eye,
-  Upload, Trash2, Loader2
+  Upload, Trash2, Loader2, Pencil
 } from 'lucide-vue-next'
 
 const emit = defineEmits(['navigate'])
@@ -340,37 +359,69 @@ const backToList = () => {
   loadSessions() // Refresh list
 }
 
-const loadSessionToExport = async (sessionId) => {
-  const data = await window.api.history.loadSession(sessionId)
-  if (!data?.products?.length) return toast.error('Session rỗng')
-  // Replace globalRowData with history products (set status DONE)
-  rowData.value = data.products.map(p => ({
+// ─── Merge confirm dialog ───────────────────────────────────────────────
+const mergeConfirm = ref(null) // { products: [], sessionName: string, sessionId: string|null }
+
+const mergeAndNavigate = async (newProducts, mode, sessionId) => {
+  const mapped = newProducts.map(p => ({
     ...p,
     id: p.asin,
     status: 'DONE',
     log: '✓ Loaded from history'
   }))
+
+  if (mode === 'replace') {
+    rowData.value = mapped
+    // Point auto-save to the source session
+    activeSessionId.value = sessionId || null
+  } else {
+    // Pause auto-save before mutating rowData to prevent watcher writing to old session
+    activeSessionId.value = null
+    // Merge: append only products whose ASIN is not already in rowData
+    const existingAsins = new Set(rowData.value.map(r => r.asin || r.id))
+    const toAdd = mapped.filter(p => !existingAsins.has(p.asin))
+    const skipped = mapped.length - toAdd.length
+    rowData.value = [...rowData.value, ...toAdd]
+    if (skipped > 0) {
+      toast.info(`Đã bỏ qua ${skipped} sản phẩm trùng ASIN`)
+    }
+    // Merged data = new snapshot, create a new session for auto-save
+    try {
+      const doneProducts = rowData.value.filter(r => r.status === 'DONE')
+      const res = await window.api.history.saveCurrent(JSON.parse(JSON.stringify(doneProducts)))
+      if (res?.ok) activeSessionId.value = res.sessionId
+    } catch (e) {
+      console.warn('[History] Failed to create merged session:', e)
+    }
+  }
+
   toast.success('Đã load vào Export', {
-    description: `${data.products.length} sản phẩm từ "${data.name}"`,
+    description: `${newProducts.length} sản phẩm${mode === 'merge' ? ' (gộp)' : ''}`,
     duration: 3000
   })
+  mergeConfirm.value = null
   emit('navigate', 'preview')
+}
+
+const loadProductsToExport = (products, sessionName, sessionId) => {
+  if (rowData.value.length > 0) {
+    // Show merge/replace dialog
+    mergeConfirm.value = { products, sessionName, sessionId }
+  } else {
+    mergeAndNavigate(products, 'replace', sessionId)
+  }
+}
+
+const loadSessionToExport = async (sessionId) => {
+  const data = await window.api.history.loadSession(sessionId)
+  if (!data?.products?.length) return toast.error('Session rỗng')
+  loadProductsToExport(data.products, data.name, sessionId)
 }
 
 const loadSelectedToExport = () => {
   if (!activeSession.value?.products?.length || selectedAsins.value.size === 0) return
   const selected = activeSession.value.products.filter(p => selectedAsins.value.has(p.asin))
-  rowData.value = selected.map(p => ({
-    ...p,
-    id: p.asin,
-    status: 'DONE',
-    log: '✓ Loaded from history'
-  }))
-  toast.success('Đã load vào Export', {
-    description: `${selected.length} sản phẩm đã chọn`,
-    duration: 3000
-  })
-  emit('navigate', 'preview')
+  loadProductsToExport(selected, `${selected.length} sản phẩm đã chọn`, activeSession.value.id)
 }
 
 // ─── Rename ─────────────────────────────────────────────────────────────
@@ -410,6 +461,10 @@ const executeDelete = async () => {
   if (!deleteConfirm.value) return
   if (deleteConfirm.value.type === 'session') {
     await window.api.history.deleteSession(deleteConfirm.value.sessionId)
+    // Clear activeSessionId if we just deleted the session tied to current rowData
+    if (activeSessionId.value === deleteConfirm.value.sessionId) {
+      activeSessionId.value = null
+    }
     toast.success('Đã xóa session')
     loadSessions()
   } else if (deleteConfirm.value.type === 'products' && activeSession.value) {
@@ -528,6 +583,13 @@ const formatDate = (iso) => {
 }
 .session-name:hover {
   color: hsl(var(--primary));
+}
+.edit-hint {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.session-name:hover .edit-hint {
+  opacity: 0.6;
 }
 
 .session-name-input {

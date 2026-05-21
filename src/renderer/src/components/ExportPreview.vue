@@ -588,6 +588,45 @@ const editingCell = ref(null) // { rowIdx, col }
 const editingValue = ref('')
 const editInputRef = ref(null)
 
+// Map CSV column names back to rowData field names for auto-save sync
+const CSV_TO_ROW_FIELD = {
+  '*Title': 'title',
+  '*Description': 'descriptionHtml',
+  '*StartPrice': 'sellPrice',
+  '*Quantity': null, // no direct map
+}
+
+const syncEditToRowData = (row, col, value) => {
+  // Only sync parent/single rows — child row fields belong to variations, not the parent product
+  if (row._rowType === 'child') return
+
+  // Find the source product in rowData by ASIN
+  const asin = row._productAsin
+  if (!asin) return
+  const source = rowData.value.find(r => r.asin === asin)
+  if (!source) return
+
+  // Check direct mapping first
+  const field = CSV_TO_ROW_FIELD[col]
+  if (field) {
+    source[field] = col === '*StartPrice' ? Number(value) || 0 : value
+    if (col === '*Description') source.description = value
+    return
+  }
+
+  // Handle aspect columns: C:Brand or *C:Brand → brand
+  if (col === 'C:Brand' || col === '*C:Brand') {
+    source.brand = value
+    return
+  }
+
+  // Handle ebay category
+  if (col === '*Category') {
+    source.ebayCategory = value
+    return
+  }
+}
+
 const startEdit = async (rowIdx, col, currentValue) => {
   // If editing another cell, commit it first
   if (editingCell.value && (editingCell.value.rowIdx !== rowIdx || editingCell.value.col !== col)) {
@@ -608,7 +647,10 @@ const commitEdit = (rowIdx, col) => {
   if (editingCell.value?.rowIdx === rowIdx && editingCell.value?.col === col) {
     let val = editingValue.value
     if (val !== undefined && val !== null) {
-      previewRows.value[rowIdx][col] = String(val).trim()
+      const trimmed = String(val).trim()
+      previewRows.value[rowIdx][col] = trimmed
+      // Sync back to rowData for auto-save
+      syncEditToRowData(previewRows.value[rowIdx], col, trimmed)
     }
     editingCell.value = null
   }

@@ -205,7 +205,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['stats-update'])
 
-import { globalRowData as rowData } from '../store'
+import { globalRowData as rowData, activeSessionId } from '../store'
 
 const isCrawling = ref(false)
 let stopRequested = false
@@ -435,6 +435,7 @@ const startCrawl = async () => {
     try {
       const result = await window.api.history.saveCurrent(JSON.parse(JSON.stringify(doneProducts)))
       if (result?.ok) {
+        activeSessionId.value = result.sessionId
         toast.success('Đã lưu lịch sử', {
           description: `${doneProducts.length} sản phẩm đã được lưu vào lịch sử crawl.`,
           duration: 3000
