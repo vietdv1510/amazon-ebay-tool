@@ -435,7 +435,13 @@ const getFormState = (source) => JSON.stringify({
   variations: source.variations || [],
 })
 
-const isDirty = computed(() => getFormState(props.row) !== getFormState(form))
+// Snapshot taken after onMounted auto-init completes (not from props.row directly)
+const initialSnapshot = ref('')
+
+const isDirty = computed(() => {
+  if (!initialSnapshot.value) return false // Still initializing
+  return initialSnapshot.value !== getFormState(form)
+})
 defineExpose({ isDirty })
 
 const handleClose = () => {
@@ -525,6 +531,8 @@ onMounted(async () => {
   } else {
     await autoSelectCategory()
   }
+  // Capture snapshot AFTER auto-init so isDirty only reflects user edits
+  initialSnapshot.value = getFormState(form)
 })
 
 const clearCategory = () => {
