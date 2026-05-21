@@ -509,11 +509,11 @@ const autoSelectCategory = async (doneRow) => {
   }
 
   try {
-    // Offline SQLite dùng LIKE match theo từng term → cần rút gọn query
-    // thay vì gửi full title (dễ bị AND-miss với 8+ terms)
-    const query = buildCategoryQuery(doneRow)
+    // Use full title — same query as DetailPanel.autoSelectCategory
+    // eBay API handles full titles well; offline SQLite fallback is only for API failure
+    const query = (doneRow.title || '').substring(0, 150).trim()
     if (!query || query.length < 3) {
-      console.warn('[AutoCategory] Skipping — query too short:', query, doneRow.asin)
+      console.warn('[AutoCategory] Skipping — title too short:', query, doneRow.asin)
       return
     }
     const res = await window.api.ebay.categorySuggestions(query)
